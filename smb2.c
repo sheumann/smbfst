@@ -9,64 +9,58 @@
 #include "endian.h"
 #include "smb2proto.h"
 
-static SMB2Header header;
-
 static const smb_u128 u128_zero = {0,0};
 
+static struct {
+    DirectTCPHeader directTCPHeader;
+    SMB2Header smb2header;
+    unsigned char body[12345];
+} msg;
+
+#define negotiateRequest (*(SMB2_NEGOTIATE_Request*)msg.body)
+
 void SyncMessage(Connection *connection, uint16_t command, uint32_t treeId,
-                 uint32_t length1, const void *part1,
-                 uint32_t length2, const void *part2) {
+                 uint32_t bodyLength) {
     Word tcperr;
 
-    header.ProtocolId = 0x424D53FE;
-    header.StructureSize = 64;
+    msg.smb2header.ProtocolId = 0x424D53FE;
+    msg.smb2header.StructureSize = 64;
     
     if (connection->Dialect = SMB_202) {
-        header.CreditCharge = 0;
+        msg.smb2header.CreditCharge = 0;
     } else {
         UNIMPLEMENTED
     }
     
     if (connection->Dialect <= SMB_21) {
-        header.Status = 0;
+        msg.smb2header.Status = 0;
     } else {
         UNIMPLEMENTED
     }
     
-    header.Command = command;
+    msg.smb2header.Command = command;
     
-    header.CreditRequest = 256; // TODO handle credits
+    msg.smb2header.CreditRequest = 256; // TODO handle credits
     
-    header.Flags = 0;
-    header.NextCommand = 0;
-    header.MessageId = connection->nextMessageId;
-    header.Reserved2 = 0;
-    header.TreeId = treeId;
-    header.SessionId = connection->sessionId;
-    header.Signature = u128_zero;
+    msg.smb2header.Flags = 0;
+    msg.smb2header.NextCommand = 0;
+    msg.smb2header.MessageId = connection->nextMessageId;
+    msg.smb2header.Reserved2 = 0;
+    msg.smb2header.TreeId = treeId;
+    msg.smb2header.SessionId = connection->sessionId;
+    msg.smb2header.Signature = u128_zero;
     
-    header.StreamProtocolLength =
-        hton32(sizeof(SMB2Header) - 4 + length1 + length2);
+    msg.directTCPHeader.StreamProtocolLength =
+        hton32(sizeof(SMB2Header) + bodyLength);
 
     tcperr =
-        TCPIPWriteTCP(connection->ipid, (void*)&header, sizeof(header), FALSE, FALSE);
+        TCPIPWriteTCP(connection->ipid, (void*)&msg,
+                      4 + sizeof(SMB2Header) + bodyLength, TRUE, FALSE);
     if (tcperr || toolerror()) {
         printf("tcperr=%d, toolerror()=%x\n", tcperr, toolerror());
         /* TODO handle error */
     }
 
-    tcperr =
-        TCPIPWriteTCP(connection->ipid, (void*)part1, length1, length2 != 0, FALSE);
-    if (tcperr || toolerror())
-        /* TODO handle error */ ;
-
-    if (length2 != 0) {
-        tcperr =
-            TCPIPWriteTCP(connection->ipid, (void*)part2, length2, TRUE, FALSE);
-        if (tcperr || toolerror())
-            /* TODO handle error */ ;
-    }
-    
     Long startTime = GetTick();
     do {
         TCPIPPoll();
@@ -74,20 +68,22 @@ void SyncMessage(Connection *connection, uint16_t command, uint32_t treeId,
 }
 
 void Negotiate(Connection *connection) {
-    static SMB2_NEGOTIATE_Request_Header header;
-    static const uint16_t Dialects[4] = {SMB_202};
-    
-    header.StructureSize = 36;
-    header.DialectCount = 1;
-    header.SecurityMode = 0;
-    header.Reserved = 0;
-    header.Capabilities = 0;
+    negotiateRequest.StructureSize = 36;
+    negotiateRequest.DialectCount = 1;
+    negotiateRequest.SecurityMode = 0;
+    negotiateRequest.Reserved = 0;
+    negotiateRequest.Capabilities = 0;
     
     // TODO generate real GUID
-    header.ClientGuid = (smb_u128){0xa248283946289746,0xac65879365873456};
+    negotiateRequest.ClientGuid = (smb_u128){0xa248283946289746,0xac65879365873456};
     
-    header.ClientStartTime = 0;
+    negotiateRequest.ClientStartTime = 0;
     
-    SyncMessage(connection, SMB2_NEGOTIATE, 0, sizeof(header), &header,
-        sizeof(Dialects), Dialects);
+    negotiateRequest.Dialects[0] = SMB_202;
+    negotiateRequest.Dialects[1] = 0;
+    negotiateRequest.Dialects[2] = 0;
+    negotiateRequest.Dialects[3] = 0;
+    
+    SyncMessage(connection, SMB2_NEGOTIATE, 0,
+        sizeof(negotiateRequest) + 4*sizeof(negotiateRequest.Dialects[0]));
 }

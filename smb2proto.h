@@ -7,12 +7,14 @@ typedef struct {
     uint64_t lo;
 } smb_u128;
 
-/* SMB2 message header (including transport header) */
+/* Direct TCP transport header */
 typedef struct {
-    /* Direct TCP transport header */
-    uint32_t StreamProtocolLength;      /* high-order byte must be 0 */
-    
-    /* SMB2 header (sync/async) */
+    uint32_t StreamProtocolLength; /* big-endian; high-order byte must be 0 */
+} DirectTCPHeader;
+
+/* SMB2 message header (sync/async) */
+typedef struct {
+    /* SMB2 header */
     uint32_t ProtocolId;
     uint16_t StructureSize;
     uint16_t CreditCharge;
@@ -41,7 +43,7 @@ typedef struct {
     uint64_t SessionId;
     smb_u128 Signature;
 } SMB2Header;
-_Static_assert(sizeof(SMB2Header) == 4+64, "");
+_Static_assert(sizeof(SMB2Header) == 64, "");
 
 /* SMB2 commands */
 #define SMB2_NEGOTIATE       0x0000
@@ -88,8 +90,9 @@ typedef struct {
         };
         uint64_t ClientStartTime;
     };
-} SMB2_NEGOTIATE_Request_Header;
-_Static_assert(sizeof(SMB2_NEGOTIATE_Request_Header) == 36, "");
+    uint16_t Dialects[];
+} SMB2_NEGOTIATE_Request;
+_Static_assert(sizeof(SMB2_NEGOTIATE_Request) == 36, "");
 
 /* SMB protocol dialects */
 #define SMB_202 0x0202

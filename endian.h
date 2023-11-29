@@ -7,3 +7,6 @@
 /* TODO assembly versions */
 #define hton16(x) hton16c(x)
 #define hton32(x) hton32c(x)
+
+#define ntoh16(x) hton16c(x)
+#define ntoh32(x) hton32c(x)

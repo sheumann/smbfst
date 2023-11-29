@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <tcpip.h>
 #include <orca.h>
 
@@ -8,47 +9,76 @@
 #include "connection.h"
 #include "endian.h"
 #include "smb2proto.h"
+#include "readtcp.h"
 
 static const smb_u128 u128_zero = {0,0};
 
 static struct {
     DirectTCPHeader directTCPHeader;
-    SMB2Header smb2header;
-    unsigned char body[12345];
+    SMB2Header smb2Header;
+    unsigned char body[32768];
 } msg;
 
 #define negotiateRequest (*(SMB2_NEGOTIATE_Request*)msg.body)
 
-void SyncMessage(Connection *connection, uint16_t command, uint32_t treeId,
-                 uint32_t bodyLength) {
+
+ReadStatus ReadMessage(Connection *connection) {
+    ReadStatus result;
+    uint32_t msgSize;
+    
+    result = ReadTCP(connection->ipid, 4, &msg.directTCPHeader);
+    if (result != rsDone)
+        return result;
+    
+    msgSize = ntoh32(msg.directTCPHeader.StreamProtocolLength);
+    if (msgSize > sizeof(SMB2Header) + sizeof(msg.body)) {
+        return rsError;
+    }
+    
+    result = ReadTCP(connection->ipid, msgSize, &msg.smb2Header);
+    if (result != rsDone)
+        return result;
+
+    // Check that it looks like an SMB2/3 message
+    
+    if (msgSize < sizeof(SMB2Header))
+        return rsError;
+    if (msg.smb2Header.ProtocolId != 0x424D53FE)
+        return rsError;
+    if (msg.smb2Header.StructureSize != 64)
+        return rsError;
+}
+
+bool SendMessage(Connection *connection, uint16_t command, uint32_t treeId,
+                 uint16_t bodyLength) {
     Word tcperr;
 
-    msg.smb2header.ProtocolId = 0x424D53FE;
-    msg.smb2header.StructureSize = 64;
+    msg.smb2Header.ProtocolId = 0x424D53FE;
+    msg.smb2Header.StructureSize = 64;
     
     if (connection->Dialect = SMB_202) {
-        msg.smb2header.CreditCharge = 0;
+        msg.smb2Header.CreditCharge = 0;
     } else {
         UNIMPLEMENTED
     }
     
     if (connection->Dialect <= SMB_21) {
-        msg.smb2header.Status = 0;
+        msg.smb2Header.Status = 0;
     } else {
         UNIMPLEMENTED
     }
     
-    msg.smb2header.Command = command;
+    msg.smb2Header.Command = command;
     
-    msg.smb2header.CreditRequest = 256; // TODO handle credits
+    msg.smb2Header.CreditRequest = 256; // TODO handle credits
     
-    msg.smb2header.Flags = 0;
-    msg.smb2header.NextCommand = 0;
-    msg.smb2header.MessageId = connection->nextMessageId;
-    msg.smb2header.Reserved2 = 0;
-    msg.smb2header.TreeId = treeId;
-    msg.smb2header.SessionId = connection->sessionId;
-    msg.smb2header.Signature = u128_zero;
+    msg.smb2Header.Flags = 0;
+    msg.smb2Header.NextCommand = 0;
+    msg.smb2Header.MessageId = connection->nextMessageId;
+    msg.smb2Header.Reserved2 = 0;
+    msg.smb2Header.TreeId = treeId;
+    msg.smb2Header.SessionId = connection->sessionId;
+    msg.smb2Header.Signature = u128_zero;
     
     msg.directTCPHeader.StreamProtocolLength =
         hton32(sizeof(SMB2Header) + bodyLength);
@@ -56,15 +86,25 @@ void SyncMessage(Connection *connection, uint16_t command, uint32_t treeId,
     tcperr =
         TCPIPWriteTCP(connection->ipid, (void*)&msg,
                       4 + sizeof(SMB2Header) + bodyLength, TRUE, FALSE);
-    if (tcperr || toolerror()) {
-        printf("tcperr=%d, toolerror()=%x\n", tcperr, toolerror());
-        /* TODO handle error */
-    }
+    return !(tcperr || toolerror());
+}
 
-    Long startTime = GetTick();
-    do {
-        TCPIPPoll();
-    } while (GetTick() - startTime < 5*60);
+ReadStatus SendMessageAndGetResponse(Connection *connection, uint16_t command,
+                                     uint32_t treeId, uint16_t bodyLength) {
+    uint64_t messageId = connection->nextMessageId;
+    if (SendMessage(connection, command, treeId, bodyLength) == false)
+        return rsError;
+
+    if (ReadMessage(connection) != rsDone)
+        return rsError;
+    
+    // Check that the message received is a response to the one sent.
+    if (!(msg.smb2Header.Flags & SMB2_FLAGS_SERVER_TO_REDIR))
+        return rsError;
+    if (msg.smb2Header.MessageId != messageId)
+        return rsError;
+
+    return rsDone;
 }
 
 void Negotiate(Connection *connection) {
@@ -84,6 +124,6 @@ void Negotiate(Connection *connection) {
     negotiateRequest.Dialects[2] = 0;
     negotiateRequest.Dialects[3] = 0;
     
-    SyncMessage(connection, SMB2_NEGOTIATE, 0,
+    SendMessageAndGetResponse(connection, SMB2_NEGOTIATE, 0,
         sizeof(negotiateRequest) + 4*sizeof(negotiateRequest.Dialects[0]));
 }

@@ -8,3 +8,8 @@
 #else
 #define UNIMPLEMENTED
 #endif
+
+/* Marinetti buffer types */
+#define buffTypePointer 0x0000
+#define buffTypeHandle 0x0001
+#define buffTypeNewHandle 0x0002

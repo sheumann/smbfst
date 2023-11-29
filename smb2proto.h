@@ -1,5 +1,7 @@
 #include <stdint.h>
 
+#include "ntstatus.h"
+
 #define SMB_PORT 445
 
 typedef struct {
@@ -65,6 +67,7 @@ _Static_assert(sizeof(SMB2Header) == 64, "");
 #define SMB2_QUERY_INFO      0x0010
 #define SMB2_SET_INFO        0x0011
 #define SMB2_OPLOCK_BREAK    0x0012
+#define SMB2 SERVER_TO_CLIENT_NOTIFICATION 0x0013
 
 /* SMB2 message flags */
 #define SMB2_FLAGS_SERVER_TO_REDIR    0x00000001
@@ -74,6 +77,13 @@ _Static_assert(sizeof(SMB2Header) == 64, "");
 #define SMB2_FLAGS_PRIORITY_MASK      0x00000070
 #define SMB2_FLAGS_DFS_OPERATIONS     0x10000000
 #define SMB2_FLAGS_REPLAY_OPERATION   0x20000000
+
+/* Common header field for the body part of all SMB2 messages */
+typedef struct {
+    uint16_t StructureSize;
+} SMB2_Common_Header;
+
+/* Individual message structures */
 
 typedef struct {
     uint16_t StructureSize;
@@ -100,3 +110,41 @@ _Static_assert(sizeof(SMB2_NEGOTIATE_Request) == 36, "");
 #define SMB_30  0x0300
 #define SMB_302 0x0302
 #define SMB_311 0x0311
+
+typedef struct {
+    uint16_t StructureSize;
+    uint16_t SecurityMode;
+    uint16_t DialectRevision;
+    union {
+        uint16_t NegotiateContextCount;
+        uint16_t Reserved;
+    };
+    smb_u128 ServerGuid;
+    uint32_t Capabilities;
+    uint32_t MaxTransactSize;
+    uint32_t MaxReadSize;
+    uint32_t MaxWriteSize;
+    uint64_t SystemTime;
+    uint64_t ServerStartTime;
+    uint16_t SecurityBufferOffset;
+    uint16_t SecurityBufferLength;
+    union {
+        uint32_t NegotiateContextOffset;
+        uint32_t Reserved2;
+    };
+    uint8_t Buffer[];
+} SMB2_NEGOTIATE_Response;
+_Static_assert(sizeof(SMB2_NEGOTIATE_Response) == 64, "");
+
+/* SecurityMode flags */
+#define SMB2_NEGOTIATE_SIGNING_ENABLED  0x0001
+#define SMB2_NEGOTIATE_SIGNING_REQUIRED 0x0002
+
+/* Capabilities flags */
+#define SMB2_GLOBAL_CAP_DFS                0x00000001
+#define SMB2_GLOBAL_CAP_LEASING            0x00000002
+#define SMB2_GLOBAL_CAP_LARGE_MTU          0x00000004
+#define SMB2_GLOBAL_CAP_MULTI_CHANNEL      0x00000008
+#define SMB2_GLOBAL_CAP_PERSISTENT_HANDLES 0x00000010
+#define SMB2_GLOBAL_CAP_DIRECTORY_LEASING  0x00000020
+#define SMB2_GLOBAL_CAP_ENCRYPTION         0x00000040

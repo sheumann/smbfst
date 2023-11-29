@@ -11,6 +11,51 @@
 #include "smb2proto.h"
 #include "readtcp.h"
 
+static const uint16_t requestStructureSizes[] = {
+    [SMB2_NEGOTIATE] = 36,
+    [SMB2_SESSION_SETUP] = 25,
+    [SMB2_LOGOFF] = 4,
+    [SMB2_TREE_CONNECT] = 9,
+    [SMB2_TREE_DISCONNECT] = 4,
+    [SMB2_CREATE] = 57,
+    [SMB2_CLOSE] = 24,
+    [SMB2_FLUSH] = 24,
+    [SMB2_READ] = 49,
+    [SMB2_WRITE] = 49,
+    [SMB2_LOCK] = 48,
+    [SMB2_IOCTL] = 57,
+    [SMB2_CANCEL] = 4,
+    [SMB2_ECHO] = 4,
+    [SMB2_QUERY_DIRECTORY] = 33,
+    [SMB2_CHANGE_NOTIFY] = 32,
+    [SMB2_QUERY_INFO] = 41,
+    [SMB2_SET_INFO] = 33,
+    [SMB2_OPLOCK_BREAK] = 24, /* for acknowledgment */
+};
+
+static const uint16_t responseStructureSizes[] = {
+    [SMB2_NEGOTIATE] = 65,
+    [SMB2_SESSION_SETUP] = 9,
+    [SMB2_LOGOFF] = 4,
+    [SMB2_TREE_CONNECT] = 16,
+    [SMB2_TREE_DISCONNECT] = 4,
+    [SMB2_CREATE] = 89,
+    [SMB2_CLOSE] = 60,
+    [SMB2_FLUSH] = 4,
+    [SMB2_READ] = 17,
+    [SMB2_WRITE] = 17,
+    [SMB2_LOCK] = 4,
+    [SMB2_IOCTL] = 49,
+    [SMB2_CANCEL] = 0, /* no response */
+    [SMB2_ECHO] = 4,
+    [SMB2_QUERY_DIRECTORY] = 9,
+    [SMB2_CHANGE_NOTIFY] = 9,
+    [SMB2_QUERY_INFO] = 9,
+    [SMB2_SET_INFO] = 2,
+    [SMB2_OPLOCK_BREAK] = 24,
+};
+
+
 static const smb_u128 u128_zero = {0,0};
 
 static struct {
@@ -19,8 +64,11 @@ static struct {
     unsigned char body[32768];
 } msg;
 
-#define negotiateRequest (*(SMB2_NEGOTIATE_Request*)msg.body)
+static uint16_t bodySize;   // size of last message received
 
+#define msgBodyHeader     (*(SMB2_Common_Header*)msg.body)
+#define negotiateRequest  (*(SMB2_NEGOTIATE_Request*)msg.body)
+#define negotiateResponse (*(SMB2_NEGOTIATE_Response*)msg.body)
 
 ReadStatus ReadMessage(Connection *connection) {
     ReadStatus result;
@@ -47,6 +95,10 @@ ReadStatus ReadMessage(Connection *connection) {
         return rsError;
     if (msg.smb2Header.StructureSize != 64)
         return rsError;
+    
+    bodySize = msgSize - sizeof(SMB2Header);
+    
+    return rsDone;
 }
 
 bool SendMessage(Connection *connection, uint16_t command, uint32_t treeId,
@@ -56,13 +108,13 @@ bool SendMessage(Connection *connection, uint16_t command, uint32_t treeId,
     msg.smb2Header.ProtocolId = 0x424D53FE;
     msg.smb2Header.StructureSize = 64;
     
-    if (connection->Dialect = SMB_202) {
+    if (connection->dialect == SMB_202) {
         msg.smb2Header.CreditCharge = 0;
     } else {
         UNIMPLEMENTED
     }
     
-    if (connection->Dialect <= SMB_21) {
+    if (connection->dialect <= SMB_21) {
         msg.smb2Header.Status = 0;
     } else {
         UNIMPLEMENTED
@@ -70,7 +122,7 @@ bool SendMessage(Connection *connection, uint16_t command, uint32_t treeId,
     
     msg.smb2Header.Command = command;
     
-    msg.smb2Header.CreditRequest = 256; // TODO handle credits
+    msg.smb2Header.CreditRequest = 1;
     
     msg.smb2Header.Flags = 0;
     msg.smb2Header.NextCommand = 0;
@@ -89,9 +141,12 @@ bool SendMessage(Connection *connection, uint16_t command, uint32_t treeId,
     return !(tcperr || toolerror());
 }
 
-ReadStatus SendMessageAndGetResponse(Connection *connection, uint16_t command,
+ReadStatus SendRequestAndGetResponse(Connection *connection, uint16_t command,
                                      uint32_t treeId, uint16_t bodyLength) {
     uint64_t messageId = connection->nextMessageId;
+    
+    msgBodyHeader.StructureSize = requestStructureSizes[command];
+    
     if (SendMessage(connection, command, treeId, bodyLength) == false)
         return rsError;
 
@@ -103,12 +158,28 @@ ReadStatus SendMessageAndGetResponse(Connection *connection, uint16_t command,
         return rsError;
     if (msg.smb2Header.MessageId != messageId)
         return rsError;
+    if (msg.smb2Header.Command != command)
+        return rsError;
+    
+    if (msg.smb2Header.Status != STATUS_SUCCESS) {
+        // TODO handle errors
+        return rsError;
+    }
+    
+    if (bodySize < responseStructureSizes[command])
+        return rsError;
+    if (msgBodyHeader.StructureSize != responseStructureSizes[command])
+        return rsError;
 
     return rsDone;
 }
 
 void Negotiate(Connection *connection) {
-    negotiateRequest.StructureSize = 36;
+    ReadStatus result;
+
+    // assume lowest version until we have negotiated
+    connection->dialect = SMB_202;
+
     negotiateRequest.DialectCount = 1;
     negotiateRequest.SecurityMode = 0;
     negotiateRequest.Reserved = 0;
@@ -124,6 +195,23 @@ void Negotiate(Connection *connection) {
     negotiateRequest.Dialects[2] = 0;
     negotiateRequest.Dialects[3] = 0;
     
-    SendMessageAndGetResponse(connection, SMB2_NEGOTIATE, 0,
+    result = SendRequestAndGetResponse(connection, SMB2_NEGOTIATE, 0,
         sizeof(negotiateRequest) + 4*sizeof(negotiateRequest.Dialects[0]));
+    if (result != rsDone) {
+        // TODO handle errors
+        return;
+    }
+    
+    connection->signingRequired =
+        negotiateResponse.SecurityMode & SMB2_NEGOTIATE_SIGNING_REQUIRED;
+        
+    if (negotiateResponse.DialectRevision != SMB_202) {
+        // TODO handle other dialects, and handle errors
+        return;
+    }
+    connection->dialect = negotiateResponse.DialectRevision;
+    
+    // TODO compute time difference based on negotiateResponse.SystemTime
+    
+    // Security buffer is currently ignored
 }

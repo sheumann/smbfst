@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <stdbool.h>
 #include <types.h>
 
 typedef struct {
@@ -6,7 +7,9 @@ typedef struct {
     
     uint64_t nextMessageId;
     
-    uint16_t Dialect;
+    uint16_t dialect;
+    
+    bool signingRequired;
     
     uint64_t sessionId; // TODO separate session structure?
 } Connection;

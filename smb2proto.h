@@ -2,6 +2,8 @@
 
 #include "ntstatus.h"
 
+#define SMB2_ASSERT_SIZE(type,size) _Static_assert(sizeof(type) == (size), "");
+
 #define SMB_PORT 445
 
 typedef struct {
@@ -45,7 +47,7 @@ typedef struct {
     uint64_t SessionId;
     smb_u128 Signature;
 } SMB2Header;
-_Static_assert(sizeof(SMB2Header) == 64, "");
+SMB2_ASSERT_SIZE(SMB2Header,64)
 
 /* SMB2 commands */
 #define SMB2_NEGOTIATE       0x0000
@@ -102,7 +104,7 @@ typedef struct {
     };
     uint16_t Dialects[];
 } SMB2_NEGOTIATE_Request;
-_Static_assert(sizeof(SMB2_NEGOTIATE_Request) == 36, "");
+SMB2_ASSERT_SIZE(SMB2_NEGOTIATE_Request,36)
 
 /* SMB protocol dialects */
 #define SMB_202 0x0202
@@ -132,9 +134,9 @@ typedef struct {
         uint32_t NegotiateContextOffset;
         uint32_t Reserved2;
     };
-    uint8_t Buffer[];
+    uint8_t  Buffer[];
 } SMB2_NEGOTIATE_Response;
-_Static_assert(sizeof(SMB2_NEGOTIATE_Response) == 64, "");
+SMB2_ASSERT_SIZE(SMB2_NEGOTIATE_Response,64)
 
 /* SecurityMode flags */
 #define SMB2_NEGOTIATE_SIGNING_ENABLED  0x0001
@@ -148,3 +150,16 @@ _Static_assert(sizeof(SMB2_NEGOTIATE_Response) == 64, "");
 #define SMB2_GLOBAL_CAP_PERSISTENT_HANDLES 0x00000010
 #define SMB2_GLOBAL_CAP_DIRECTORY_LEASING  0x00000020
 #define SMB2_GLOBAL_CAP_ENCRYPTION         0x00000040
+
+typedef struct {
+    uint16_t StructureSize;
+    uint8_t  Flags;
+    uint8_t  SecurityMode;
+    uint32_t Capabilities;
+    uint32_t Channel;
+    uint16_t SecurityBufferOffset;
+    uint16_t SecurityBufferLength;
+    uint64_t PreviousSessionId;
+    uint8_t  Buffer[];
+} SMB2_SESSION_SETUP_Request;
+SMB2_ASSERT_SIZE(SMB2_SESSION_SETUP_Request,24)

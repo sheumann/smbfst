@@ -10,6 +10,7 @@
 #include "endian.h"
 #include "smb2proto.h"
 #include "readtcp.h"
+#include "auth.h"
 
 static const uint16_t requestStructureSizes[] = {
     [SMB2_NEGOTIATE] = 36,
@@ -66,9 +67,12 @@ static struct {
 
 static uint16_t bodySize;   // size of last message received
 
-#define msgBodyHeader     (*(SMB2_Common_Header*)msg.body)
-#define negotiateRequest  (*(SMB2_NEGOTIATE_Request*)msg.body)
-#define negotiateResponse (*(SMB2_NEGOTIATE_Response*)msg.body)
+static ReadStatus result;   // result from last read
+
+#define msgBodyHeader       (*(SMB2_Common_Header*)msg.body)
+#define negotiateRequest    (*(SMB2_NEGOTIATE_Request*)msg.body)
+#define negotiateResponse   (*(SMB2_NEGOTIATE_Response*)msg.body)
+#define sessionSetupRequest (*(SMB2_SESSION_SETUP_Request*)msg.body)
 
 ReadStatus ReadMessage(Connection *connection) {
     ReadStatus result;
@@ -175,8 +179,6 @@ ReadStatus SendRequestAndGetResponse(Connection *connection, uint16_t command,
 }
 
 void Negotiate(Connection *connection) {
-    ReadStatus result;
-
     // assume lowest version until we have negotiated
     connection->dialect = SMB_202;
 
@@ -214,4 +216,24 @@ void Negotiate(Connection *connection) {
     // TODO compute time difference based on negotiateResponse.SystemTime
     
     // Security buffer is currently ignored
+}
+
+void SessionSetup(Connection *connection) {
+    static AuthState authState;
+    static size_t authSize;
+
+    sessionSetupRequest.Flags = 0;
+    sessionSetupRequest.SecurityMode = 0;
+    sessionSetupRequest.Capabilities = 0;
+    sessionSetupRequest.Channel = 0;
+    sessionSetupRequest.SecurityBufferOffset = 
+        sizeof(SMB2Header) + sizeof(SMB2_SESSION_SETUP_Request);
+    
+    InitAuth(&authState);
+    authSize = DoAuthStep(&authState, NULL, sessionSetupRequest.Buffer);
+    
+    sessionSetupRequest.SecurityBufferLength = authSize;
+    
+    result = SendRequestAndGetResponse(connection, SMB2_SESSION_SETUP, 0,
+        sizeof(sessionSetupRequest) + authSize);
 }

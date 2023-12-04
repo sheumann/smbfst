@@ -65,6 +65,8 @@ int main(int argc, char *argv[]) {
         
         Negotiate(&connection);
         
+        SessionSetup(&connection);
+        
         puts("ending");
         
 connect_error:

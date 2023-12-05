@@ -3,6 +3,7 @@
 
 typedef enum {
     rsDone,
+    rsMoreProcessingRequired,
     rsError,
     rsTimedOut
 } ReadStatus;

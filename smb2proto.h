@@ -163,3 +163,12 @@ typedef struct {
     uint8_t  Buffer[];
 } SMB2_SESSION_SETUP_Request;
 SMB2_ASSERT_SIZE(SMB2_SESSION_SETUP_Request,24)
+
+typedef struct {
+    uint16_t StructureSize;
+    uint16_t SessionFlags;
+    uint16_t SecurityBufferOffset;
+    uint16_t SecurityBufferLength;
+    uint8_t  Buffer[];
+} SMB2_SESSION_SETUP_Response;
+

@@ -1,3 +1,5 @@
+#include <stdint.h>
+
 typedef struct {
     unsigned step;
     unsigned char *negotiateMessage;
@@ -8,4 +10,4 @@ typedef struct {
 void InitAuth(AuthState *state);
 
 size_t DoAuthStep(AuthState *state, const unsigned char *previousMsg,
-                  unsigned char *msgBuf);
+                  uint16_t previousSize, unsigned char *msgBuf);

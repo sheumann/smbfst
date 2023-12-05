@@ -2,6 +2,7 @@
 #include <tcpip.h>
 #include <orca.h>
 
+/* for debugging only */
 #include <misctool.h>
 #include <stdio.h>
 
@@ -69,10 +70,20 @@ static uint16_t bodySize;   // size of last message received
 
 static ReadStatus result;   // result from last read
 
-#define msgBodyHeader       (*(SMB2_Common_Header*)msg.body)
-#define negotiateRequest    (*(SMB2_NEGOTIATE_Request*)msg.body)
-#define negotiateResponse   (*(SMB2_NEGOTIATE_Response*)msg.body)
-#define sessionSetupRequest (*(SMB2_SESSION_SETUP_Request*)msg.body)
+#define msgBodyHeader        (*(SMB2_Common_Header*)msg.body)
+#define negotiateRequest     (*(SMB2_NEGOTIATE_Request*)msg.body)
+#define negotiateResponse    (*(SMB2_NEGOTIATE_Response*)msg.body)
+#define sessionSetupRequest  (*(SMB2_SESSION_SETUP_Request*)msg.body)
+#define sessionSetupResponse (*(SMB2_SESSION_SETUP_Response*)msg.body)
+
+/*
+ * Verify that a offset/length pair specifying a buffer within the last
+ * message received actually refer to locations within that message.
+ *
+ * Note: argument values should be uint16_t, not 32-bit or larger.
+ */
+#define VerifyBuffer(offset,length) \
+    ((uint32_t)(offset) + (length) <= bodySize + sizeof(SMB2Header))
 
 ReadStatus ReadMessage(Connection *connection) {
     ReadStatus result;
@@ -165,17 +176,19 @@ ReadStatus SendRequestAndGetResponse(Connection *connection, uint16_t command,
     if (msg.smb2Header.Command != command)
         return rsError;
     
-    if (msg.smb2Header.Status != STATUS_SUCCESS) {
-        // TODO handle errors
-        return rsError;
-    }
-    
     if (bodySize < responseStructureSizes[command])
         return rsError;
     if (msgBodyHeader.StructureSize != responseStructureSizes[command])
         return rsError;
 
-    return rsDone;
+    if (msg.smb2Header.Status == STATUS_SUCCESS) {
+        return rsDone;
+    } else if (msg.smb2Header.Status == STATUS_MORE_PROCESSING_REQUIRED) {
+        return rsMoreProcessingRequired;
+    } else {
+        // TODO handle errors
+        return rsError;
+    }
 }
 
 void Negotiate(Connection *connection) {
@@ -221,6 +234,8 @@ void Negotiate(Connection *connection) {
 void SessionSetup(Connection *connection) {
     static AuthState authState;
     static size_t authSize;
+    static unsigned char *previousAuthMsg;
+    static size_t previousAuthSize;
 
     sessionSetupRequest.Flags = 0;
     sessionSetupRequest.SecurityMode = 0;
@@ -230,10 +245,44 @@ void SessionSetup(Connection *connection) {
         sizeof(SMB2Header) + sizeof(SMB2_SESSION_SETUP_Request);
     
     InitAuth(&authState);
-    authSize = DoAuthStep(&authState, NULL, sessionSetupRequest.Buffer);
+    previousAuthMsg = NULL;
+    previousAuthSize = 0;
+
+    while (1) {
+        authSize = DoAuthStep(&authState, previousAuthMsg,
+            previousAuthSize, sessionSetupRequest.Buffer);
+        if (authSize == (size_t)-1) {
+            // TODO handle errors
+            break;
+        }
     
-    sessionSetupRequest.SecurityBufferLength = authSize;
+        sessionSetupRequest.SecurityBufferLength = authSize;
     
-    result = SendRequestAndGetResponse(connection, SMB2_SESSION_SETUP, 0,
-        sizeof(sessionSetupRequest) + authSize);
+        result = SendRequestAndGetResponse(connection, SMB2_SESSION_SETUP, 0,
+            sizeof(sessionSetupRequest) + authSize);
+        
+        if (result == rsDone) {
+            return;
+        } else if (result != rsMoreProcessingRequired) {
+            // TODO handle errors
+            return;
+        }
+
+        if (!VerifyBuffer(
+            sessionSetupResponse.SecurityBufferOffset,
+            sessionSetupResponse.SecurityBufferLength)) {
+            // TODO handle errors
+            
+            printf("Security Buffer Offset = %u, SecurityBuffer Length = %u, exceeds body size of %u\n",
+            sessionSetupResponse.SecurityBufferOffset,
+            sessionSetupResponse.SecurityBufferLength,
+            bodySize
+            );
+            return;
+            }
+        
+        previousAuthMsg = (unsigned char *)&msg.smb2Header + 
+            sessionSetupResponse.SecurityBufferOffset;
+        previousAuthSize = sessionSetupResponse.SecurityBufferLength;
+    };
 }

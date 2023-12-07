@@ -141,7 +141,7 @@ bool SendMessage(Connection *connection, uint16_t command, uint32_t treeId,
     
     msg.smb2Header.Flags = 0;
     msg.smb2Header.NextCommand = 0;
-    msg.smb2Header.MessageId = connection->nextMessageId;
+    msg.smb2Header.MessageId = connection->nextMessageId++;
     msg.smb2Header.Reserved2 = 0;
     msg.smb2Header.TreeId = treeId;
     msg.smb2Header.SessionId = connection->sessionId;

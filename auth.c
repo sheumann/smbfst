@@ -54,6 +54,16 @@ length_t GetX690Length(const unsigned char **bufPtrPtr,
     return length;
 }
 
+void WriteX690Length(unsigned char **bufPtrPtr, uint16_t val) {
+    if (val < 128) {
+        *(*bufPtrPtr)++ = val;
+    } else {
+        *(*bufPtrPtr)++ = 0x82;
+        *(*bufPtrPtr)++ = val >> 8;
+        *(*bufPtrPtr)++ = val & 0xFF;
+    }
+}
+
 /*
  * Do one step of an authentication exchange.
  *
@@ -69,6 +79,7 @@ size_t DoAuthStep(AuthState *state, const unsigned char *previousMsg,
     unsigned char *msgPtr = msgBuf;
     unsigned char *prevMsgPtr;
     size_t itemSize;
+    unsigned char *authMsgPtr;
 
     switch (state->step++) {
     case 0:
@@ -118,8 +129,8 @@ size_t DoAuthStep(AuthState *state, const unsigned char *previousMsg,
             sizeof(NTLM_CHALLENGE_MESSAGE))
             return (size_t)-1;
         
-        /* expect constructed encoding and get size */
-        if ((*prevMsgPtr++ & 0xF0) != 0xA0)
+        /* expect constructed [1] encoding and get size */
+        if (*prevMsgPtr++ != 0xA1)
             return (size_t)-1;
         itemSize = GetX690Length(&prevMsgPtr, previousMsg + previousSize);
         if (itemSize == 0)
@@ -162,8 +173,32 @@ size_t DoAuthStep(AuthState *state, const unsigned char *previousMsg,
         if (itemSize == 0)
             return (size_t)-1; //invalid size
 
-        NTLM_HandleChallenge((NTLM_CHALLENGE_MESSAGE *)prevMsgPtr, itemSize);
-        return (size_t)-1; //TODO
+        /* Get NTLM AUTHENTICATE_MESSAGE */
+        authMsgPtr = NTLM_HandleChallenge((NTLM_CHALLENGE_MESSAGE *)prevMsgPtr,
+            itemSize, &itemSize);
+        if (authMsgPtr == NULL)
+            return (size_t)-1;
+        
+        // This ensures sizes are multi-byte
+        // TODO handle more elegantly, making sure not to read beyond buffer
+        if (itemSize < 256)
+            itemSize = 256;
+        
+        *msgPtr++ = 0xA1; // constructed [1] (negTokenResp)
+        WriteX690Length(&msgPtr, itemSize+12);
+        *msgPtr++ = 0x30; // sequence
+        WriteX690Length(&msgPtr, itemSize+8);
+
+        /* responseToken */
+        *msgPtr++ = 0xA2; // constructed [2]
+        WriteX690Length(&msgPtr, itemSize+4);
+        *msgPtr++ = 0x04; // OCTET STRING
+        WriteX690Length(&msgPtr, itemSize);
+        
+        memcpy(msgPtr, authMsgPtr, itemSize);
+        msgPtr += itemSize;
+        
+        return msgPtr - msgBuf;
         
     default:
         return (size_t)-1;

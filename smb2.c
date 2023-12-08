@@ -236,13 +236,6 @@ void SessionSetup(Connection *connection) {
     static size_t authSize;
     static unsigned char *previousAuthMsg;
     static size_t previousAuthSize;
-
-    sessionSetupRequest.Flags = 0;
-    sessionSetupRequest.SecurityMode = 0;
-    sessionSetupRequest.Capabilities = 0;
-    sessionSetupRequest.Channel = 0;
-    sessionSetupRequest.SecurityBufferOffset = 
-        sizeof(SMB2Header) + sizeof(SMB2_SESSION_SETUP_Request);
     
     InitAuth(&authState);
     previousAuthMsg = NULL;
@@ -255,8 +248,15 @@ void SessionSetup(Connection *connection) {
             // TODO handle errors
             break;
         }
-    
+
+        sessionSetupRequest.Flags = 0;
+        sessionSetupRequest.SecurityMode = 0;
+        sessionSetupRequest.Capabilities = 0;
+        sessionSetupRequest.Channel = 0;
+        sessionSetupRequest.SecurityBufferOffset = 
+            sizeof(SMB2Header) + sizeof(SMB2_SESSION_SETUP_Request);
         sessionSetupRequest.SecurityBufferLength = authSize;
+        sessionSetupRequest.PreviousSessionId = 0;
     
         result = SendRequestAndGetResponse(connection, SMB2_SESSION_SETUP, 0,
             sizeof(sessionSetupRequest) + authSize);
@@ -274,12 +274,13 @@ void SessionSetup(Connection *connection) {
             // TODO handle errors
             
             printf("Security Buffer Offset = %u, SecurityBuffer Length = %u, exceeds body size of %u\n",
-            sessionSetupResponse.SecurityBufferOffset,
-            sessionSetupResponse.SecurityBufferLength,
-            bodySize
-            );
+                sessionSetupResponse.SecurityBufferOffset,
+                sessionSetupResponse.SecurityBufferLength,
+                bodySize);
             return;
-            }
+        }
+        
+        connection->sessionId = msg.smb2Header.SessionId;
         
         previousAuthMsg = (unsigned char *)&msg.smb2Header + 
             sessionSetupResponse.SecurityBufferOffset;

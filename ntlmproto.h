@@ -53,7 +53,7 @@ typedef struct {
     NTLM_SUBFIELD DomainNameFields;
     NTLM_SUBFIELD UserNameFields;
     NTLM_SUBFIELD WorkstationNameFields;
-    NTLM_SUBFIELD EncryptedRandomSessionFields;
+    NTLM_SUBFIELD EncryptedRandomSessionKeyFields;
     uint32_t NegotiateFlags;
     NTLM_VERSION Version;
     uint8_t  MIC[16];
@@ -102,22 +102,32 @@ NTLM_ASSERT_SIZE(NTLMv2_RESPONSE,16)
 #define NtLmChallenge    2
 #define NtLmAuthenticate 3
 
-/*
-Mac sends:
-NTLMSSP_NEGOTIATE_KEY_EXCH -- do key exchange
-NTLMSSP_NEGOTIATE_128 -- 128-bit session key negotiation
-NTLMSSP_NEGOTIATE_VERSION -- request version info
-NTLMSSP_NEGOTIATE_TARGET_INFO -- (request?) target info in challenge
-*NTLMSSP_NEGOTIATE_EXTENDED_SESSIONSECURITY -- use NTLM v2 session security
-*NTLMSSP_NEGOTIATE_ALWAYS_SIGN -- always negotiate session key
-*NTLMSSP_NEGOTIATE_NTLM -- use (at least?) NTLM v1 session security
-NTLMSSP_NEGOTIATE_SIGN -- negotiate session key for message signatures
-*NTLMSSP_REQUEST_TARGET -- require target name in challenge
-*NTLMSSP_NEGOTIATE_UNICODE -- request Unicode encoding
-(* = specified to be used per [MS-NLMP] sec. 3.1.5.1.1)
+typedef struct {
+    uint8_t  RespType;
+    uint8_t  HiRespType;
+    uint16_t Reserved1;
+    uint32_t Reserved2;
+    uint64_t TimeStamp;
+    uint64_t ChallengeFromClient;
+    uint32_t Reserved3;
+    uint8_t  AvPairs[];
+} NTLMv2_CLIENT_CHALLENGE;
 
-no domain name
-no workstation name
-version 6.1
-*/
+typedef struct {
+    uint16_t AvId;
+    uint16_t AvLen;
+    uint8_t  Value[];
+} AV_PAIR;
 
+/* AvId values */
+#define MsvAvEOL             0x0000
+#define MsvAvNbComputerName  0x0001
+#define MsvAvNbDomainName    0x0002
+#define MsvAvDnsComputerName 0x0003
+#define MsvAvDnsDomainName   0x0004
+#define MsvAvDnsTreeName     0x0005
+#define MsvAvFlags           0x0006
+#define MsvAvTimestamp       0x0007
+#define MsvAvSingleHost      0x0008
+#define MsvAvTargetName      0x0009
+#define MsvAvChannelBindings 0x000A

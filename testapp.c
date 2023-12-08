@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <stddef.h>
+#include <string.h>
+#include <ctype.h>
 #include <orca.h>
 
 #include <tcpip.h>
@@ -10,6 +12,7 @@
 #include "smb2proto.h"
 #include "connection.h"
 #include "smb2.h"
+#include "authinfo.h"
 
 #define TIMEOUT 15 /* seconds */
 
@@ -20,10 +23,39 @@ int main(int argc, char *argv[]) {
         srBuff status;
         Long startTime;
         Connection connection = {0};
+        int i;
+        size_t len;
         
-        if (argc < 2) {
+        if (argc < 4) {
             puts("Too few arguments");
             goto args_error;
+        }
+
+        len = strlen(argv[2]);
+        if (len > 100)
+            len = 100;
+        for (i = 0; i < len; i++) {
+            user[i] = argv[2][i];
+            userUpperCase[i] = toupper(argv[2][i]);
+        }
+        userSize = len*2;
+
+        len = strlen(argv[3]);
+        if (len > 100)
+            len = 100;
+        for (i = 0; i < len; i++) {
+            password[i] = argv[3][i];
+        }
+        passwordSize = len*2;
+        
+        if (argc >= 5) {
+            len = strlen(argv[4]);
+            if (len > 100)
+                len = 100;
+            for (i = 0; i < len; i++) {
+                userDomain[i] = argv[4][i];
+            }
+            userDomainSize = len*2;
         }
 
         LoadOneTool(54, 0x200);

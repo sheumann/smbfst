@@ -10,6 +10,24 @@
 #include "ntlm.h"
 #include "authinfo.h"
 
+static const NTLM_NEGOTIATE_MESSAGE negotiateMessage = {
+    .Signature = "NTLMSSP",
+    .MessageType = NtLmNegotiate,
+    .NegotiateFlags = 
+        NTLMSSP_NEGOTIATE_KEY_EXCH +
+        NTLMSSP_NEGOTIATE_128 +
+        NTLMSSP_NEGOTIATE_TARGET_INFO +
+        NTLMSSP_NEGOTIATE_EXTENDED_SESSIONSECURITY +
+        NTLMSSP_NEGOTIATE_ALWAYS_SIGN +
+        NTLMSSP_NEGOTIATE_NTLM +
+        NTLMSSP_NEGOTIATE_SIGN +
+        NTLMSSP_REQUEST_TARGET +
+        NTLMSSP_NEGOTIATE_UNICODE,
+    .DomainNameFields = {0,0,0},
+    .WorkstationFields = {0,0,0},
+    .Version = {0},
+};
+
 /*
  * Compute NT one-way function v2 for given user, user domain, and password
  *
@@ -38,23 +56,6 @@ void NTOWFv2(uint16_t passwordSize, char16_t password[],
 }
 
 void NTLM_GetNegotiateMessage(unsigned char *buf) {
-    static NTLM_NEGOTIATE_MESSAGE negotiateMessage = {
-        .Signature = "NTLMSSP",
-        .MessageType = NtLmNegotiate,
-        .NegotiateFlags = 
-            NTLMSSP_NEGOTIATE_KEY_EXCH +
-            NTLMSSP_NEGOTIATE_128 +
-            NTLMSSP_NEGOTIATE_TARGET_INFO +
-            NTLMSSP_NEGOTIATE_EXTENDED_SESSIONSECURITY +
-            NTLMSSP_NEGOTIATE_ALWAYS_SIGN +
-            NTLMSSP_NEGOTIATE_NTLM +
-            NTLMSSP_NEGOTIATE_SIGN +
-            NTLMSSP_REQUEST_TARGET +
-            NTLMSSP_NEGOTIATE_UNICODE,
-        .DomainNameFields = {0,0,0},
-        .WorkstationFields = {0,0,0},
-        .Version = {0},
-    };
 
     memcpy(buf, &negotiateMessage, sizeof(negotiateMessage));
 }
@@ -104,11 +105,12 @@ unsigned char *NTLM_HandleChallenge(const NTLM_CHALLENGE_MESSAGE *challengeMsg,
     static unsigned char responseKeyNT[16];
     static unsigned char ntProofStr[16];
     static unsigned char sessionBaseKey[16];
-    static unsigned char exportedSessionKey[16];
+    static unsigned char encryptedRandomSessionKey[16];
+    unsigned char *payloadPtr;
     
     // Nonce used for session key generation
     // TODO generate a random number for this
-    static unsigned char nonce[16] = 
+    static unsigned char exportedSessionKey[16] = 
         {13,123,123,4,3,242,234,23,123,13,31,45,34,143,234,171};
     
     struct hmac_md5_context hmac_md5_context;
@@ -147,14 +149,30 @@ unsigned char *NTLM_HandleChallenge(const NTLM_CHALLENGE_MESSAGE *challengeMsg,
     static uint64_t clientChallenge = 0x5e4cabd35234cd45;
     memcpy(tempBuf+16, &clientChallenge, 8);
 
+    payloadPtr = tempBuf + 28;
+
+    if (infoPtr != NULL) {
+        if (NTLM_GetTargetInfo(challengeMsg, challengeSize, MsvAvFlags,
+            &infoSize) == NULL) {
+            ((AV_PAIR*)payloadPtr)->AvId = MsvAvFlags;
+            ((AV_PAIR*)payloadPtr)->AvLen = 4;
+            payloadPtr += 4;
+            *(uint32_t*)payloadPtr = 0x00000002; // auth message includes MIC
+            payloadPtr += 4;
+        } else {
+            // TODO should update existing flags.
+        }
+    }
+
     // TODO Validate that locations specified are within input buffer
     //      and do not overflow output buffer
     // TODO Adjust target info as specified in [MS-NLMP] (end of sec. 3.1.5.1.2)
-    memcpy(tempBuf+28, (const unsigned char *)challengeMsg
+    memcpy(payloadPtr, (const unsigned char *)challengeMsg
         + challengeMsg->TargetInfoFields.BufferOffset,
         challengeMsg->TargetInfoFields.Len);
+    payloadPtr += challengeMsg->TargetInfoFields.Len;
 
-    tempBufSize = 28 + challengeMsg->TargetInfoFields.Len + 4;
+    tempBufSize = payloadPtr - tempBuf + 4;
 
     /* Compute NTProofStr */
     hmac_md5_init(&hmac_md5_context, responseKeyNT, sizeof(responseKeyNT));
@@ -169,9 +187,10 @@ unsigned char *NTLM_HandleChallenge(const NTLM_CHALLENGE_MESSAGE *challengeMsg,
     hmac_md5_compute(&hmac_md5_context, ntProofStr, sizeof(ntProofStr));
     memcpy(sessionBaseKey, hmac_md5_context.u[0].ctx.hash, 16);
 
-    /* Compute ExportedSessionKey */
+    /* Compute EncryptedRandomSessionKey */
     rc4_init(&rc4_context, sessionBaseKey, sizeof(sessionBaseKey));
-    rc4_process(&rc4_context, nonce, exportedSessionKey, 16);
+    rc4_process(&rc4_context, exportedSessionKey, encryptedRandomSessionKey,
+        16);
 
     /* Generate NTLM authenticate message */
 
@@ -179,7 +198,7 @@ unsigned char *NTLM_HandleChallenge(const NTLM_CHALLENGE_MESSAGE *challengeMsg,
     memcpy(authMsg.Signature, "NTLMSSP", 8);
     authMsg.MessageType = NtLmAuthenticate;
     
-    unsigned char *payloadPtr = authMsg.Payload;
+    payloadPtr = authMsg.Payload;
     
     // Send 24 zero bytes as LmChallengeResponse
     authMsg.LmChallengeResponseFields.Len =
@@ -225,7 +244,7 @@ unsigned char *NTLM_HandleChallenge(const NTLM_CHALLENGE_MESSAGE *challengeMsg,
         authMsg.EncryptedRandomSessionKeyFields.MaxLen = 16;
     authMsg.EncryptedRandomSessionKeyFields.BufferOffset =
         payloadPtr - (unsigned char*)&authMsg;
-    memcpy(payloadPtr, exportedSessionKey, 16);
+    memcpy(payloadPtr, encryptedRandomSessionKey, 16);
     payloadPtr += 16;
     
     //authMsg.NegotiateFlags = challengeMsg->NegotiateFlags;
@@ -245,10 +264,20 @@ unsigned char *NTLM_HandleChallenge(const NTLM_CHALLENGE_MESSAGE *challengeMsg,
     authMsg.Version.ProductMajorVersion = 6;
     authMsg.Version.ProductBuild = 1;
     authMsg.Version.NTLMRevisionCurrent = NTLMSSP_REVISION_W2K3;
-    
-    // set authMsg.MIC
 
     *resultSize = payloadPtr - (unsigned char*)&authMsg;
+
+    // set authMsg.MIC
+    hmac_md5_init(&hmac_md5_context, exportedSessionKey,
+        sizeof(exportedSessionKey));
+    hmac_md5_update(&hmac_md5_context, (const void *)&negotiateMessage,
+        sizeof(negotiateMessage));
+    hmac_md5_update(&hmac_md5_context, (const void *)challengeMsg,
+        challengeSize);
+    hmac_md5_update(&hmac_md5_context, (const void *)&authMsg, *resultSize);
+    hmac_md5_finalize(&hmac_md5_context);
+    memcpy(authMsg.MIC, hmac_md5_context.u[0].ctx.hash, 16);
+
     return (unsigned char *)&authMsg;
 }
 

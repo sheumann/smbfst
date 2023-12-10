@@ -131,3 +131,10 @@ typedef struct {
 #define MsvAvSingleHost      0x0008
 #define MsvAvTargetName      0x0009
 #define MsvAvChannelBindings 0x000A
+
+/* NTLMSSP_MESSAGE_SIGNATURE for Extended Session Security */
+typedef struct {
+    uint32_t Version;
+    uint64_t Checksum;
+    uint32_t SeqNum;
+} NTLMSSP_MESSAGE_SIGNATURE_Extended;

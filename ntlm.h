@@ -1,6 +1,17 @@
 #include "ntlmproto.h"
 
-void NTLM_GetNegotiateMessage(unsigned char *buf);
+typedef struct {
+    unsigned char signkey[16];
+    unsigned char sealkey[16];
+} NTLM_Context;
 
-unsigned char *NTLM_HandleChallenge(const NTLM_CHALLENGE_MESSAGE *challengeMsg,
-                            uint16_t challengeSize, size_t *resultSize);
+
+void NTLM_GetNegotiateMessage(NTLM_Context *ctx, unsigned char *buf);
+
+unsigned char *NTLM_HandleChallenge(NTLM_Context *ctx,
+                                    const NTLM_CHALLENGE_MESSAGE *challengeMsg,
+                                    uint16_t challengeSize, size_t *resultSize);
+
+unsigned char *NTLM_GetMechListMIC(NTLM_Context *ctx,
+                                   const unsigned char *mechList,
+                                   uint16_t mechListSize, size_t *resultSize);

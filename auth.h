@@ -1,10 +1,16 @@
 #include <stdint.h>
 
+/* This size must be sufficient to hold any mechList we may produce. */
+#define MAX_MECHLIST_SIZE 100
+
 typedef struct {
     unsigned step;
     unsigned char *negotiateMessage;
     unsigned char *challengeMessage;
     unsigned char *authenticateMessage;
+
+    uint8_t mechList[MAX_MECHLIST_SIZE];
+    uint16_t mechListSize;
 } AuthState;
 
 void InitAuth(AuthState *state);

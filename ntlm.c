@@ -9,6 +9,7 @@
 
 #include "ntlm.h"
 #include "authinfo.h"
+#include "auth.h"
 
 static const NTLM_NEGOTIATE_MESSAGE negotiateMessage = {
     .Signature = "NTLMSSP",
@@ -55,7 +56,7 @@ void NTOWFv2(uint16_t passwordSize, char16_t password[],
     memcpy(result, hmac_md5_context.u[0].ctx.hash, 16);
 }
 
-void NTLM_GetNegotiateMessage(unsigned char *buf) {
+void NTLM_GetNegotiateMessage(NTLM_Context *ctx, unsigned char *buf) {
 
     memcpy(buf, &negotiateMessage, sizeof(negotiateMessage));
 }
@@ -96,8 +97,36 @@ not_found:
     return NULL;
 }
 
-unsigned char *NTLM_HandleChallenge(const NTLM_CHALLENGE_MESSAGE *challengeMsg,
-                            uint16_t challengeSize, size_t *resultSize) {
+static void GetSignKey(const uint8_t exportedSessionKey[16],
+                       uint8_t signKey[16]) {
+    static const unsigned char clientString[] =
+        "session key to client-to-server signing key magic constant";
+    struct md5_context md5_context;
+    
+    md5_init(&md5_context);
+    md5_update(&md5_context, exportedSessionKey, 16);
+    md5_update(&md5_context, clientString, sizeof(clientString));
+    md5_finalize(&md5_context);
+    memcpy(signKey, md5_context.hash, 16);
+}
+
+static void GetSealKey(const uint8_t exportedSessionKey[16],
+                       uint8_t sealKey[16]) {
+    static const unsigned char clientString[] =
+        "session key to client-to-server sealing key magic constant";
+    struct md5_context md5_context;
+    
+    md5_init(&md5_context);
+    md5_update(&md5_context, exportedSessionKey, 16); // assumes 128-bit security
+    md5_update(&md5_context, clientString, sizeof(clientString));
+    md5_finalize(&md5_context);
+    memcpy(sealKey, md5_context.hash, 16);
+}
+
+unsigned char *NTLM_HandleChallenge(NTLM_Context *ctx,
+    const NTLM_CHALLENGE_MESSAGE *challengeMsg, uint16_t challengeSize,
+    size_t *resultSize) {
+
     uint16_t infoSize;
     const void *infoPtr;
     static uint8_t tempBuf[8+8+8+4+1000]; // TODO size this as needed
@@ -251,12 +280,12 @@ unsigned char *NTLM_HandleChallenge(const NTLM_CHALLENGE_MESSAGE *challengeMsg,
     authMsg.NegotiateFlags =
             NTLMSSP_NEGOTIATE_KEY_EXCH +
             NTLMSSP_NEGOTIATE_128 +
-            //NTLMSSP_NEGOTIATE_TARGET_INFO +
+            NTLMSSP_NEGOTIATE_TARGET_INFO +
             NTLMSSP_NEGOTIATE_EXTENDED_SESSIONSECURITY +
-            //NTLMSSP_NEGOTIATE_ALWAYS_SIGN +
+            NTLMSSP_NEGOTIATE_ALWAYS_SIGN +
             NTLMSSP_NEGOTIATE_NTLM +
-            //NTLMSSP_NEGOTIATE_SIGN +
-            //NTLMSSP_REQUEST_TARGET +
+            NTLMSSP_NEGOTIATE_SIGN +
+            NTLMSSP_REQUEST_TARGET +
             NTLMSSP_NEGOTIATE_UNICODE,
     // TODO adjust flags?
     
@@ -278,18 +307,47 @@ unsigned char *NTLM_HandleChallenge(const NTLM_CHALLENGE_MESSAGE *challengeMsg,
     hmac_md5_finalize(&hmac_md5_context);
     memcpy(authMsg.MIC, hmac_md5_context.u[0].ctx.hash, 16);
 
+    GetSignKey(exportedSessionKey, ctx->signkey);
+    GetSealKey(exportedSessionKey, ctx->sealkey);
+
     return (unsigned char *)&authMsg;
 }
+
+unsigned char *NTLM_GetMechListMIC(NTLM_Context *ctx,
+    const unsigned char *mechList, uint16_t mechListSize, size_t *resultSize) {
+
+    static NTLMSSP_MESSAGE_SIGNATURE_Extended sig = {
+        .Version = 1,
+        .SeqNum = 0,
+    };
+
+    struct hmac_md5_context hmac_md5_context;
+    struct rc4_context rc4_context;
+
+    hmac_md5_init(&hmac_md5_context, ctx->signkey, sizeof(ctx->signkey));
+    hmac_md5_update(&hmac_md5_context, (void*)&sig.SeqNum, sizeof(sig.SeqNum));
+    hmac_md5_update(&hmac_md5_context, mechList, mechListSize);
+    hmac_md5_finalize(&hmac_md5_context);
+
+    rc4_init(&rc4_context, ctx->sealkey, sizeof(ctx->sealkey));
+    rc4_process(&rc4_context, hmac_md5_context.u[0].ctx.hash,
+        (void*)&sig.Checksum, 8);
+
+    *resultSize = sizeof(sig);
+
+    return (unsigned char *)&sig;
+}
+
 
 #ifdef NTLM_TEST
 #include <stdio.h>
 
-uint16_t user[4] = u"USER";
-uint16_t userDom[6] = u"Domain";
-uint16_t password[8] = u"Password";
-
 int main(void) {
     static unsigned char responseKeyNT[16];
+    
+    uint16_t user[4] = u"USER";
+    uint16_t userDom[6] = u"Domain";
+    uint16_t password[8] = u"Password";
 
     NTOWFv2(sizeof(password), password, sizeof(user), user,
         sizeof(userDom), userDom, responseKeyNT);
@@ -297,6 +355,36 @@ int main(void) {
     printf("NTOWFv2 = ");
     for (int i = 0; i < 16; i++) {
         printf("%02x ", responseKeyNT[i]);
+    }
+    printf("\n");
+    
+    uint8_t randomSessionKey[16] = "UUUUUUUUUUUUUUUU";
+    NTLM_Context ctx;
+    
+    GetSignKey(randomSessionKey, ctx.signkey);
+    GetSealKey(randomSessionKey, ctx.sealkey);
+    
+    printf("signkey = ");
+    for (int i = 0; i < 16; i++) {
+        printf("%02x ", ctx.signkey[i]);
+    }
+    printf("\n");
+
+    printf("sealkey = ");
+    for (int i = 0; i < 16; i++) {
+        printf("%02x ", ctx.sealkey[i]);
+    }
+    printf("\n");
+    
+    uint16_t message[9] = u"Plaintext";
+    
+    size_t sigSize;
+    unsigned char *sig =
+        NTLM_GetMechListMIC(&ctx, (void*)message, sizeof(message), &sigSize);
+    
+    printf("signature = ");
+    for (int i = 0; i < sigSize; i++) {
+        printf("%02x ", sig[i]);
     }
     printf("\n");
 }

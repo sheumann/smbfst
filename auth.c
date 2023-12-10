@@ -80,6 +80,10 @@ size_t DoAuthStep(AuthState *state, const unsigned char *previousMsg,
     unsigned char *prevMsgPtr;
     size_t itemSize;
     unsigned char *authMsgPtr;
+    unsigned char *mechListPtr;
+    unsigned char *mechListMICPtr;
+    size_t mechListMICSize;
+    static NTLM_Context ntlmContext;
 
     switch (state->step++) {
     case 0:
@@ -105,10 +109,15 @@ size_t DoAuthStep(AuthState *state, const unsigned char *previousMsg,
         /* mechTypes */
         *msgPtr++ = 0xA0; /* constructed [0] */
         *msgPtr++ = 2 + sizeof(NTLMSSP_OID);
+        mechListPtr = msgPtr;
         *msgPtr++ = 0x30; /* SEQUENCE OF */
         *msgPtr++ = sizeof(NTLMSSP_OID);
         memcpy(msgPtr, NTLMSSP_OID, sizeof(NTLMSSP_OID));
         msgPtr += sizeof(NTLMSSP_OID);
+        state->mechListSize = msgPtr - mechListPtr;
+        
+        // Save mechList for later computation of mechListMIC
+        memcpy(state->mechList, mechListPtr, state->mechListSize);
         
         /* mechToken */
         *msgPtr++ = 0xA2; /* constructed [2] */
@@ -117,7 +126,7 @@ size_t DoAuthStep(AuthState *state, const unsigned char *previousMsg,
         *msgPtr++ = sizeof(NTLM_NEGOTIATE_MESSAGE);
         
         /* NTLM NEGOTIATE_MESSAGE */
-        NTLM_GetNegotiateMessage(msgPtr);
+        NTLM_GetNegotiateMessage(&ntlmContext, msgPtr);
         msgPtr += sizeof(NTLM_NEGOTIATE_MESSAGE);
         
         return msgPtr - msgBuf;
@@ -174,10 +183,13 @@ size_t DoAuthStep(AuthState *state, const unsigned char *previousMsg,
             return (size_t)-1; //invalid size
 
         /* Get NTLM AUTHENTICATE_MESSAGE */
-        authMsgPtr = NTLM_HandleChallenge((NTLM_CHALLENGE_MESSAGE *)prevMsgPtr,
-            itemSize, &itemSize);
+        authMsgPtr = NTLM_HandleChallenge(&ntlmContext,
+            (NTLM_CHALLENGE_MESSAGE *)prevMsgPtr, itemSize, &itemSize);
         if (authMsgPtr == NULL)
             return (size_t)-1;
+
+        mechListMICPtr = NTLM_GetMechListMIC(&ntlmContext, state->mechList,
+            state->mechListSize, &mechListMICSize);
         
         // This ensures sizes are multi-byte
         // TODO handle more elegantly, making sure not to read beyond buffer
@@ -185,19 +197,28 @@ size_t DoAuthStep(AuthState *state, const unsigned char *previousMsg,
             itemSize = 256;
         
         *msgPtr++ = 0xA1; // constructed [1] (negTokenResp)
-        WriteX690Length(&msgPtr, itemSize+12);
+        WriteX690Length(&msgPtr, 12+itemSize+4+mechListMICSize);
         *msgPtr++ = 0x30; // sequence
-        WriteX690Length(&msgPtr, itemSize+8);
+        WriteX690Length(&msgPtr, 8+itemSize+4+mechListMICSize);
 
         /* responseToken */
         *msgPtr++ = 0xA2; // constructed [2]
         WriteX690Length(&msgPtr, itemSize+4);
         *msgPtr++ = 0x04; // OCTET STRING
         WriteX690Length(&msgPtr, itemSize);
-        
+
         memcpy(msgPtr, authMsgPtr, itemSize);
         msgPtr += itemSize;
-        
+
+        /* mechListMIC */
+        *msgPtr++ = 0xA3; // constructed [3]
+        WriteX690Length(&msgPtr, mechListMICSize+2);
+        *msgPtr++ = 0x04; // OCTET STRING
+        WriteX690Length(&msgPtr, mechListMICSize);
+
+        memcpy(msgPtr, mechListMICPtr, mechListMICSize);
+        msgPtr += mechListMICSize;
+
         return msgPtr - msgBuf;
         
     default:

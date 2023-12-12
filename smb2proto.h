@@ -172,3 +172,59 @@ typedef struct {
     uint8_t  Buffer[];
 } SMB2_SESSION_SETUP_Response;
 
+typedef struct {
+    uint16_t StructureSize;
+    union {
+        uint16_t Flags;
+        uint16_t Reserved;
+    };
+    uint16_t PathOffset;
+    uint16_t PathLength;
+    uint8_t Buffer[];
+} SMB2_TREE_CONNECT_Request;
+
+/* Tree Connect request flags */
+#define SMB2_TREE_CONNECT_FLAG_CLUSTER_RECONNECT 0x0001
+#define SMB2_TREE_CONNECT_FLAG_REDIRECT_TO_OWNER 0x0002
+#define SMB2_TREE_CONNECT_FLAG_EXTENSION_PRESENT 0x0004
+
+typedef struct {
+    uint16_t StructureSize;
+    uint8_t  ShareType;
+    uint8_t  Reserved;
+    uint32_t ShareFlags;
+    uint32_t Capabilities;
+    uint32_t MaximalAccess;
+} SMB2_TREE_CONNECT_Response;
+
+/* ShareType values */
+#define SMB2_SHARE_TYPE_DISK  0x01
+#define SMB2_SHARE_TYPE_PIPE  0x02
+#define SMB2_SHARE_TYPE_PRINT 0x03
+
+/* ShareFlags flags */
+#define SMB2_SHAREFLAG_MANUAL_CACHING              0x00000000
+#define SMB2_SHAREFLAG_AUTO_CACHING                0x00000010
+#define SMB2_SHAREFLAG_VDO_CACHING                 0x00000020
+#define SMB2_SHAREFLAG_NO_CACHING                  0x00000030
+#define SMB2_SHAREFLAG_DFS                         0x00000001
+#define SMB2_SHAREFLAG_DFS_ROOT                    0x00000002
+#define SMB2_SHAREFLAG_RESTRICT_EXCLUSIVE_OPENS    0x00000100
+#define SMB2_SHAREFLAG_FORCE_SHARED_DELETE         0x00000200
+#define SMB2_SHAREFLAG_ALLOW_NAMESPACE_CACHING     0x00000400
+#define SMB2_SHAREFLAG_ACCESS_BASED_DIRECTORY_ENUM 0x00000800
+#define SMB2_SHAREFLAG_FORCE_LEVELII_OPLOCK        0x00001000
+#define SMB2_SHAREFLAG_ENABLE_HASH_V1              0x00002000
+#define SMB2_SHAREFLAG_ENABLE_HASH_V2              0x00004000
+#define SMB2_SHAREFLAG_ENCRYPT_DATA                0x00008000
+#define SMB2_SHAREFLAG_IDENTITY_REMOTING           0x00040000
+#define SMB2_SHAREFLAG_COMPRESS_DATA               0x00100000
+#define SMB2_SHAREFLAG_ISOLATED_TRANSPORT          0x00200000
+
+/* Capabilities flags */
+#define SMB2_SHARE_CAP_DFS                     0x00000008
+#define SMB2_SHARE_CAP_CONTINUOUS_AVAILABILITY 0x00000010
+#define SMB2_SHARE_CAP_SCALEOUT                0x00000020
+#define SMB2_SHARE_CAP_CLUSTER                 0x00000040
+#define SMB2_SHARE_CAP_ASYMMETRIC              0x00000080
+#define SMB2_SHARE_CAP_REDIRECT_TO_OWNER       0x00000100

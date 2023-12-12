@@ -2,6 +2,7 @@
 #include <stddef.h>
 #include <string.h>
 #include <ctype.h>
+#include <uchar.h>
 #include <orca.h>
 
 #include <tcpip.h>
@@ -23,8 +24,11 @@ int main(int argc, char *argv[]) {
         srBuff status;
         Long startTime;
         Connection connection = {0};
-        int i;
+        int i,j;
         size_t len;
+
+        static char16_t treeName[100];
+        static uint16_t treeNameSize;
         
         if (argc < 4) {
             puts("Too few arguments");
@@ -56,6 +60,27 @@ int main(int argc, char *argv[]) {
                 userDomain[i] = argv[4][i];
             }
             userDomainSize = len*2;
+        }
+
+        if (argc >= 6) {
+            // TODO length check
+            i = 0;
+            treeName[i++] = '\\';
+            treeName[i++] = '\\';
+            
+            len = strlen(argv[1]);
+            for (j = 0; j < len; i++, j++) {
+                treeName[i] = argv[1][j];
+            }
+
+            treeName[i++] = '\\';
+
+            len = strlen(argv[5]);
+            for (j = 0; j < len; i++, j++) {
+                treeName[i] = argv[5][j];
+            }
+            
+            treeNameSize = i*2;
         }
 
         LoadOneTool(54, 0x200);
@@ -98,6 +123,9 @@ int main(int argc, char *argv[]) {
         Negotiate(&connection);
         
         SessionSetup(&connection);
+        
+        if (argc >= 6)
+            TreeConnect(&connection, treeName, treeNameSize);
         
         puts("ending");
         

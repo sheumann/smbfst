@@ -1,4 +1,7 @@
 #include <stdbool.h>
+#include <stddef.h>
+#include <string.h>
+#include <uchar.h>
 #include <tcpip.h>
 #include <orca.h>
 
@@ -75,6 +78,8 @@ static ReadStatus result;   // result from last read
 #define negotiateResponse    (*(SMB2_NEGOTIATE_Response*)msg.body)
 #define sessionSetupRequest  (*(SMB2_SESSION_SETUP_Request*)msg.body)
 #define sessionSetupResponse (*(SMB2_SESSION_SETUP_Response*)msg.body)
+#define treeConnectRequest   (*(SMB2_TREE_CONNECT_Request*)msg.body)
+#define treeConnectResponse  (*(SMB2_TREE_CONNECT_Response*)msg.body)
 
 /*
  * Verify that a offset/length pair specifying a buffer within the last
@@ -286,4 +291,20 @@ void SessionSetup(Connection *connection) {
             sessionSetupResponse.SecurityBufferOffset;
         previousAuthSize = sessionSetupResponse.SecurityBufferLength;
     };
+}
+
+void TreeConnect(Connection *connection, char16_t share[],
+    uint16_t shareSize) {
+    treeConnectRequest.Reserved = 0;
+    treeConnectRequest.PathOffset =
+        sizeof(SMB2Header) + offsetof(SMB2_TREE_CONNECT_Request, Buffer);
+    treeConnectRequest.PathLength = shareSize;
+    memcpy(treeConnectRequest.Buffer, share, shareSize);
+    
+    result = SendRequestAndGetResponse(connection, SMB2_TREE_CONNECT, 0,
+        sizeof(treeConnectRequest) + shareSize);
+    if (result != rsDone) {
+        // TODO handle errors
+        return;
+    }
 }

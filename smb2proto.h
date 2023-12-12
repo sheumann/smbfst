@@ -228,3 +228,137 @@ typedef struct {
 #define SMB2_SHARE_CAP_CLUSTER                 0x00000040
 #define SMB2_SHARE_CAP_ASYMMETRIC              0x00000080
 #define SMB2_SHARE_CAP_REDIRECT_TO_OWNER       0x00000100
+
+typedef struct {
+    uint16_t StructureSize;
+    uint8_t  SecurityFlags;
+    uint8_t  RequestedOplockLevel;
+    uint32_t ImpersonationLevel;
+    uint64_t SmbCreateFlags;
+    uint64_t Reserved;
+    uint32_t DesiredAccess;
+    uint32_t FileAttributes;
+    uint32_t ShareAccess;
+    uint32_t CreateDisposition;
+    uint32_t CreateOptions;
+    uint16_t NameOffset;
+    uint16_t NameLength;
+    uint32_t CreateContextsOffset;
+    uint32_t CreateContextsLength;
+    uint8_t  Buffer[];
+} SMB2_CREATE_Request;
+
+/* RequestedOplockLevel values */
+#define SMB2_OPLOCK_LEVEL_NONE      0x00
+#define SMB2_OPLOCK_LEVEL_II        0x01
+#define SMB2_OPLOCK_LEVEL_EXCLUSIVE 0x08
+#define SMB2_OPLOCK_LEVEL_BATCH     0x09
+#define SMB2_OPLOCK_LEVEL_LEASE     0xFF
+
+/* Impersonation values */
+#define Anonymous      0x00000000
+#define Identification 0x00000001
+#define Impersonation  0x00000002
+#define Delegate       0x00000003
+
+/* File attributes (from [MS-FSCC] section 2.6) */
+#define FILE_ATTRIBUTE_READONLY              0x00000001
+#define FILE_ATTRIBUTE_HIDDEN                0x00000002
+#define FILE_ATTRIBUTE_SYSTEM                0x00000004
+#define FILE_ATTRIBUTE_DIRECTORY             0x00000010
+#define FILE_ATTRIBUTE_ARCHIVE               0x00000020
+#define FILE_ATTRIBUTE_NORMAL                0x00000080
+#define FILE_ATTRIBUTE_TEMPORARY             0x00000100
+#define FILE_ATTRIBUTE_SPARSE_FILE           0x00000200
+#define FILE_ATTRIBUTE_REPARSE_POINT         0x00000400
+#define FILE_ATTRIBUTE_COMPRESSED            0x00000800
+#define FILE_ATTRIBUTE_OFFLINE               0x00001000
+#define FILE_ATTRIBUTE_NOT_CONTENT_INDEXED   0x00002000
+#define FILE_ATTRIBUTE_ENCRYPTED             0x00004000
+#define FILE_ATTRIBUTE_INTEGRITY_STREAM      0x00008000
+#define FILE_ATTRIBUTE_NO_SCRUB_DATA         0x00020000
+#define FILE_ATTRIBUTE_RECALL_ON_OPEN        0x00040000
+#define FILE_ATTRIBUTE_PINNED                0x00080000
+#define FILE_ATTRIBUTE_UNPINNED              0x00100000
+#define FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS 0x00400000
+
+/* ShareAccess flags */
+#define FILE_SHARE_READ   0x00000001
+#define FILE_SHARE_WRITE  0x00000002
+#define FILE_SHARE_DELETE 0x00000004
+
+/* CreateDisposition values */
+#define FILE_SUPERSEDE    0x00000000
+#define FILE_OPEN         0x00000001
+#define FILE_CREATE       0x00000002
+#define FILE_OPEN_IF      0x00000003
+#define FILE_OVERWRITE    0x00000004
+#define FILE_OVERWRITE_IF 0x00000005
+
+/* CreateOptions flags */
+#define FILE_DIRECTORY_FILE            0x00000001
+#define FILE_WRITE_THROUGH             0x00000002
+#define FILE_SEQUENTIAL_ONLY           0x00000004
+#define FILE_NO_INTERMEDIATE_BUFFERING 0x00000008
+#define FILE_SYNCHRONOUS_IO_ALERT      0x00000010
+#define FILE_SYNCHRONOUS_IO_NONALERT   0x00000020
+#define FILE_NON_DIRECTORY_FILE        0x00000040
+#define FILE_COMPLETE_IF_OPLOCKED      0x00000100
+#define FILE_NO_EA_KNOWLEDGE           0x00000200
+#define FILE_RANDOM_ACCESS             0x00000800
+#define FILE_DELETE_ON_CLOSE           0x00001000
+#define FILE_OPEN_BY_FILE_ID           0x00002000
+#define FILE_OPEN_FOR_BACKUP_INTENT    0x00004000
+#define FILE_NO_COMPRESSION            0x00008000
+#define FILE_OPEN_REMOTE_INSTANCE      0x00000400
+#define FILE_OPEN_REQUIRING_OPLOCK     0x00010000
+#define FILE_DISALLOW_EXCLUSIVE        0x00020000
+#define FILE_RESERVE_OPFILTER          0x00100000
+#define FILE_OPEN_REPARSE_POINT        0x00200000
+#define FILE_OPEN_NO_RECALL            0x00400000
+#define FILE_OPEN_FOR_FREE_SPACE_QUERY 0x00800000
+
+/* file/pipe/printer access mask flags */
+#define FILE_READ_DATA         0x00000001
+#define FILE_WRITE_DATA        0x00000002
+#define FILE_APPEND_DATA       0x00000004
+#define FILE_READ_EA           0x00000008
+#define FILE_WRITE_EA          0x00000010
+#define FILE_DELETE_CHILD      0x00000040
+#define FILE_EXECUTE           0x00000020
+#define FILE_READ_ATTRIBUTES   0x00000080
+#define FILE_WRITE_ATTRIBUTES  0x00000100
+#define DELETE                 0x00010000
+#define READ_CONTROL           0x00020000
+#define WRITE_DAC              0x00040000
+#define WRITE_OWNER            0x00080000
+#define SYNCHRONIZE            0x00100000
+#define ACCESS_SYSTEM_SECURITY 0x01000000
+#define MAXIMUM_ALLOWED        0x02000000
+#define GENERIC_ALL            0x10000000
+#define GENERIC_EXECUTE        0x20000000
+#define GENERIC_WRITE          0x40000000
+#define GENERIC_READ           0x80000000
+
+/* directory access mask flags */
+#define FILE_LIST_DIRECTORY    0x00000001
+#define FILE_ADD_FILE          0x00000002
+#define FILE_ADD_SUBDIRECTORY  0x00000004
+#define FILE_READ_EA           0x00000008
+#define FILE_WRITE_EA          0x00000010
+#define FILE_TRAVERSE          0x00000020
+#define FILE_DELETE_CHILD      0x00000040
+#define FILE_READ_ATTRIBUTES   0x00000080
+#define FILE_WRITE_ATTRIBUTES  0x00000100
+#define DELETE                 0x00010000
+#define READ_CONTROL           0x00020000
+#define WRITE_DAC              0x00040000
+#define WRITE_OWNER            0x00080000
+#define SYNCHRONIZE            0x00100000
+#define ACCESS_SYSTEM_SECURITY 0x01000000
+#define MAXIMUM_ALLOWED        0x02000000
+#define GENERIC_ALL            0x10000000
+#define GENERIC_EXECUTE        0x20000000
+#define GENERIC_WRITE          0x40000000
+#define GENERIC_READ           0x80000000
+

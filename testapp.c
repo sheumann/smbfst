@@ -26,9 +26,13 @@ int main(int argc, char *argv[]) {
         Connection connection = {0};
         int i,j;
         size_t len;
+        uint32_t treeId;
 
         static char16_t treeName[100];
         static uint16_t treeNameSize;
+        
+        static char16_t fileName[100];
+        static uint16_t fileNameSize;
         
         if (argc < 4) {
             puts("Too few arguments");
@@ -83,6 +87,16 @@ int main(int argc, char *argv[]) {
             treeNameSize = i*2;
         }
 
+        if (argc >= 7) {
+            len = strlen(argv[6]);
+            if (len > 100)
+                len = 100;
+            for (i = 0; i < len; i++) {
+                fileName[i] = argv[6][i];
+            }
+            fileNameSize = len*2;
+        }
+
         LoadOneTool(54, 0x200);
         TCPIPStartUp();
         
@@ -125,7 +139,10 @@ int main(int argc, char *argv[]) {
         SessionSetup(&connection);
         
         if (argc >= 6)
-            TreeConnect(&connection, treeName, treeNameSize);
+            treeId = TreeConnect(&connection, treeName, treeNameSize);
+        
+        if (argc >= 7)
+            Open(&connection, treeId, fileName, fileNameSize);
         
         puts("ending");
         

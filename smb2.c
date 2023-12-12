@@ -80,6 +80,8 @@ static ReadStatus result;   // result from last read
 #define sessionSetupResponse (*(SMB2_SESSION_SETUP_Response*)msg.body)
 #define treeConnectRequest   (*(SMB2_TREE_CONNECT_Request*)msg.body)
 #define treeConnectResponse  (*(SMB2_TREE_CONNECT_Response*)msg.body)
+#define createRequest        (*(SMB2_CREATE_Request*)msg.body)
+#define createResponse       (*(SMB2_CREATE_Response*)msg.body)
 
 /*
  * Verify that a offset/length pair specifying a buffer within the last
@@ -293,7 +295,7 @@ void SessionSetup(Connection *connection) {
     };
 }
 
-void TreeConnect(Connection *connection, char16_t share[],
+uint32_t TreeConnect(Connection *connection, char16_t share[],
     uint16_t shareSize) {
     treeConnectRequest.Reserved = 0;
     treeConnectRequest.PathOffset =
@@ -303,6 +305,37 @@ void TreeConnect(Connection *connection, char16_t share[],
     
     result = SendRequestAndGetResponse(connection, SMB2_TREE_CONNECT, 0,
         sizeof(treeConnectRequest) + shareSize);
+    if (result != rsDone) {
+        // TODO handle errors
+        return 0;
+    }
+    
+    // TODO check if 0 could be a valid treeId; if so, distinguish error returns
+    return msg.smb2Header.TreeId;
+}
+
+void Open(Connection *connection, uint32_t treeId,
+    char16_t file[], uint16_t fileSize) {
+    
+    createRequest.SecurityFlags = 0;
+    createRequest.RequestedOplockLevel = SMB2_OPLOCK_LEVEL_NONE;
+    createRequest.ImpersonationLevel = Impersonation;
+    createRequest.SmbCreateFlags = 0;
+    createRequest.Reserved = 0;
+    createRequest.DesiredAccess = MAXIMUM_ALLOWED; // TODO allow to configure
+    createRequest.FileAttributes = 0;
+    createRequest.ShareAccess = 0; // TODO set based on desired access
+    createRequest.CreateDisposition = FILE_OPEN;
+    createRequest.CreateOptions = 0;
+    createRequest.NameOffset =
+        sizeof(SMB2Header) + offsetof(SMB2_CREATE_Request, Buffer);
+    createRequest.NameLength = fileSize;
+    createRequest.CreateContextsOffset = 0;
+    createRequest.CreateContextsLength = 0;
+    memcpy(createRequest.Buffer, file, fileSize);
+
+    result = SendRequestAndGetResponse(connection, SMB2_CREATE, treeId,
+        sizeof(createRequest) + fileSize);
     if (result != rsDone) {
         // TODO handle errors
         return;

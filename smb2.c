@@ -3,6 +3,7 @@
 #include <string.h>
 #include <uchar.h>
 #include <tcpip.h>
+#include <memory.h>
 #include <orca.h>
 
 /* for debugging only */
@@ -16,6 +17,7 @@
 #include "smb2.h"
 #include "readtcp.h"
 #include "auth.h"
+#include "crypto/sha256.h"
 
 static const uint16_t requestStructureSizes[] = {
     [SMB2_NEGOTIATE] = 36,
@@ -169,6 +171,15 @@ bool SendMessage(Connection *connection, uint16_t command, uint32_t treeId,
     msg.smb2Header.SessionId = connection->sessionId;
     msg.smb2Header.Signature = u128_zero;
     
+    if (connection->signingRequired) {
+        msg.smb2Header.Flags |= SMB2_FLAGS_SIGNED;
+        
+        hmac_sha256_compute(connection->signingContext, (void*)&msg.smb2Header,
+            sizeof(SMB2Header) + bodyLength);
+        memcpy(&msg.smb2Header.Signature,
+            connection->signingContext->u[0].ctx.hash, 16);
+    }
+    
     msg.directTCPHeader.StreamProtocolLength =
         hton32(sizeof(SMB2Header) + bodyLength);
 
@@ -239,7 +250,7 @@ void Negotiate(Connection *connection) {
         return;
     }
     
-    connection->signingRequired =
+    connection->wantSigning =
         negotiateResponse.SecurityMode & SMB2_NEGOTIATE_SIGNING_REQUIRED;
         
     if (negotiateResponse.DialectRevision != SMB_202) {
@@ -247,6 +258,10 @@ void Negotiate(Connection *connection) {
         return;
     }
     connection->dialect = negotiateResponse.DialectRevision;
+    
+    if (negotiateResponse.SecurityMode & SMB2_NEGOTIATE_SIGNING_REQUIRED) {
+        connection->wantSigning = true;
+    }
     
     // TODO compute time difference based on negotiateResponse.SystemTime
     
@@ -284,6 +299,30 @@ void SessionSetup(Connection *connection) {
             sizeof(sessionSetupRequest) + authSize);
         
         if (result == rsDone) {
+            if (connection->wantSigning &&
+                (sessionSetupResponse.SessionFlags &
+                    (SMB2_SESSION_FLAG_IS_GUEST|SMB2_SESSION_FLAG_IS_NULL)) == 0)
+            {
+                if (connection->dialect <= SMB_21) {
+                    Handle ctxHandle = NewHandle(
+                        sizeof(struct hmac_sha256_context), userid(), 0x8015, 0);
+                    if (toolerror()) {
+                        // TODO handle errors
+                        return;
+                    }
+                
+                    connection->signingRequired = true;
+                    connection->signingContext = (void*)*ctxHandle;
+                
+                    hmac_sha256_init(connection->signingContext,
+                        authState.signKey,
+                        16);
+                } else {
+                    // TODO SMB 3.x version
+                    UNIMPLEMENTED
+                }
+            }
+        
             return;
         } else if (result != rsMoreProcessingRequired) {
             // TODO handle errors

@@ -184,7 +184,8 @@ size_t DoAuthStep(AuthState *state, const unsigned char *previousMsg,
 
         /* Get NTLM AUTHENTICATE_MESSAGE */
         authMsgPtr = NTLM_HandleChallenge(&ntlmContext,
-            (NTLM_CHALLENGE_MESSAGE *)prevMsgPtr, itemSize, &itemSize);
+            (NTLM_CHALLENGE_MESSAGE *)prevMsgPtr, itemSize, &itemSize,
+            state->signKey);
         if (authMsgPtr == NULL)
             return (size_t)-1;
 

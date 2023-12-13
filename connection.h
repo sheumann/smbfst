@@ -2,6 +2,8 @@
 #include <stdbool.h>
 #include <types.h>
 
+struct hmac_sha256_context;
+
 typedef struct {
     Word ipid;
     
@@ -9,7 +11,10 @@ typedef struct {
     
     uint16_t dialect;
     
-    bool signingRequired;
+    bool wantSigning; // flag set in Negotiate, but not necessarily in effect yet
     
     uint64_t sessionId; // TODO separate session structure?
+    
+    bool signingRequired;
+    struct hmac_sha256_context *signingContext;
 } Connection;

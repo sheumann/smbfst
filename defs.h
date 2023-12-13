@@ -1,6 +1,7 @@
 #ifdef __ORCAC__
 #pragma lint -1
 #pragma ignore 24
+segment "AUTOSEG~~~";
 #endif
 
 #ifdef __ORCAC__

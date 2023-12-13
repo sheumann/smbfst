@@ -11,6 +11,8 @@ typedef struct {
 
     uint8_t mechList[MAX_MECHLIST_SIZE];
     uint16_t mechListSize;
+    
+    uint8_t signKey[16];
 } AuthState;
 
 void InitAuth(AuthState *state);

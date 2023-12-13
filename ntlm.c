@@ -125,7 +125,7 @@ static void GetSealKey(const uint8_t exportedSessionKey[16],
 
 unsigned char *NTLM_HandleChallenge(NTLM_Context *ctx,
     const NTLM_CHALLENGE_MESSAGE *challengeMsg, uint16_t challengeSize,
-    size_t *resultSize) {
+    size_t *resultSize, char sessionKey[16]) {
 
     uint16_t infoSize;
     const void *infoPtr;
@@ -309,6 +309,9 @@ unsigned char *NTLM_HandleChallenge(NTLM_Context *ctx,
 
     GetSignKey(exportedSessionKey, ctx->signkey);
     GetSealKey(exportedSessionKey, ctx->sealkey);
+    
+    // save session key for use by SMB
+    memcpy(sessionKey, exportedSessionKey, 16);
 
     return (unsigned char *)&authMsg;
 }

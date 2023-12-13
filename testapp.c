@@ -14,6 +14,7 @@
 #include "connection.h"
 #include "smb2.h"
 #include "authinfo.h"
+#include "fileinfo.h"
 
 #define TIMEOUT 15 /* seconds */
 
@@ -158,8 +159,28 @@ int main(int argc, char *argv[]) {
             Close(&connection, treeId, fileId);
         }
         
+        if (argc > 6) {
+            fileId = Open(&connection, treeId, NULL, 0); // root dir of share
 
-        puts("ending");
+            printf("Directory listing:\n");
+            do {
+                uint16_t entrySize = QueryDirectory(
+                    &connection, treeId, fileId, sizeof(buf), buf);
+                if (entrySize == 0)
+                    break;
+                   
+                FILE_DIRECTORY_INFORMATION *dirInfo = (void*)&buf;
+                uint16_t nameSize = dirInfo->FileNameLength / 2;
+                //TODO validate that name does not overflow buffer
+                
+                for (unsigned i = 0; i < nameSize; i++) {
+                    putchar(dirInfo->FileName[i]);
+                }
+                putchar('\n');
+            } while (1);
+            
+            Close(&connection, treeId, fileId);
+        }
         
 connect_error:
         TCPIPAbortTCP(connection.ipid);

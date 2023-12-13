@@ -82,19 +82,21 @@ static uint16_t bodySize;   // size of last message received
 
 static ReadStatus result;   // result from last read
 
-#define msgBodyHeader        (*(SMB2_Common_Header*)msg.body)
-#define negotiateRequest     (*(SMB2_NEGOTIATE_Request*)msg.body)
-#define negotiateResponse    (*(SMB2_NEGOTIATE_Response*)msg.body)
-#define sessionSetupRequest  (*(SMB2_SESSION_SETUP_Request*)msg.body)
-#define sessionSetupResponse (*(SMB2_SESSION_SETUP_Response*)msg.body)
-#define treeConnectRequest   (*(SMB2_TREE_CONNECT_Request*)msg.body)
-#define treeConnectResponse  (*(SMB2_TREE_CONNECT_Response*)msg.body)
-#define createRequest        (*(SMB2_CREATE_Request*)msg.body)
-#define createResponse       (*(SMB2_CREATE_Response*)msg.body)
-#define readRequest          (*(SMB2_READ_Request*)msg.body)
-#define readResponse         (*(SMB2_READ_Response*)msg.body)
-#define closeRequest         (*(SMB2_CLOSE_Request*)msg.body)
-#define closeResponse        (*(SMB2_CLOSE_Response*)msg.body)
+#define msgBodyHeader          (*(SMB2_Common_Header*)msg.body)
+#define negotiateRequest       (*(SMB2_NEGOTIATE_Request*)msg.body)
+#define negotiateResponse      (*(SMB2_NEGOTIATE_Response*)msg.body)
+#define sessionSetupRequest    (*(SMB2_SESSION_SETUP_Request*)msg.body)
+#define sessionSetupResponse   (*(SMB2_SESSION_SETUP_Response*)msg.body)
+#define treeConnectRequest     (*(SMB2_TREE_CONNECT_Request*)msg.body)
+#define treeConnectResponse    (*(SMB2_TREE_CONNECT_Response*)msg.body)
+#define createRequest          (*(SMB2_CREATE_Request*)msg.body)
+#define createResponse         (*(SMB2_CREATE_Response*)msg.body)
+#define readRequest            (*(SMB2_READ_Request*)msg.body)
+#define readResponse           (*(SMB2_READ_Response*)msg.body)
+#define closeRequest           (*(SMB2_CLOSE_Request*)msg.body)
+#define closeResponse          (*(SMB2_CLOSE_Response*)msg.body)
+#define queryDirectoryRequest  (*(SMB2_QUERY_DIRECTORY_Request*)msg.body)
+#define queryDirectoryResponse (*(SMB2_QUERY_DIRECTORY_Response*)msg.body)
 
 /*
  * Verify that a offset/length pair specifying a buffer within the last
@@ -386,7 +388,6 @@ uint32_t Read(Connection *connection, uint32_t treeId, SMB2_FILEID file,
 }
 
 void Close(Connection *connection, uint32_t treeId, SMB2_FILEID file) {
-
     closeRequest.Flags = 0;
     closeRequest.Reserved = 0;
     closeRequest.FileId = file;
@@ -397,4 +398,50 @@ void Close(Connection *connection, uint32_t treeId, SMB2_FILEID file) {
         // TODO handle errors
         return;
     }
+}
+
+uint16_t QueryDirectory(Connection *connection, uint32_t treeId,
+    SMB2_FILEID file, uint16_t length, void *buf) {
+
+    queryDirectoryRequest.FileInformationClass = FileDirectoryInformation;
+    queryDirectoryRequest.Flags = SMB2_RETURN_SINGLE_ENTRY;
+    queryDirectoryRequest.FileIndex = 0;
+    queryDirectoryRequest.FileId = file;
+    queryDirectoryRequest.FileNameOffset =
+        sizeof(SMB2Header) + offsetof(SMB2_QUERY_DIRECTORY_Request, Buffer);
+    queryDirectoryRequest.FileNameLength = 2;
+    queryDirectoryRequest.OutputBufferLength =
+        sizeof(msg.body) - sizeof(SMB2_QUERY_DIRECTORY_Response);
+        
+    /* 
+     * Note: [MS-SMB2] says the file name pattern is optional,
+     * but Mac (at least) requires it.
+     */
+    queryDirectoryRequest.Buffer[0] = '*';
+    queryDirectoryRequest.Buffer[1] = '\0';
+
+    result = SendRequestAndGetResponse(connection, SMB2_QUERY_DIRECTORY, treeId,
+        sizeof(queryDirectoryRequest) + 2);
+    if (result != rsDone) {
+        // TODO handle errors
+        return 0;
+    }
+
+    if (queryDirectoryResponse.OutputBufferLength >
+        sizeof(msg.body) - sizeof(SMB2_QUERY_DIRECTORY_Response))
+        return 0;
+    if (queryDirectoryResponse.OutputBufferOffset + 
+        queryDirectoryResponse.OutputBufferLength > sizeof(msg))
+        return 0;
+    if (queryDirectoryResponse.OutputBufferOffset + 
+        queryDirectoryResponse.OutputBufferLength <
+        sizeof(SMB2Header) + sizeof(queryDirectoryResponse))
+        return 0;
+    
+    uint16_t resultLen = min(length, queryDirectoryResponse.OutputBufferLength);
+    memcpy(buf,
+        (char*)&msg.smb2Header + queryDirectoryResponse.OutputBufferOffset,
+        resultLen);
+
+    return resultLen;
 }

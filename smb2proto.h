@@ -433,4 +433,36 @@ typedef struct {
 /* Close request flags */
 #define SMB2_CLOSE_FLAG_POSTQUERY_ATTRIB 0x0001
 
+typedef struct {
+    uint16_t StructureSize;
+    uint8_t  FileInformationClass;
+    uint8_t  Flags;
+    uint32_t FileIndex;
+    SMB2_FILEID FileId;
+    uint16_t FileNameOffset;
+    uint16_t FileNameLength;
+    uint32_t OutputBufferLength;
+    uint8_t  Buffer[];
+} SMB2_QUERY_DIRECTORY_Request;
 
+/* FileInformationClass values usable for directory queries */
+#define FileDirectoryInformation        0x01
+#define FileFullDirectoryInformation    0x02
+#define FileIdFullDirectoryInformation  0x26
+#define FileBothDirectoryInformation    0x03
+#define FileIdBothDirectoryInformation  0x25
+#define FileNamesInformation            0x0C
+#define FileIdExtdDirectoryInformation  0x3C
+
+/* Query Directory request flags */
+#define SMB2_RESTART_SCANS       0x01
+#define SMB2_RETURN_SINGLE_ENTRY 0x02
+#define SMB2_INDEX_SPECIFIED     0x04
+#define SMB2_REOPEN              0x10
+
+typedef struct {
+    uint16_t StructureSize;
+    uint16_t OutputBufferOffset;
+    uint16_t OutputBufferLength;
+    uint8_t  Buffer[];
+} SMB2_QUERY_DIRECTORY_Response;

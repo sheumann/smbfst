@@ -93,6 +93,8 @@ static ReadStatus result;   // result from last read
 #define createResponse       (*(SMB2_CREATE_Response*)msg.body)
 #define readRequest          (*(SMB2_READ_Request*)msg.body)
 #define readResponse         (*(SMB2_READ_Response*)msg.body)
+#define closeRequest         (*(SMB2_CLOSE_Request*)msg.body)
+#define closeResponse        (*(SMB2_CLOSE_Response*)msg.body)
 
 /*
  * Verify that a offset/length pair specifying a buffer within the last
@@ -381,4 +383,18 @@ uint32_t Read(Connection *connection, uint32_t treeId, SMB2_FILEID file,
         readResponse.DataLength);
     
     return readResponse.DataLength;
+}
+
+void Close(Connection *connection, uint32_t treeId, SMB2_FILEID file) {
+
+    closeRequest.Flags = 0;
+    closeRequest.Reserved = 0;
+    closeRequest.FileId = file;
+
+    result = SendRequestAndGetResponse(connection, SMB2_CLOSE, treeId,
+        sizeof(closeRequest));
+    if (result != rsDone) {
+        // TODO handle errors
+        return;
+    }
 }

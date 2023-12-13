@@ -154,6 +154,8 @@ int main(int argc, char *argv[]) {
                 putchar(buf[i]);
             }
             printf("\n");
+            
+            Close(&connection, treeId, fileId);
         }
         
 

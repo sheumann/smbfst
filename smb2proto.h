@@ -422,3 +422,15 @@ typedef struct {
     };
     uint8_t  Buffer[];
 } SMB2_READ_Response;
+
+typedef struct {
+    uint16_t StructureSize;
+    uint16_t Flags;
+    uint32_t Reserved;
+    SMB2_FILEID FileId;
+} SMB2_CLOSE_Request;
+
+/* Close request flags */
+#define SMB2_CLOSE_FLAG_POSTQUERY_ATTRIB 0x0001
+
+

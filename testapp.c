@@ -27,12 +27,16 @@ int main(int argc, char *argv[]) {
         int i,j;
         size_t len;
         uint32_t treeId;
+        SMB2_FILEID fileId;
 
         static char16_t treeName[100];
         static uint16_t treeNameSize;
         
         static char16_t fileName[100];
         static uint16_t fileNameSize;
+        
+        static uint8_t buf[1000];
+        uint32_t readSize;
         
         if (argc < 4) {
             puts("Too few arguments");
@@ -141,9 +145,18 @@ int main(int argc, char *argv[]) {
         if (argc >= 6)
             treeId = TreeConnect(&connection, treeName, treeNameSize);
         
-        if (argc >= 7)
-            Open(&connection, treeId, fileName, fileNameSize);
+        if (argc >= 7) {
+            fileId = Open(&connection, treeId, fileName, fileNameSize);
+            readSize = Read(&connection, treeId, fileId, 0, 1000, buf);
+            
+            printf("data read:\n");
+            for (unsigned i = 0; i < readSize; i++) {
+                putchar(buf[i]);
+            }
+            printf("\n");
+        }
         
+
         puts("ending");
         
 connect_error:

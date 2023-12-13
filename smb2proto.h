@@ -362,3 +362,63 @@ typedef struct {
 #define GENERIC_WRITE          0x40000000
 #define GENERIC_READ           0x80000000
 
+typedef struct {
+    uint64_t Persistent;
+    uint64_t Volatile;
+} SMB2_FILEID;
+
+typedef struct {
+    uint16_t StructureSize;
+    uint8_t  OplockLevel;
+    uint8_t  Flags;
+    uint32_t CreateAction;
+    uint64_t CreationTime;
+    uint64_t LastAccessTime;
+    uint64_t LastWriteTime;
+    uint64_t ChangeTime;
+    uint64_t AllocationSize;
+    uint64_t EndofFile;
+    uint32_t FileAttributes;
+    uint32_t Reserved2;
+    SMB2_FILEID FileId;
+    uint32_t CreateContextsOffset;
+    uint32_t CreateContextsLength;
+    uint8_t  Buffer[];
+} SMB2_CREATE_Response;
+
+typedef struct {
+    uint16_t StructureSize;
+    uint8_t  Padding;
+    uint8_t  Flags;
+    uint32_t Length;
+    uint64_t Offset;
+    SMB2_FILEID FileId;
+    uint32_t MinimumCount;
+    uint32_t Channel;
+    uint32_t RemainingBytes;
+    uint16_t ReadChannelInfoOffset;
+    uint16_t ReadChannelInfoLength;
+    uint8_t  Buffer[];
+} SMB2_READ_Request;
+
+/* Read request flags (SMB 3.0.2+) */
+#define SMB2_READFLAG_READ_UNBUFFERED    0x01
+#define SMB2_READFLAG_REQUEST_COMPRESSED 0x02
+
+/* Channel values (SMB 3.0+) */
+#define SMB2_CHANNEL_NONE               0x00000000
+#define SMB2_CHANNEL_RDMA_V1            0x00000001
+#define SMB2_CHANNEL_RDMA_V1_INVALIDATE 0x00000002
+
+typedef struct {
+    uint16_t StructureSize;
+    uint8_t  DataOffset;
+    uint8_t  Reserved;
+    uint32_t DataLength;
+    uint32_t DataRemaining;
+    union {
+        uint32_t Reserved2;
+        uint32_t Flags;
+    };
+    uint8_t  Buffer[];
+} SMB2_READ_Response;

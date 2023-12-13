@@ -13,6 +13,7 @@
 #include "connection.h"
 #include "endian.h"
 #include "smb2proto.h"
+#include "smb2.h"
 #include "readtcp.h"
 #include "auth.h"
 
@@ -38,6 +39,14 @@ static const uint16_t requestStructureSizes[] = {
     [SMB2_OPLOCK_BREAK] = 24, /* for acknowledgment */
 };
 
+/*
+ * StructureSize values for response structures.
+ *
+ * Note: The StructureSize field should always be set to these values,
+ * but the actual size of the structure can sometimes be one byte smaller,
+ * because the low-order bit of these values represents a variable-length
+ * portion of the response, and in some cases that portion can be empty.
+ */
 static const uint16_t responseStructureSizes[] = {
     [SMB2_NEGOTIATE] = 65,
     [SMB2_SESSION_SETUP] = 9,
@@ -82,6 +91,8 @@ static ReadStatus result;   // result from last read
 #define treeConnectResponse  (*(SMB2_TREE_CONNECT_Response*)msg.body)
 #define createRequest        (*(SMB2_CREATE_Request*)msg.body)
 #define createResponse       (*(SMB2_CREATE_Response*)msg.body)
+#define readRequest          (*(SMB2_READ_Request*)msg.body)
+#define readResponse         (*(SMB2_READ_Response*)msg.body)
 
 /*
  * Verify that a offset/length pair specifying a buffer within the last
@@ -183,7 +194,7 @@ ReadStatus SendRequestAndGetResponse(Connection *connection, uint16_t command,
     if (msg.smb2Header.Command != command)
         return rsError;
     
-    if (bodySize < responseStructureSizes[command])
+    if (bodySize < (responseStructureSizes[command] & 0xFFFE))
         return rsError;
     if (msgBodyHeader.StructureSize != responseStructureSizes[command])
         return rsError;
@@ -314,7 +325,7 @@ uint32_t TreeConnect(Connection *connection, char16_t share[],
     return msg.smb2Header.TreeId;
 }
 
-void Open(Connection *connection, uint32_t treeId,
+SMB2_FILEID Open(Connection *connection, uint32_t treeId,
     char16_t file[], uint16_t fileSize) {
     
     createRequest.SecurityFlags = 0;
@@ -322,7 +333,7 @@ void Open(Connection *connection, uint32_t treeId,
     createRequest.ImpersonationLevel = Impersonation;
     createRequest.SmbCreateFlags = 0;
     createRequest.Reserved = 0;
-    createRequest.DesiredAccess = MAXIMUM_ALLOWED; // TODO allow to configure
+    createRequest.DesiredAccess = FILE_READ_DATA; // TODO allow to configure
     createRequest.FileAttributes = 0;
     createRequest.ShareAccess = 0; // TODO set based on desired access
     createRequest.CreateDisposition = FILE_OPEN;
@@ -338,6 +349,36 @@ void Open(Connection *connection, uint32_t treeId,
         sizeof(createRequest) + fileSize);
     if (result != rsDone) {
         // TODO handle errors
-        return;
+        return (SMB2_FILEID){0,0};
     }
+    
+    return createResponse.FileId;
+}
+
+uint32_t Read(Connection *connection, uint32_t treeId, SMB2_FILEID file,
+    uint64_t offset, uint16_t length, void *buf) {
+
+    readRequest.Padding = 0;
+    readRequest.Flags = 0;
+    readRequest.Length = length;
+    readRequest.Offset = offset;
+    readRequest.FileId = file;
+    readRequest.MinimumCount = 1; // TODO check if this is appropriate
+    readRequest.Channel = 0;
+    readRequest.RemainingBytes = 0;
+    readRequest.ReadChannelInfoOffset = 0;
+    readRequest.ReadChannelInfoLength = 0;
+    
+    result = SendRequestAndGetResponse(connection, SMB2_READ, treeId,
+        sizeof(readRequest));
+    if (result != rsDone) {
+        // TODO handle errors
+        return 0;
+    }
+    
+    // TODO verify that data area specified by offset/length is in bounds
+    memcpy(buf, (char*)&msg.smb2Header + readResponse.DataOffset,
+        readResponse.DataLength);
+    
+    return readResponse.DataLength;
 }

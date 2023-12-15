@@ -2,6 +2,9 @@
 #pragma lint -1
 #pragma ignore 24
 segment "AUTOSEG~~~";
+#ifndef GENERATE_ROOT
+#pragma noroot
+#endif
 #endif
 
 #ifdef __ORCAC__

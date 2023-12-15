@@ -9,6 +9,7 @@
 #include <locator.h>
 #include <misctool.h>
 
+#define GENERATE_ROOT
 #include "defs.h"
 #include "smb2proto.h"
 #include "connection.h"

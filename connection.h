@@ -1,3 +1,6 @@
+#ifndef __CONNECTION_H__
+#define __CONNECTION_H__
+
 #include <stdint.h>
 #include <stdbool.h>
 #include <types.h>
@@ -18,3 +21,5 @@ typedef struct {
     bool signingRequired;
     struct hmac_sha256_context *signingContext;
 } Connection;
+
+#endif

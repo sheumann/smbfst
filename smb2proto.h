@@ -1,3 +1,6 @@
+#ifndef __SMB2PROTO_H__
+#define __SMB2PROTO_H__
+
 #include <stdint.h>
 
 #include "ntstatus.h"
@@ -471,3 +474,5 @@ typedef struct {
     uint16_t OutputBufferLength;
     uint8_t  Buffer[];
 } SMB2_QUERY_DIRECTORY_Response;
+
+#endif

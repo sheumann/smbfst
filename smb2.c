@@ -74,31 +74,11 @@ static const uint16_t responseStructureSizes[] = {
 
 static const smb_u128 u128_zero = {0,0};
 
-static struct {
-    DirectTCPHeader directTCPHeader;
-    SMB2Header smb2Header;
-    unsigned char body[32768];
-} msg;
+MsgRec msg;
 
 static uint16_t bodySize;   // size of last message received
 
-static ReadStatus result;   // result from last read
-
-#define msgBodyHeader          (*(SMB2_Common_Header*)msg.body)
-#define negotiateRequest       (*(SMB2_NEGOTIATE_Request*)msg.body)
-#define negotiateResponse      (*(SMB2_NEGOTIATE_Response*)msg.body)
-#define sessionSetupRequest    (*(SMB2_SESSION_SETUP_Request*)msg.body)
-#define sessionSetupResponse   (*(SMB2_SESSION_SETUP_Response*)msg.body)
-#define treeConnectRequest     (*(SMB2_TREE_CONNECT_Request*)msg.body)
-#define treeConnectResponse    (*(SMB2_TREE_CONNECT_Response*)msg.body)
-#define createRequest          (*(SMB2_CREATE_Request*)msg.body)
-#define createResponse         (*(SMB2_CREATE_Response*)msg.body)
-#define readRequest            (*(SMB2_READ_Request*)msg.body)
-#define readResponse           (*(SMB2_READ_Response*)msg.body)
-#define closeRequest           (*(SMB2_CLOSE_Request*)msg.body)
-#define closeResponse          (*(SMB2_CLOSE_Response*)msg.body)
-#define queryDirectoryRequest  (*(SMB2_QUERY_DIRECTORY_Request*)msg.body)
-#define queryDirectoryResponse (*(SMB2_QUERY_DIRECTORY_Response*)msg.body)
+//static ReadStatus result;   // result from last read
 
 /*
  * Verify that a offset/length pair specifying a buffer within the last
@@ -224,6 +204,7 @@ ReadStatus SendRequestAndGetResponse(Connection *connection, uint16_t command,
     }
 }
 
+#if 0
 void Negotiate(Connection *connection) {
     // assume lowest version until we have negotiated
     connection->dialect = SMB_202;
@@ -484,3 +465,4 @@ uint16_t QueryDirectory(Connection *connection, uint32_t treeId,
 
     return resultLen;
 }
+#endif

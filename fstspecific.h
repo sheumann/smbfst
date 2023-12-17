@@ -7,7 +7,9 @@
 #define smbFSID 0x800e
 
 #define SMB_CONNECT 0
-#define SMB_AUTHENTICATE 1
+#define SMB_CONNECTION_RETAIN 1
+#define SMB_CONNECTION_RELEASE 2
+#define SMB_AUTHENTICATE 3
 
 typedef struct SMBConnectRec {
     Word pCount;
@@ -34,5 +36,12 @@ typedef struct SMBAuthenticateRec {
     char16_t *password;
     Word passwordSize;
 } SMBAuthenticateRec;
+
+typedef struct SMBConnectionRec {
+    Word pCount;
+    Word fileSysID;
+    Word commandNum;
+    LongWord connectionID;
+} SMBConnectionRec;
 
 #endif

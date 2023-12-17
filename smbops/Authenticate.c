@@ -9,7 +9,7 @@
 #include "auth.h"
 #include "crypto/sha256.h"
 
-Word Authenticate(SMBAuthenticateRec *pblock, void *gsosdp, Word pcount) {
+Word SMB_Authenticate(SMBAuthenticateRec *pblock, void *gsosdp, Word pcount) {
     static ReadStatus result;
     static AuthState authState;
     static size_t authSize;
@@ -26,7 +26,7 @@ Word Authenticate(SMBAuthenticateRec *pblock, void *gsosdp, Word pcount) {
             previousAuthSize, sessionSetupRequest.Buffer);
         if (authSize == (size_t)-1) {
             // TODO handle errors
-            break;
+            return networkError;
         }
 
         sessionSetupRequest.Flags = 0;

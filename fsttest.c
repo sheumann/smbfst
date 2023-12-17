@@ -28,6 +28,12 @@ SMBAuthenticateRec authenticatePB = {
     .flags = 0,
 };
 
+SMBConnectionRec connectionReleasePB = {
+    .pCount = 3,
+    .fileSysID = smbFSID,
+    .commandNum = SMB_CONNECTION_RELEASE,
+};
+
 int main(int argc, char *argv[]) {
     cvtRec theCvtRec;
     
@@ -92,4 +98,7 @@ int main(int argc, char *argv[]) {
     if (toolerror()) {
         printf("authenticate error = %04x\n", toolerror());
     }
+    
+    connectionReleasePB.connectionID = connectPB.connectionID;
+    FSTSpecific(&connectionReleasePB);
 }

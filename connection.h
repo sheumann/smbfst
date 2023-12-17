@@ -20,6 +20,11 @@ typedef struct {
     
     bool signingRequired;
     struct hmac_sha256_context *signingContext;
+    
+    Word refCount;
 } Connection;
+
+void Connection_Retain(Connection *conn);
+void Connection_Release(Connection *conn);
 
 #endif

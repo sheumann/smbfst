@@ -78,7 +78,7 @@ app_entry start
 maxRegularCall equ $25                  ; max call we handle, except FSTSpecific
 FSTSpecificCall equ $33                 ; FSTSpecific call number (low byte)
 pblock  equ     $32                     ; pblock ptr (on GS/OS direct page)
-maxFSTSpecificCall equ 2                ; max FSTSpecific subcall number
+maxFSTSpecificCall equ 4                ; max FSTSpecific subcall number
 SYS_EXIT equ    $01fc40                 ; SYS_EXIT system service call
         
         phk                             ; set databank (no need to save/restore)
@@ -203,6 +203,8 @@ gsos_calls anop
 
 ; Table of FSTSpecific subcalls
 fstspecific_calls anop
-        dc      i4'Connect'
-        dc      i4'Authenticate'
+        dc      i4'SMB_Connect'
+        dc      i4'SMB_Connection_Retain'
+        dc      i4'SMB_Connection_Release'
+        dc      i4'SMB_Authenticate'
         end

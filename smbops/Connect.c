@@ -7,16 +7,12 @@
 #include <string.h>
 #include "fstspecific.h"
 #include "smb2.h"
-
-// TODO use our own allocation functions
-#include <stdlib.h>
-#define smb_malloc(x) malloc(x)
-#define smb_free(x)   free(x)
+#include "alloc.h"
 
 // Timeout for TCP connection establishment
 #define TIMEOUT 15 /* seconds */
 
-Word Connect(SMBConnectRec *pblock, void *gsosdp, Word pcount) {
+Word SMB_Connect(SMBConnectRec *pblock, void *gsosdp, Word pcount) {
     static ReadStatus result;
     static Word tcpError;
     static srBuff status;
@@ -107,6 +103,7 @@ Word Connect(SMBConnectRec *pblock, void *gsosdp, Word pcount) {
     
     // Security buffer is currently ignored
     
+    connection->refCount = 1;
     pblock->connectionID = (LongWord)connection;
     return 0;
 }

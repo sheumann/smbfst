@@ -14,11 +14,7 @@
 #include "authinfo.h"
 #include "auth.h"
 #include "fstdata.h"
-
-// TODO use our own allocation functions
-#include <stdlib.h>
-#define smb_malloc(x) malloc(x)
-#define smb_free(x)   free(x)
+#include "alloc.h"
 
 static const NTLM_NEGOTIATE_MESSAGE negotiateMessage = {
     .Signature = "NTLMSSP",
@@ -46,6 +42,7 @@ typedef struct {
     };
     struct hmac_md5_context hmac_md5_context;
 } ctxRec;
+_Static_assert(sizeof(ctxRec) <= GBUF_SIZE, "");
 
 #define c (*(ctxRec*)gbuf)
 

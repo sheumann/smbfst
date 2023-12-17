@@ -10,6 +10,8 @@
 #define SMB_CONNECTION_RETAIN 1
 #define SMB_CONNECTION_RELEASE 2
 #define SMB_AUTHENTICATE 3
+#define SMB_SESSION_RETAIN 4
+#define SMB_SESSION_RELEASE 5
 
 typedef struct SMBConnectRec {
     Word pCount;
@@ -43,5 +45,12 @@ typedef struct SMBConnectionRec {
     Word commandNum;
     LongWord connectionID;
 } SMBConnectionRec;
+
+typedef struct SMBSessionRec {
+    Word pCount;
+    Word fileSysID;
+    Word commandNum;
+    LongWord sessionID;
+} SMBSessionRec;
 
 #endif

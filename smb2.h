@@ -3,6 +3,7 @@
 
 #include "smb2proto.h"
 #include "connection.h"
+#include "session.h"
 #include "readtcp.h"
 
 #define msgBodyHeader          (*(SMB2_Common_Header*)msg.body)
@@ -40,7 +41,7 @@ extern MsgRec msg;
 
 extern uint16_t bodySize;   // size of last message received
 
-ReadStatus SendRequestAndGetResponse(Connection *connection, uint16_t command,
+ReadStatus SendRequestAndGetResponse(Session *session, uint16_t command,
                                      uint32_t treeId, uint16_t bodyLength);
 
 void Negotiate(Connection *connection);

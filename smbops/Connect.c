@@ -17,6 +17,7 @@ Word SMB_Connect(SMBConnectRec *pblock, void *gsosdp, Word pcount) {
     static Word tcpError;
     static srBuff status;
     static Long startTime;
+    static Session dummySession = {0};
 
     if (pblock->pCount != 7)
         return invalidPcount;
@@ -74,7 +75,8 @@ Word SMB_Connect(SMBConnectRec *pblock, void *gsosdp, Word pcount) {
     negotiateRequest.Dialects[2] = 0;
     negotiateRequest.Dialects[3] = 0;
     
-    result = SendRequestAndGetResponse(connection, SMB2_NEGOTIATE, 0,
+    dummySession.connection = connection;
+    result = SendRequestAndGetResponse(&dummySession, SMB2_NEGOTIATE, 0,
         sizeof(negotiateRequest) + 4*sizeof(negotiateRequest.Dialects[0]));
     if (result != rsDone) {
         TCPIPAbortTCP(connection->ipid);

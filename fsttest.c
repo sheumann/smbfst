@@ -34,6 +34,12 @@ SMBConnectionRec connectionReleasePB = {
     .commandNum = SMB_CONNECTION_RELEASE,
 };
 
+SMBSessionRec sessionReleasePB = {
+    .pCount = 3,
+    .fileSysID = smbFSID,
+    .commandNum = SMB_SESSION_RELEASE,
+};
+
 int main(int argc, char *argv[]) {
     cvtRec theCvtRec;
     
@@ -63,6 +69,7 @@ int main(int argc, char *argv[]) {
     FSTSpecific(&connectPB);
     if (toolerror()) {
         printf("connect error = %04x\n", toolerror());
+        return 0;
     }
     
     authenticatePB.connectionID = connectPB.connectionID;
@@ -85,20 +92,30 @@ int main(int argc, char *argv[]) {
     authenticatePB.password = password;
     authenticatePB.passwordSize = len*2;
 
-    len = strlen(argv[4]);
-    if (len > 100)
-        len = 100;
-    for (i = 0; i < len; i++) {
-        domain[i] = argv[4][i];
+    if (argc >= 5) {
+        len = strlen(argv[4]);
+        if (len > 100)
+            len = 100;
+        for (i = 0; i < len; i++) {
+            domain[i] = argv[4][i];
+        }
+        authenticatePB.userDomain = domain;
+        authenticatePB.userDomainSize = len*2;
+    } else {
+        authenticatePB.userDomainSize = 0;
     }
-    authenticatePB.userDomain = domain;
-    authenticatePB.userDomainSize = len*2;
 
     FSTSpecific(&authenticatePB);
     if (toolerror()) {
         printf("authenticate error = %04x\n", toolerror());
+        connectionReleasePB.connectionID = connectPB.connectionID;
+        FSTSpecific(&connectionReleasePB);
+        return 0;
     }
     
     connectionReleasePB.connectionID = connectPB.connectionID;
     FSTSpecific(&connectionReleasePB);
+
+    sessionReleasePB.sessionID = authenticatePB.sessionID;
+    FSTSpecific(&sessionReleasePB);
 }

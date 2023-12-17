@@ -1,12 +1,15 @@
 #include "defs.h"
 #include <types.h>
-
+#include <stddef.h>
+#include <string.h>
 #include <memory.h>
 #include <orca.h>
 #include <gsos.h>
 #include "fstspecific.h"
 #include "smb2.h"
 #include "auth.h"
+#include "alloc.h"
+#include "connection.h"
 #include "crypto/sha256.h"
 
 Word SMB_Authenticate(SMBAuthenticateRec *pblock, void *gsosdp, Word pcount) {
@@ -16,6 +19,14 @@ Word SMB_Authenticate(SMBAuthenticateRec *pblock, void *gsosdp, Word pcount) {
     static unsigned char *previousAuthMsg;
     static size_t previousAuthSize;
     Connection *connection = (Connection *)pblock->connectionID;
+    Session *session;
+    
+    session = smb_malloc(sizeof(Session));
+    if (session == NULL)
+        return outOfMem;
+
+    memset(session, 0, sizeof(Session));
+    session->connection = connection;
 
     InitAuth(&authState, pblock);
     previousAuthMsg = NULL;
@@ -26,6 +37,7 @@ Word SMB_Authenticate(SMBAuthenticateRec *pblock, void *gsosdp, Word pcount) {
             previousAuthSize, sessionSetupRequest.Buffer);
         if (authSize == (size_t)-1) {
             // TODO handle errors
+            smb_free(session);
             return networkError;
         }
 
@@ -38,7 +50,7 @@ Word SMB_Authenticate(SMBAuthenticateRec *pblock, void *gsosdp, Word pcount) {
         sessionSetupRequest.SecurityBufferLength = authSize;
         sessionSetupRequest.PreviousSessionId = 0;
 
-        result = SendRequestAndGetResponse(connection, SMB2_SESSION_SETUP, 0,
+        result = SendRequestAndGetResponse(session, SMB2_SESSION_SETUP, 0,
             sizeof(sessionSetupRequest) + authSize);
         
         if (result == rsDone) {
@@ -51,13 +63,14 @@ Word SMB_Authenticate(SMBAuthenticateRec *pblock, void *gsosdp, Word pcount) {
                         sizeof(struct hmac_sha256_context), userid(), 0x8015, 0);
                     if (toolerror()) {
                         // TODO clean up on errors?
+                        smb_free(session);
                         return outOfMem;
                     }
                 
-                    connection->signingRequired = true;
-                    connection->signingContext = (void*)*ctxHandle;
+                    session->signingRequired = true;
+                    session->signingContext = (void*)*ctxHandle;
                 
-                    hmac_sha256_init(connection->signingContext,
+                    hmac_sha256_init(session->signingContext,
                         authState.signKey,
                         16);
                 } else {
@@ -65,10 +78,14 @@ Word SMB_Authenticate(SMBAuthenticateRec *pblock, void *gsosdp, Word pcount) {
                     UNIMPLEMENTED
                 }
             }
-        
+
+            Connection_Retain(connection);
+            session->refCount = 1;
+            pblock->sessionID = (LongWord)session;
             return 0;
         } else if (result != rsMoreProcessingRequired) {
             // TODO clean up on errors?
+            smb_free(session);
             return invalidAccess;
         }
 
@@ -76,10 +93,11 @@ Word SMB_Authenticate(SMBAuthenticateRec *pblock, void *gsosdp, Word pcount) {
             sessionSetupResponse.SecurityBufferOffset,
             sessionSetupResponse.SecurityBufferLength)) {
             // TODO clean up on errors?
+            smb_free(session);
             return networkError;
         }
         
-        connection->sessionId = msg.smb2Header.SessionId;
+        session->sessionId = msg.smb2Header.SessionId;
         
         previousAuthMsg = (unsigned char *)&msg.smb2Header + 
             sessionSetupResponse.SecurityBufferOffset;

@@ -16,11 +16,6 @@ typedef struct {
     
     bool wantSigning; // flag set in Negotiate, but not necessarily in effect yet
     
-    uint64_t sessionId; // TODO separate session structure?
-    
-    bool signingRequired;
-    struct hmac_sha256_context *signingContext;
-    
     Word refCount;
 } Connection;
 

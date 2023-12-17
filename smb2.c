@@ -12,6 +12,7 @@
 
 #include "defs.h"
 #include "connection.h"
+#include "session.h"
 #include "endian.h"
 #include "smb2proto.h"
 #include "smb2.h"
@@ -111,8 +112,9 @@ ReadStatus ReadMessage(Connection *connection) {
     return rsDone;
 }
 
-bool SendMessage(Connection *connection, uint16_t command, uint32_t treeId,
+bool SendMessage(Session *session, uint16_t command, uint32_t treeId,
                  uint16_t bodyLength) {
+    Connection *connection = session->connection;
     Word tcperr;
 
     msg.smb2Header.ProtocolId = 0x424D53FE;
@@ -139,16 +141,16 @@ bool SendMessage(Connection *connection, uint16_t command, uint32_t treeId,
     msg.smb2Header.MessageId = connection->nextMessageId++;
     msg.smb2Header.Reserved2 = 0;
     msg.smb2Header.TreeId = treeId;
-    msg.smb2Header.SessionId = connection->sessionId;
+    msg.smb2Header.SessionId = session->sessionId;
     msg.smb2Header.Signature = u128_zero;
 
-    if (connection->signingRequired) {
+    if (session->signingRequired) {
         msg.smb2Header.Flags |= SMB2_FLAGS_SIGNED;
         
-        hmac_sha256_compute(connection->signingContext, (void*)&msg.smb2Header,
+        hmac_sha256_compute(session->signingContext, (void*)&msg.smb2Header,
             sizeof(SMB2Header) + bodyLength);
         memcpy(&msg.smb2Header.Signature,
-            connection->signingContext->u[0].ctx.hash, 16);
+            session->signingContext->u[0].ctx.hash, 16);
     }
     
     msg.directTCPHeader.StreamProtocolLength =
@@ -160,13 +162,14 @@ bool SendMessage(Connection *connection, uint16_t command, uint32_t treeId,
     return !(tcperr || toolerror());
 }
 
-ReadStatus SendRequestAndGetResponse(Connection *connection, uint16_t command,
+ReadStatus SendRequestAndGetResponse(Session *session, uint16_t command,
                                      uint32_t treeId, uint16_t bodyLength) {
+    Connection *connection = session->connection;
     uint64_t messageId = connection->nextMessageId;
     
     msgBodyHeader.StructureSize = requestStructureSizes[command];
     
-    if (SendMessage(connection, command, treeId, bodyLength) == false)
+    if (SendMessage(session, command, treeId, bodyLength) == false)
         return rsError;
 
     if (ReadMessage(connection) != rsDone)

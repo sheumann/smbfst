@@ -2,6 +2,9 @@
 #include <string.h>
 #include <uchar.h>
 
+#include <ctype.h>
+#include <stdlib.h>
+
 #include "defs.h"
 #include "crypto/md4.h"
 #include "crypto/md5.h"
@@ -10,6 +13,12 @@
 #include "ntlm.h"
 #include "authinfo.h"
 #include "auth.h"
+#include "fstdata.h"
+
+// TODO use our own allocation functions
+#include <stdlib.h>
+#define smb_malloc(x) malloc(x)
+#define smb_free(x)   free(x)
 
 static const NTLM_NEGOTIATE_MESSAGE negotiateMessage = {
     .Signature = "NTLMSSP",
@@ -29,6 +38,17 @@ static const NTLM_NEGOTIATE_MESSAGE negotiateMessage = {
     .Version = {0},
 };
 
+typedef struct {
+    union {
+        struct md4_context md4_context;
+        struct md5_context md5_context;
+        struct rc4_context rc4_context;
+    };
+    struct hmac_md5_context hmac_md5_context;
+} ctxRec;
+
+#define c (*(ctxRec*)gbuf)
+
 /*
  * Compute NT one-way function v2 for given user, user domain, and password
  *
@@ -39,21 +59,17 @@ void NTOWFv2(uint16_t passwordSize, char16_t password[],
              uint16_t userSize, char16_t userUpperCase[],
              uint16_t userDomainSize, char16_t userDomain[],
              unsigned  char *result) {
-    // TODO allocate contexts off-stack
-    struct md4_context md4_context;
-    struct hmac_md5_context hmac_md5_context;
+    md4_init(&c.md4_context);
+    md4_update(&c.md4_context, (const void*)password, passwordSize);
+    md4_finalize(&c.md4_context);
     
-    md4_init(&md4_context);
-    md4_update(&md4_context, (const void*)password, passwordSize);
-    md4_finalize(&md4_context);
+    hmac_md5_init(&c.hmac_md5_context,
+        c.md4_context.hash, sizeof(c.md4_context.hash));
+    hmac_md5_update(&c.hmac_md5_context, (const void*)userUpperCase, userSize);
+    hmac_md5_update(&c.hmac_md5_context, (const void*)userDomain, userDomainSize);
+    hmac_md5_finalize(&c.hmac_md5_context);
     
-    hmac_md5_init(&hmac_md5_context,
-        md4_context.hash, sizeof(md4_context.hash));
-    hmac_md5_update(&hmac_md5_context, (const void*)userUpperCase, userSize);
-    hmac_md5_update(&hmac_md5_context, (const void*)userDomain, userDomainSize);
-    hmac_md5_finalize(&hmac_md5_context);
-    
-    memcpy(result, hmac_md5_context.u[0].ctx.hash, 16);
+    memcpy(result, c.hmac_md5_context.u[0].ctx.hash, 16);
 }
 
 void NTLM_GetNegotiateMessage(NTLM_Context *ctx, unsigned char *buf) {
@@ -71,7 +87,9 @@ static const void *NTLM_GetTargetInfo(
     const NTLM_CHALLENGE_MESSAGE *challengeMsg, uint16_t challengeSize,
     uint16_t avId, uint16_t *size) {
     AV_PAIR *avPair;
-    uint32_t offset = challengeMsg->TargetInfoFields.BufferOffset;
+    static uint32_t offset;
+    
+    offset = challengeMsg->TargetInfoFields.BufferOffset;
     
     while (1) {
         if (offset == 0 || offset > challengeSize - 4)
@@ -101,31 +119,30 @@ static void GetSignKey(const uint8_t exportedSessionKey[16],
                        uint8_t signKey[16]) {
     static const unsigned char clientString[] =
         "session key to client-to-server signing key magic constant";
-    struct md5_context md5_context;
     
-    md5_init(&md5_context);
-    md5_update(&md5_context, exportedSessionKey, 16);
-    md5_update(&md5_context, clientString, sizeof(clientString));
-    md5_finalize(&md5_context);
-    memcpy(signKey, md5_context.hash, 16);
+    md5_init(&c.md5_context);
+    md5_update(&c.md5_context, exportedSessionKey, 16);
+    md5_update(&c.md5_context, clientString, sizeof(clientString));
+    md5_finalize(&c.md5_context);
+    memcpy(signKey, c.md5_context.hash, 16);
 }
 
 static void GetSealKey(const uint8_t exportedSessionKey[16],
                        uint8_t sealKey[16]) {
     static const unsigned char clientString[] =
         "session key to client-to-server sealing key magic constant";
-    struct md5_context md5_context;
     
-    md5_init(&md5_context);
-    md5_update(&md5_context, exportedSessionKey, 16); // assumes 128-bit security
-    md5_update(&md5_context, clientString, sizeof(clientString));
-    md5_finalize(&md5_context);
-    memcpy(sealKey, md5_context.hash, 16);
+    md5_init(&c.md5_context);
+    md5_update(&c.md5_context, exportedSessionKey, 16); // assumes 128-bit security
+    md5_update(&c.md5_context, clientString, sizeof(clientString));
+    md5_finalize(&c.md5_context);
+    memcpy(sealKey, c.md5_context.hash, 16);
 }
 
 unsigned char *NTLM_HandleChallenge(NTLM_Context *ctx,
+    SMBAuthenticateRec *authRec,
     const NTLM_CHALLENGE_MESSAGE *challengeMsg, uint16_t challengeSize,
-    size_t *resultSize, char sessionKey[16]) {
+    size_t *resultSize, uint8_t sessionKey[16]) {
 
     uint16_t infoSize;
     const void *infoPtr;
@@ -136,14 +153,13 @@ unsigned char *NTLM_HandleChallenge(NTLM_Context *ctx,
     static unsigned char sessionBaseKey[16];
     static unsigned char encryptedRandomSessionKey[16];
     unsigned char *payloadPtr;
+    char16_t *userNameUpperCase;
+    unsigned i;
     
     // Nonce used for session key generation
     // TODO generate a random number for this
     static unsigned char exportedSessionKey[16] = 
         {13,123,123,4,3,242,234,23,123,13,31,45,34,143,234,171};
-    
-    struct hmac_md5_context hmac_md5_context;
-    struct rc4_context rc4_context;
     
     
     // Check that this is a valid challenge message
@@ -155,9 +171,22 @@ unsigned char *NTLM_HandleChallenge(NTLM_Context *ctx,
         return 0;
     // TODO verify flags
 
+    userNameUpperCase = smb_malloc(authRec->userNameSize);
+    if (!userNameUpperCase)
+        return 0;
+
+    for (i = 0; i < authRec->userNameSize; i++) {
+        // TODO properly uppercase non-ASCII characters
+        userNameUpperCase[i] = toupper(authRec->userName[i]);
+    }
+
     /* Compute NT one-way function v2 */
-    NTOWFv2(passwordSize, password, userSize, userUpperCase,
-        userDomainSize, userDomain, responseKeyNT);
+    NTOWFv2(authRec->passwordSize, authRec->password,
+        authRec->userNameSize, userNameUpperCase,
+        authRec->userDomainSize, authRec->userDomain,
+        responseKeyNT);
+
+    smb_free(userNameUpperCase);
 
     // TODO special case for anonymous logins
 
@@ -204,21 +233,21 @@ unsigned char *NTLM_HandleChallenge(NTLM_Context *ctx,
     tempBufSize = payloadPtr - tempBuf + 4;
 
     /* Compute NTProofStr */
-    hmac_md5_init(&hmac_md5_context, responseKeyNT, sizeof(responseKeyNT));
-    hmac_md5_update(&hmac_md5_context, (void*)&challengeMsg->ServerChallenge,
+    hmac_md5_init(&c.hmac_md5_context, responseKeyNT, sizeof(responseKeyNT));
+    hmac_md5_update(&c.hmac_md5_context, (void*)&challengeMsg->ServerChallenge,
         sizeof(challengeMsg->ServerChallenge));
-    hmac_md5_update(&hmac_md5_context, tempBuf, tempBufSize);
-    hmac_md5_finalize(&hmac_md5_context);
-    memcpy(ntProofStr, hmac_md5_context.u[0].ctx.hash, 16);
+    hmac_md5_update(&c.hmac_md5_context, tempBuf, tempBufSize);
+    hmac_md5_finalize(&c.hmac_md5_context);
+    memcpy(ntProofStr, c.hmac_md5_context.u[0].ctx.hash, 16);
 
     /* Compute SessionBaseKey (which is used as KeyExchangeKey) */
-    hmac_md5_init(&hmac_md5_context, responseKeyNT, sizeof(responseKeyNT));
-    hmac_md5_compute(&hmac_md5_context, ntProofStr, sizeof(ntProofStr));
-    memcpy(sessionBaseKey, hmac_md5_context.u[0].ctx.hash, 16);
+    hmac_md5_init(&c.hmac_md5_context, responseKeyNT, sizeof(responseKeyNT));
+    hmac_md5_compute(&c.hmac_md5_context, ntProofStr, sizeof(ntProofStr));
+    memcpy(sessionBaseKey, c.hmac_md5_context.u[0].ctx.hash, 16);
 
     /* Compute EncryptedRandomSessionKey */
-    rc4_init(&rc4_context, sessionBaseKey, sizeof(sessionBaseKey));
-    rc4_process(&rc4_context, exportedSessionKey, encryptedRandomSessionKey,
+    rc4_init(&c.rc4_context, sessionBaseKey, sizeof(sessionBaseKey));
+    rc4_process(&c.rc4_context, exportedSessionKey, encryptedRandomSessionKey,
         16);
 
     /* Generate NTLM authenticate message */
@@ -247,18 +276,18 @@ unsigned char *NTLM_HandleChallenge(NTLM_Context *ctx,
     payloadPtr += tempBufSize;
 
     authMsg.DomainNameFields.Len =
-        authMsg.DomainNameFields.MaxLen = userDomainSize;
+        authMsg.DomainNameFields.MaxLen = authRec->userDomainSize;
     authMsg.DomainNameFields.BufferOffset =
         payloadPtr - (unsigned char*)&authMsg;
-    memcpy(payloadPtr, userDomain, userDomainSize);
-    payloadPtr += userDomainSize;
+    memcpy(payloadPtr, authRec->userDomain, authRec->userDomainSize);
+    payloadPtr += authRec->userDomainSize;
     
     authMsg.UserNameFields.Len =
-        authMsg.UserNameFields.MaxLen = userSize;
+        authMsg.UserNameFields.MaxLen = authRec->userNameSize;
     authMsg.UserNameFields.BufferOffset =
         payloadPtr - (unsigned char*)&authMsg;
-    memcpy(payloadPtr, user, userSize);
-    payloadPtr += userSize;
+    memcpy(payloadPtr, authRec->userName, authRec->userNameSize);
+    payloadPtr += authRec->userNameSize;
     
     // workstation name = "IIGS"
     // TODO generate a more unique one, or allow it to be configured
@@ -297,15 +326,15 @@ unsigned char *NTLM_HandleChallenge(NTLM_Context *ctx,
     *resultSize = payloadPtr - (unsigned char*)&authMsg;
 
     // set authMsg.MIC
-    hmac_md5_init(&hmac_md5_context, exportedSessionKey,
+    hmac_md5_init(&c.hmac_md5_context, exportedSessionKey,
         sizeof(exportedSessionKey));
-    hmac_md5_update(&hmac_md5_context, (const void *)&negotiateMessage,
+    hmac_md5_update(&c.hmac_md5_context, (const void *)&negotiateMessage,
         sizeof(negotiateMessage));
-    hmac_md5_update(&hmac_md5_context, (const void *)challengeMsg,
+    hmac_md5_update(&c.hmac_md5_context, (const void *)challengeMsg,
         challengeSize);
-    hmac_md5_update(&hmac_md5_context, (const void *)&authMsg, *resultSize);
-    hmac_md5_finalize(&hmac_md5_context);
-    memcpy(authMsg.MIC, hmac_md5_context.u[0].ctx.hash, 16);
+    hmac_md5_update(&c.hmac_md5_context, (const void *)&authMsg, *resultSize);
+    hmac_md5_finalize(&c.hmac_md5_context);
+    memcpy(authMsg.MIC, c.hmac_md5_context.u[0].ctx.hash, 16);
 
     GetSignKey(exportedSessionKey, ctx->signkey);
     GetSealKey(exportedSessionKey, ctx->sealkey);
@@ -324,16 +353,13 @@ unsigned char *NTLM_GetMechListMIC(NTLM_Context *ctx,
         .SeqNum = 0,
     };
 
-    struct hmac_md5_context hmac_md5_context;
-    struct rc4_context rc4_context;
+    hmac_md5_init(&c.hmac_md5_context, ctx->signkey, sizeof(ctx->signkey));
+    hmac_md5_update(&c.hmac_md5_context, (void*)&sig.SeqNum, sizeof(sig.SeqNum));
+    hmac_md5_update(&c.hmac_md5_context, mechList, mechListSize);
+    hmac_md5_finalize(&c.hmac_md5_context);
 
-    hmac_md5_init(&hmac_md5_context, ctx->signkey, sizeof(ctx->signkey));
-    hmac_md5_update(&hmac_md5_context, (void*)&sig.SeqNum, sizeof(sig.SeqNum));
-    hmac_md5_update(&hmac_md5_context, mechList, mechListSize);
-    hmac_md5_finalize(&hmac_md5_context);
-
-    rc4_init(&rc4_context, ctx->sealkey, sizeof(ctx->sealkey));
-    rc4_process(&rc4_context, hmac_md5_context.u[0].ctx.hash,
+    rc4_init(&c.rc4_context, ctx->sealkey, sizeof(ctx->sealkey));
+    rc4_process(&c.rc4_context, c.hmac_md5_context.u[0].ctx.hash,
         (void*)&sig.Checksum, 8);
 
     *resultSize = sizeof(sig);

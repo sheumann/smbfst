@@ -107,5 +107,6 @@ Word Connect(SMBConnectRec *pblock, void *gsosdp, Word pcount) {
     
     // Security buffer is currently ignored
     
+    pblock->connectionID = (LongWord)connection;
     return 0;
 }

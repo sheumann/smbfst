@@ -1,4 +1,8 @@
+#ifndef __NTLM_H__
+#define __NTLM_H__
+
 #include "ntlmproto.h"
+#include "fstspecific.h"
 
 typedef struct {
     unsigned char signkey[16];
@@ -9,10 +13,13 @@ typedef struct {
 void NTLM_GetNegotiateMessage(NTLM_Context *ctx, unsigned char *buf);
 
 unsigned char *NTLM_HandleChallenge(NTLM_Context *ctx,
+                                    SMBAuthenticateRec *authRec,
                                     const NTLM_CHALLENGE_MESSAGE *challengeMsg,
                                     uint16_t challengeSize, size_t *resultSize,
-                                    char sessionKey[16]);
+                                    uint8_t sessionKey[16]);
 
 unsigned char *NTLM_GetMechListMIC(NTLM_Context *ctx,
                                    const unsigned char *mechList,
                                    uint16_t mechListSize, size_t *resultSize);
+
+#endif

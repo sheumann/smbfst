@@ -1,3 +1,5 @@
+#include "defs.h"
+
 #include <string.h>
 
 #include "auth.h"
@@ -23,8 +25,9 @@ enum {
 
 
 
-void InitAuth(AuthState *state) {
+void InitAuth(AuthState *state, SMBAuthenticateRec *authRec) {
     memset(state, 0, sizeof(*state));
+    state->authRec = authRec;
 }
 
 /*
@@ -32,8 +35,8 @@ void InitAuth(AuthState *state) {
  */
 length_t GetX690Length(const unsigned char **bufPtrPtr,
     const unsigned char *bufEnd) {
-    length_t length;
-    length_t i;
+    static length_t length;
+    static length_t i;
 
     if (*bufPtrPtr == bufEnd)
         return 0;
@@ -77,12 +80,12 @@ void WriteX690Length(unsigned char **bufPtrPtr, uint16_t val) {
 size_t DoAuthStep(AuthState *state, const unsigned char *previousMsg,
                   uint16_t previousSize, unsigned char *msgBuf) {
     unsigned char *msgPtr = msgBuf;
-    unsigned char *prevMsgPtr;
-    size_t itemSize;
-    unsigned char *authMsgPtr;
-    unsigned char *mechListPtr;
-    unsigned char *mechListMICPtr;
-    size_t mechListMICSize;
+    unsigned const char *prevMsgPtr;
+    static size_t itemSize;
+    static unsigned char *authMsgPtr;
+    static unsigned char *mechListPtr;
+    static unsigned char *mechListMICPtr;
+    static size_t mechListMICSize;
     static NTLM_Context ntlmContext;
 
     switch (state->step++) {
@@ -183,7 +186,7 @@ size_t DoAuthStep(AuthState *state, const unsigned char *previousMsg,
             return (size_t)-1; //invalid size
 
         /* Get NTLM AUTHENTICATE_MESSAGE */
-        authMsgPtr = NTLM_HandleChallenge(&ntlmContext,
+        authMsgPtr = NTLM_HandleChallenge(&ntlmContext, state->authRec,
             (NTLM_CHALLENGE_MESSAGE *)prevMsgPtr, itemSize, &itemSize,
             state->signKey);
         if (authMsgPtr == NULL)

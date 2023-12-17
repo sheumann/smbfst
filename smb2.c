@@ -76,18 +76,9 @@ static const smb_u128 u128_zero = {0,0};
 
 MsgRec msg;
 
-static uint16_t bodySize;   // size of last message received
+uint16_t bodySize;   // size of last message received
 
 //static ReadStatus result;   // result from last read
-
-/*
- * Verify that a offset/length pair specifying a buffer within the last
- * message received actually refer to locations within that message.
- *
- * Note: argument values should be uint16_t, not 32-bit or larger.
- */
-#define VerifyBuffer(offset,length) \
-    ((uint32_t)(offset) + (length) <= bodySize + sizeof(SMB2Header))
 
 ReadStatus ReadMessage(Connection *connection) {
     ReadStatus result;
@@ -138,7 +129,7 @@ bool SendMessage(Connection *connection, uint16_t command, uint32_t treeId,
     } else {
         UNIMPLEMENTED
     }
-    
+
     msg.smb2Header.Command = command;
     
     msg.smb2Header.CreditRequest = 1;
@@ -150,7 +141,7 @@ bool SendMessage(Connection *connection, uint16_t command, uint32_t treeId,
     msg.smb2Header.TreeId = treeId;
     msg.smb2Header.SessionId = connection->sessionId;
     msg.smb2Header.Signature = u128_zero;
-    
+
     if (connection->signingRequired) {
         msg.smb2Header.Flags |= SMB2_FLAGS_SIGNED;
         

@@ -21,6 +21,15 @@
 #define queryDirectoryRequest  (*(SMB2_QUERY_DIRECTORY_Request*)msg.body)
 #define queryDirectoryResponse (*(SMB2_QUERY_DIRECTORY_Response*)msg.body)
 
+/*
+ * Verify that a offset/length pair specifying a buffer within the last
+ * message received actually refer to locations within that message.
+ *
+ * Note: argument values should be uint16_t, not 32-bit or larger.
+ */
+#define VerifyBuffer(offset,length) \
+    ((uint32_t)(offset) + (length) <= bodySize + sizeof(SMB2Header))
+
 typedef struct {
     DirectTCPHeader directTCPHeader;
     SMB2Header smb2Header;
@@ -28,6 +37,8 @@ typedef struct {
 } MsgRec;
 
 extern MsgRec msg;
+
+extern uint16_t bodySize;   // size of last message received
 
 ReadStatus SendRequestAndGetResponse(Connection *connection, uint16_t command,
                                      uint32_t treeId, uint16_t bodyLength);

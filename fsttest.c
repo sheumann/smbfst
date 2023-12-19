@@ -40,6 +40,12 @@ SMBSessionRec sessionReleasePB = {
     .commandNum = SMB_SESSION_RELEASE,
 };
 
+SMBMountRec mountPB = {
+    .pCount = 6,
+    .fileSysID = smbFSID,
+    .commandNum = SMB_MOUNT,
+};
+
 int main(int argc, char *argv[]) {
     cvtRec theCvtRec;
     
@@ -49,11 +55,13 @@ int main(int argc, char *argv[]) {
     static char16_t user[100];
     static char16_t password[100];
     static char16_t domain[100];
+    static char16_t share[100];
     uint16_t userSize;
     uint16_t passwordSize;
     uint16_t domainSize;
+    uint16_t shareSize;
 
-    if (argc < 4) {
+    if (argc < 6) {
         puts("Too few arguments");
         return 0;
     }
@@ -92,18 +100,23 @@ int main(int argc, char *argv[]) {
     authenticatePB.password = password;
     authenticatePB.passwordSize = len*2;
 
-    if (argc >= 5) {
-        len = strlen(argv[4]);
-        if (len > 100)
-            len = 100;
-        for (i = 0; i < len; i++) {
-            domain[i] = argv[4][i];
-        }
-        authenticatePB.userDomain = domain;
-        authenticatePB.userDomainSize = len*2;
-    } else {
-        authenticatePB.userDomainSize = 0;
+    len = strlen(argv[4]);
+    if (len > 100)
+        len = 100;
+    for (i = 0; i < len; i++) {
+        domain[i] = argv[4][i];
     }
+    authenticatePB.userDomain = domain;
+    authenticatePB.userDomainSize = len*2;
+    
+    len = strlen(argv[5]);
+    if (len > 100)
+        len = 100;
+    for (i = 0; i < len; i++) {
+        share[i] = argv[5][i];
+    }
+    mountPB.shareName = share;
+    mountPB.shareNameSize = len*2;
 
     FSTSpecific(&authenticatePB);
     if (toolerror()) {
@@ -112,9 +125,12 @@ int main(int argc, char *argv[]) {
         FSTSpecific(&connectionReleasePB);
         return 0;
     }
-    
+
     connectionReleasePB.connectionID = connectPB.connectionID;
     FSTSpecific(&connectionReleasePB);
+
+    mountPB.sessionID = authenticatePB.sessionID;
+    FSTSpecific(&mountPB);
 
     sessionReleasePB.sessionID = authenticatePB.sessionID;
     FSTSpecific(&sessionReleasePB);

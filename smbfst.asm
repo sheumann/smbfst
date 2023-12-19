@@ -208,6 +208,7 @@ fstspecific_calls anop
         dc      i4'SMB_Authenticate'
         dc      i4'SMB_Session_Retain'
         dc      i4'SMB_Session_Release'
+        dc      i4'SMB_Mount'
 fstspecific_end anop
 
 maxFSTSpecificCall equ -1+(fstspecific_end-fstspecific_calls)/4

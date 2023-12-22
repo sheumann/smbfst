@@ -4,7 +4,7 @@
 #include <types.h>
 #include <uchar.h>
 
-#define smbFSID 0x800e
+#define smbFSID 0x400e
 
 #define SMB_CONNECT 0
 #define SMB_CONNECTION_RETAIN 1

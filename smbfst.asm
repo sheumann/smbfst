@@ -3,7 +3,7 @@
         copy    13/AInclude/E16.GSOS
 
 ; ID for SMB FST
-SMB_FST_ID gequ $800e
+SMB_FST_ID gequ $400e
 
 fstheader start
         dc      c'FST '                 ; signature

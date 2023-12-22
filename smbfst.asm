@@ -37,6 +37,9 @@ max_sys_call equ 4
 
         phk                             ; set databank (no need to save/restore)
         plb
+
+        tdc
+        sta     gsosDP
         
         cpx     #max_sys_call*2+1       ; check for invalid call
         bge     invalid

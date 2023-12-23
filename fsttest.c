@@ -46,6 +46,20 @@ SMBMountRec mountPB = {
     .commandNum = SMB_MOUNT,
 };
 
+ResultBuf32 devName = {32};
+ResultBuf255 volName = {255};
+
+DInfoRec dInfoPB = {
+    .pCount = 2,
+    .devName = &devName,
+};
+
+VolumeRec volumePB = {
+    .pCount = 2,
+    .devName = &devName.bufString,
+    .volName = &volName,
+};
+
 int main(int argc, char *argv[]) {
     cvtRec theCvtRec;
     
@@ -132,6 +146,25 @@ int main(int argc, char *argv[]) {
     mountPB.sessionID = authenticatePB.sessionID;
     FSTSpecific(&mountPB);
 
+    if (!toolerror()) {
+        printf("Mounted on device %u\n", mountPB.devNum);
+    } else {
+        printf("Error $%x\n", toolerror());
+    }
+
     sessionReleasePB.sessionID = authenticatePB.sessionID;
     FSTSpecific(&sessionReleasePB);
+    
+    DInfo(&dInfoPB);
+    Volume(&volumePB);
+    if (toolerror()) {
+        printf("VolumeGS error $%x\n", toolerror());
+    
+    } else {
+        printf("Volume name = ");
+        for (unsigned i = 0; i < volName.bufString.length; i++) {
+            putchar(volName.bufString.text[i]);
+        }
+        printf("\n");
+    }
 }

@@ -91,17 +91,17 @@ SYS_EXIT equ    $01fc40                 ; SYS_EXIT system service call
         tax
         
         cpx     #maxRegularCall*4+1     ; check that call number is in range
-        blt     check2
+        blt     getfunc
         cpx     #FSTSpecificCall*4
         beq     fstspec
         bra     badcall
 
-        lda     gsos_calls-4+2,x        ; get address to call
+getfunc lda     gsos_calls-4+2,x        ; get address to call
         sta     thecall+2
         lda     gsos_calls-4+1,x
         sta     thecall+1
         
-check2  lda     gsos_calls-1,x          ; get max pcount
+        lda     gsos_calls-1,x          ; get max pcount
         and     #$00FF
         beq     badcall                 ; check for invalid call
 

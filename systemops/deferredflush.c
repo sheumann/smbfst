@@ -1,4 +1,6 @@
 #include "defs.h"
+#include <gsos.h>
+#include <prodos.h>
 
 /*
  * This is called to flush the data at the end of a write-deferral session.

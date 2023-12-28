@@ -9,6 +9,8 @@
 
 #define NDIBS 16
 
+typedef LongWord VirtualPointer;
+
 /* device information block */
 struct DIB {
     void *linkPtr;
@@ -28,6 +30,7 @@ struct DIB {
     // SMB-specific part
     LongWord treeId;
     bool switched;
+    VirtualPointer vcrVP;
 };
 
 /* list of DIBs (argument to INSTALL_DRIVER) */

@@ -73,6 +73,8 @@ Word DriverDispatch(Word callNum, struct GSOSDP *dp) {
             dp->dibPointer->switched = false;
         } else if (dp->dibPointer->extendedDIBPtr == NULL) {
             retVal = drvrOffLine;
+        } else if (dp->requestCount == 0) {
+            /* 0-byte reads are considered OK */
         } else {
             retVal = networkError;
         }

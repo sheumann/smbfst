@@ -1,10 +1,12 @@
 #include "defs.h"
 #include <stddef.h>
 #include <string.h>
+#include <stdbool.h>
 #include <gsos.h>
 #include "smb2.h"
 #include "fstspecific.h"
 #include "driver.h"
+#include "gsosutils.h"
 
 #ifndef devListFull
 #define devListFull 0x0068
@@ -19,6 +21,8 @@ Word SMB_Mount(SMBMountRec *pblock, void *gsosdp, Word pcount) {
 
     static ReadStatus result;
     unsigned dibIndex;
+    bool oom;
+    VirtualPointer vcrVP;
     VCR *vcr;
 
     if (pblock->pCount != 6)
@@ -43,12 +47,8 @@ Word SMB_Mount(SMBMountRec *pblock, void *gsosdp, Word pcount) {
     if (result != rsDone) {
         return networkError;
     }
-
-    dibs[dibIndex].treeId = msg.smb2Header.TreeId;
-    dibs[dibIndex].switched = true;
-    dibs[dibIndex].extendedDIBPtr = &dibs[dibIndex].treeId;
     
-    vcr = NULL;
+    oom = false;
     asm {
         phd
         lda gsosdp
@@ -57,18 +57,14 @@ Word SMB_Mount(SMBMountRec *pblock, void *gsosdp, Word pcount) {
         ldx #volName
         ldy #^volName
         jsl ALLOC_VCR
-        bcs oom
-        jsl DEREF
-        pld
-        stx vcr
-        sty vcr+2
-        bra asm_end
-
-oom:    pld
-asm_end:
+        stx vcrVP
+        sty vcrVP+2
+        bcc endasm
+        inc oom
+endasm: pld
     }
     
-    if (!vcr) {
+    if (oom) {
         /*
          * If we're here, VCR allocation failed because we are out of memory.
          * We should probably send a TREE_DISCONNECT message to the server,
@@ -77,6 +73,13 @@ asm_end:
          */
         return outOfMem;
     }
+
+    dibs[dibIndex].treeId = msg.smb2Header.TreeId;
+    dibs[dibIndex].switched = true;
+    dibs[dibIndex].extendedDIBPtr = &dibs[dibIndex].treeId;
+    dibs[dibIndex].vcrVP = vcrVP;
+    
+    DerefVP(vcr, vcrVP);
 
     vcr->status = 0;
     vcr->openCount = 0;

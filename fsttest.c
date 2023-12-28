@@ -1,3 +1,4 @@
+#include "defs.h"
 #include <gsos.h>
 #include <stdio.h>
 #include <orca.h>
@@ -6,6 +7,7 @@
 #include <locator.h>
 #include <uchar.h>
 #include <stdint.h>
+#include <string.h>
 
 #include <memory.h>
 
@@ -55,7 +57,7 @@ DInfoRec dInfoPB = {
 };
 
 VolumeRec volumePB = {
-    .pCount = 2,
+    .pCount = 8,
     .devName = &devName.bufString,
     .volName = &volName,
 };
@@ -70,10 +72,6 @@ int main(int argc, char *argv[]) {
     static char16_t password[100];
     static char16_t domain[100];
     static char16_t share[100];
-    uint16_t userSize;
-    uint16_t passwordSize;
-    uint16_t domainSize;
-    uint16_t shareSize;
 
     if (argc < 6) {
         puts("Too few arguments");
@@ -155,16 +153,32 @@ int main(int argc, char *argv[]) {
     sessionReleasePB.sessionID = authenticatePB.sessionID;
     FSTSpecific(&sessionReleasePB);
     
+    dInfoPB.devNum = mountPB.devNum;
     DInfo(&dInfoPB);
+    if (toolerror()) {
+        printf("DInfo error $%x\n", toolerror());
+        return 0;
+    } else {
+        printf("Device name = ");
+        for (unsigned i = 0; i < devName.bufString.length; i++) {
+            putchar(devName.bufString.text[i]);
+        }
+        printf("\n");
+    }
+
     Volume(&volumePB);
     if (toolerror()) {
         printf("VolumeGS error $%x\n", toolerror());
-    
     } else {
+        printf("Volume name length = %u\n", volName.bufString.length);
         printf("Volume name = ");
         for (unsigned i = 0; i < volName.bufString.length; i++) {
             putchar(volName.bufString.text[i]);
         }
         printf("\n");
+        printf("Total blocks = %lu\n", volumePB.totalBlocks);
+        printf("Free blocks  = %lu\n", volumePB.freeBlocks);
+        printf("Block size   = %u\n",  volumePB.blockSize);
+        printf("FSID         = %x\n",  volumePB.fileSysID);
     }
 }

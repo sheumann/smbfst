@@ -115,9 +115,9 @@ getfunc lda     gsos_calls-4+2,x        ; get address to call
         tay
 
 push_params anop
+        phy                             ; push pcount (or 0 for class 0)
         pea     0                       ; push GS/OS direct page pointer
         phd
-        phy                             ; push pcount (or 0 for class 0)
         pei     pblock+2                ; push pblock pointer
         pei     pblock
 

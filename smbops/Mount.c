@@ -47,9 +47,9 @@ Word SMB_Mount(SMBMountRec *pblock, void *gsosdp, Word pcount) {
     if (result != rsDone) {
         return networkError;
     }
-    
-    oom = false;
+
     asm {
+        stz oom
         phd
         lda gsosdp
         tcd
@@ -57,11 +57,10 @@ Word SMB_Mount(SMBMountRec *pblock, void *gsosdp, Word pcount) {
         ldx #volName
         ldy #^volName
         jsl ALLOC_VCR
+        pld
         stx vcrVP
         sty vcrVP+2
-        bcc endasm
-        inc oom
-endasm: pld
+        rol oom
     }
     
     if (oom) {
@@ -78,7 +77,7 @@ endasm: pld
     dibs[dibIndex].switched = true;
     dibs[dibIndex].extendedDIBPtr = &dibs[dibIndex].treeId;
     dibs[dibIndex].vcrVP = vcrVP;
-    
+
     DerefVP(vcr, vcrVP);
 
     vcr->status = 0;

@@ -1,4 +1,5 @@
 #include "defs.h"
+#include <string.h>
 #include <gsos.h>
 #include <prodos.h>
 #include "driver.h"
@@ -16,7 +17,8 @@
 Word Volume(void *pblock, struct GSOSDP *gsosDP, Word pcount) {
     unsigned i;
     VCR *vcr;
-    char *volName;
+    GSString *volName;
+    GSString *pathName;
     Word result = 0;
 
     for (i = 0; i < NDIBS; i++) {
@@ -28,12 +30,26 @@ Word Volume(void *pblock, struct GSOSDP *gsosDP, Word pcount) {
     
     DerefVP(vcr, dibs[i].vcrVP);
     DerefVP(volName, vcr->name);
-    
+
+    // TODO check if pathName overflow is possible, and handle better if it is
+    if (volName->length > GBUF_SIZE - 3) {
+        pathName = NULL;
+    } else {
+        pathName = (void*)gbuf;
+        pathName->length = volName->length + 1;
+        pathName->text[0] = (pcount == 0 ? '/' : ':');
+        memcpy(pathName->text+1, volName->text, volName->length);
+    }
+
     if (pcount == 0) {
         #define pblock ((VolumeRec*)pblock)
         
-        if (WritePString(volName[0], volName+1, pblock->volName))
+        // TODO maybe restrict to shorter length (16 chars, like for ProDOS?)
+        if (pathName == NULL ||
+            WritePString(pathName->length, pathName->text, pblock->volName))
+        {
             result = buffTooSmall;
+        }
 
         pblock->totalBlocks = TOTAL_BLOCKS;
         pblock->freeBlocks = FREE_BLOCKS;
@@ -43,8 +59,11 @@ Word Volume(void *pblock, struct GSOSDP *gsosDP, Word pcount) {
     } else {
         #define pblock ((VolumeRecGS*)pblock)
 
-        if (WriteGSOSString(volName[0], volName+1, pblock->volName))
+        if (pathName == NULL ||
+            WriteGSOSString(pathName->length, pathName->text, pblock->volName))
+        {
             result = buffTooSmall;
+        }
         
         if (pcount < 3) goto end;
         pblock->totalBlocks = TOTAL_BLOCKS;

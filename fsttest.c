@@ -74,7 +74,8 @@ int main(int argc, char *argv[]) {
     static char16_t share[100];
 
     if (argc < 6) {
-        puts("Too few arguments");
+        printf("Usage: %s server username password domain sharename\n",
+            argv[0]);
         return 0;
     }
 

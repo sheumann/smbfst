@@ -12,7 +12,7 @@
 // TODO maybe return real information (need to deal with overflows)
 #define TOTAL_BLOCKS 0x7fffff
 #define FREE_BLOCKS  0x7fffff
-#define BLOCK_SIZE   0x000100
+#define BLOCK_SIZE   0x000200
 
 Word Volume(void *pblock, struct GSOSDP *gsosDP, Word pcount) {
     unsigned i;

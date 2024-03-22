@@ -24,6 +24,7 @@ Word SMB_Mount(SMBMountRec *pblock, void *gsosdp, Word pcount) {
     bool oom;
     VirtualPointer vcrVP;
     VCR *vcr;
+    Session *session = (Session*)pblock->sessionID;
 
     if (pblock->pCount != 6)
         return invalidPcount;
@@ -41,8 +42,7 @@ Word SMB_Mount(SMBMountRec *pblock, void *gsosdp, Word pcount) {
     treeConnectRequest.PathLength = pblock->shareNameSize;
     memcpy(treeConnectRequest.Buffer, pblock->shareName, pblock->shareNameSize);
     
-    result = SendRequestAndGetResponse((Session*)pblock->sessionID,
-        SMB2_TREE_CONNECT, 0,
+    result = SendRequestAndGetResponse(session, SMB2_TREE_CONNECT, 0,
         sizeof(treeConnectRequest) + pblock->shareNameSize);
     if (result != rsDone) {
         return networkError;
@@ -77,6 +77,7 @@ Word SMB_Mount(SMBMountRec *pblock, void *gsosdp, Word pcount) {
     dibs[dibIndex].switched = true;
     dibs[dibIndex].extendedDIBPtr = &dibs[dibIndex].treeId;
     dibs[dibIndex].vcrVP = vcrVP;
+    dibs[dibIndex].session = session;
 
     DerefVP(vcr, vcrVP);
 
@@ -86,5 +87,7 @@ Word SMB_Mount(SMBMountRec *pblock, void *gsosdp, Word pcount) {
     vcr->devNum = dibs[dibIndex].DIBDevNum;
 
     pblock->devNum = dibs[dibIndex].DIBDevNum;
+    
+    Session_Retain(session);
     return 0;
 }

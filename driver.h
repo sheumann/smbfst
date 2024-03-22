@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <types.h>
 #include "fstdata.h"
+#include "session.h"
 
 #define DEVICE_FILE_SERVER 0x0010
 
@@ -31,6 +32,7 @@ struct DIB {
     LongWord treeId;
     bool switched;
     VirtualPointer vcrVP;
+    Session *session;
 };
 
 /* list of DIBs (argument to INSTALL_DRIVER) */

@@ -3,11 +3,22 @@
 
 #include <types.h>
 
+/* GS/OS string and result buf types.
+ *
+ * These are not really limited to 255 characters.  That's just how the
+ * structures are specified in the C headers.
+ */
+typedef ResultBuf255 ResultBuf;
+typedef ResultBuf255Ptr ResultBufPtr;
+typedef GSString255 GSString;
+typedef GSString255Ptr GSStringPtr;
+
 #define GBUF_SIZE 1024
 
 /* System service calls */
 #define ALLOC_VCR 0x01fc24
 #define DEREF     0x01fc38
+#define FIND_VCR  0x01fc48
 
 /* GS/OS direct page structure */
 struct GSOSDP {
@@ -50,11 +61,11 @@ struct GSOSDP {
     };
     Word dev2Num;
     union {
-        void *path1Ptr;
+        GSString *path1Ptr;
         void *fcrPtr;
     };
     union {
-        void *path2Ptr;
+        GSString *path2Ptr;
         void *vcrPtr;
     };
     Word pathFlag;
@@ -62,6 +73,10 @@ struct GSOSDP {
     Word span2;
     
 };
+
+/* pathFlag bits */
+#define HAVE_PATH1 0x4000
+#define HAVE_PATH2 0x0040
 
 typedef struct VCR {
     Word id;

@@ -13,7 +13,7 @@
 typedef LongWord VirtualPointer;
 
 /* device information block */
-struct DIB {
+typedef struct DIB {
     void *linkPtr;
     void *entryPtr;
     Word characteristics;
@@ -33,7 +33,7 @@ struct DIB {
     bool switched;
     VirtualPointer vcrVP;
     Session *session;
-};
+} DIB;
 
 /* list of DIBs (argument to INSTALL_DRIVER) */
 struct DIBList {

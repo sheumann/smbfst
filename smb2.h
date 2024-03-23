@@ -21,6 +21,10 @@
 #define closeResponse          (*(SMB2_CLOSE_Response*)msg.body)
 #define queryDirectoryRequest  (*(SMB2_QUERY_DIRECTORY_Request*)msg.body)
 #define queryDirectoryResponse (*(SMB2_QUERY_DIRECTORY_Response*)msg.body)
+#define queryInfoRequest       (*(SMB2_QUERY_INFO_Request*)msg.body)
+#define queryInfoResponse      (*(SMB2_QUERY_INFO_Response*)msg.body)
+#define setInfoRequest         (*(SMB2_SET_INFO_Request*)msg.body)
+#define setInfoResponse        (*(SMB2_SET_INFO_Response*)msg.body)
 
 /*
  * Verify that a offset/length pair specifying a buffer within the last

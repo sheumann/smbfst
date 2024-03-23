@@ -269,27 +269,6 @@ typedef struct {
 #define Impersonation  0x00000002
 #define Delegate       0x00000003
 
-/* File attributes (from [MS-FSCC] section 2.6) */
-#define FILE_ATTRIBUTE_READONLY              0x00000001
-#define FILE_ATTRIBUTE_HIDDEN                0x00000002
-#define FILE_ATTRIBUTE_SYSTEM                0x00000004
-#define FILE_ATTRIBUTE_DIRECTORY             0x00000010
-#define FILE_ATTRIBUTE_ARCHIVE               0x00000020
-#define FILE_ATTRIBUTE_NORMAL                0x00000080
-#define FILE_ATTRIBUTE_TEMPORARY             0x00000100
-#define FILE_ATTRIBUTE_SPARSE_FILE           0x00000200
-#define FILE_ATTRIBUTE_REPARSE_POINT         0x00000400
-#define FILE_ATTRIBUTE_COMPRESSED            0x00000800
-#define FILE_ATTRIBUTE_OFFLINE               0x00001000
-#define FILE_ATTRIBUTE_NOT_CONTENT_INDEXED   0x00002000
-#define FILE_ATTRIBUTE_ENCRYPTED             0x00004000
-#define FILE_ATTRIBUTE_INTEGRITY_STREAM      0x00008000
-#define FILE_ATTRIBUTE_NO_SCRUB_DATA         0x00020000
-#define FILE_ATTRIBUTE_RECALL_ON_OPEN        0x00040000
-#define FILE_ATTRIBUTE_PINNED                0x00080000
-#define FILE_ATTRIBUTE_UNPINNED              0x00100000
-#define FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS 0x00400000
-
 /* ShareAccess flags */
 #define FILE_SHARE_READ   0x00000001
 #define FILE_SHARE_WRITE  0x00000002
@@ -453,15 +432,6 @@ typedef struct {
     uint8_t  Buffer[];
 } SMB2_QUERY_DIRECTORY_Request;
 
-/* FileInformationClass values usable for directory queries */
-#define FileDirectoryInformation        0x01
-#define FileFullDirectoryInformation    0x02
-#define FileIdFullDirectoryInformation  0x26
-#define FileBothDirectoryInformation    0x03
-#define FileIdBothDirectoryInformation  0x25
-#define FileNamesInformation            0x0C
-#define FileIdExtdDirectoryInformation  0x3C
-
 /* Query Directory request flags */
 #define SMB2_RESTART_SCANS       0x01
 #define SMB2_RETURN_SINGLE_ENTRY 0x02
@@ -474,5 +444,50 @@ typedef struct {
     uint16_t OutputBufferLength;
     uint8_t  Buffer[];
 } SMB2_QUERY_DIRECTORY_Response;
+
+typedef struct {
+    uint16_t StructureSize;
+    uint8_t  InfoType;
+    uint8_t  FileInfoClass;
+    uint32_t OutputBufferLength;
+    uint16_t InputBufferOffset;
+    uint16_t Reserved;
+    uint32_t InputBufferLength;
+    uint32_t AdditionalInformation;
+    uint32_t Flags;
+    SMB2_FILEID FileId;
+    uint8_t  Buffer[];
+} SMB2_QUERY_INFO_Request;
+
+/* InfoType values */
+#define SMB2_0_INFO_FILE       0x01
+#define SMB2_0_INFO_FILESYSTEM 0x02
+#define SMB2_0_INFO_SECURITY   0x03
+#define SMB2_0_INFO_QUOTA      0x04
+
+typedef struct {
+    uint16_t StructureSize;
+    uint16_t OutputBufferOffset;
+    uint32_t OutputBufferLength;
+    uint8_t  Buffer[];
+} SMB2_QUERY_INFO_Response;
+
+
+typedef struct {
+    uint16_t StructureSize;
+    uint8_t  InfoType;
+    uint8_t  FileInfoClass;
+    uint32_t BufferLength;
+    uint16_t BufferOffset;
+    uint16_t Reserved;
+    uint32_t AdditionalInformation;
+    SMB2_FILEID FileId;
+    uint8_t  Buffer[];
+} SMB2_SET_INFO_Request;
+
+typedef struct {
+    uint16_t StructureSize;
+} SMB2_SET_INFO_Response;
+
 
 #endif

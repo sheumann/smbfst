@@ -2,24 +2,31 @@
 #include <gsos.h>
 #include <prodos.h>
 #include "fstdata.h"
+#include "driver.h"
+#include "gsosutils.h"
 
 Word GetDevNumber(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
-    if (gsosdp->dev1Num == 0) {
-        // TODO is there a success case where we need to look up the dev num?
-        // TODO adjust error based on type of path (device or volume name?)
-        return devNotFound;
+    Word devNum = gsosdp->dev1Num;
+    
+    if (devNum == 0) {
+        DIB *dib = GetDIB(gsosdp, 1);
+        if (dib == NULL) {
+            // TODO adjust error based on type of path (device or volume name?)
+            return devNotFound;
+        }
+        devNum = dib->DIBDevNum;
     }
     
     if (pcount == 0) {
         #define pblock ((DevNumRec*)pblock)
         
-        pblock->devNum = gsosdp->dev1Num;
+        pblock->devNum = devNum;
         
         #undef pblock
     } else {
         #define pblock ((DevNumRecGS*)pblock)
         
-        pblock->devNum = gsosdp->dev1Num;
+        pblock->devNum = devNum;
         
         #undef pblock
     }

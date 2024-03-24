@@ -71,6 +71,8 @@ Word ClearBackupBit(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     info->LastWriteTime = 0;
     info->ChangeTime = 0;
     info->FileAttributes = attributes & ~(uint32_t)FILE_ATTRIBUTE_ARCHIVE;
+    if (info->FileAttributes == 0)
+        info->FileAttributes = FILE_ATTRIBUTE_NORMAL;
     info->Reserved = 0;
 #undef info
 

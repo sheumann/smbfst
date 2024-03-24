@@ -66,7 +66,7 @@ int main(int argc, char *argv[]) {
     cvtRec theCvtRec;
     
     size_t len;
-    unsigned i;
+    unsigned i,j;
 
     static char16_t user[100];
     static char16_t password[100];
@@ -121,15 +121,23 @@ int main(int argc, char *argv[]) {
     }
     authenticatePB.userDomain = domain;
     authenticatePB.userDomainSize = len*2;
-    
+
+    if (strlen(argv[1]) + strlen(argv[5]) + 3 > 100)
+        return 0;
+    i = 0;
+    share[i++] = '\\';
+    share[i++] = '\\';
+    len = strlen(argv[1]);
+    for (j = 0; j < len; j++) {
+        share[i++] = argv[1][j];
+    }
+    share[i++] = '\\';
     len = strlen(argv[5]);
-    if (len > 100)
-        len = 100;
-    for (i = 0; i < len; i++) {
-        share[i] = argv[5][i];
+    for (j = 0; j < len; j++) {
+        share[i++] = argv[5][j];
     }
     mountPB.shareName = share;
-    mountPB.shareNameSize = len*2;
+    mountPB.shareNameSize = i*2;
 
     FSTSpecific(&authenticatePB);
     if (toolerror()) {

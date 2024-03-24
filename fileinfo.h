@@ -5,6 +5,7 @@
  */
 
 #include <stdint.h>
+#include <uchar.h>
 
 /* FileInformationClass values */
 // File information (from [MS-FSCC] section 2.4)
@@ -113,3 +114,12 @@ typedef struct {
     uint32_t FileAttributes;
     uint32_t Reserved;
 } FILE_BASIC_INFORMATION;
+
+typedef struct {
+    uint64_t ReplaceIfExists; /* and reserved space */
+    uint64_t RootDirectory;
+    uint32_t FileNameLength;
+    char16_t FileName[]; /* and possible padding if needed to reach min size */
+} FILE_RENAME_INFORMATION_TYPE_2;
+
+#define FILE_RENAME_INFORMATION_TYPE_2_MIN_SIZE 24

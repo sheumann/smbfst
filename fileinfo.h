@@ -123,3 +123,7 @@ typedef struct {
 } FILE_RENAME_INFORMATION_TYPE_2;
 
 #define FILE_RENAME_INFORMATION_TYPE_2_MIN_SIZE 24
+
+typedef struct {
+    uint8_t  DeletePending;
+} FILE_DISPOSITION_INFORMATION;

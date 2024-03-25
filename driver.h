@@ -3,7 +3,7 @@
 
 #include <stdbool.h>
 #include <types.h>
-#include "fstdata.h"
+#include "gsosdata.h"
 #include "session.h"
 
 #define DEVICE_FILE_SERVER 0x0010

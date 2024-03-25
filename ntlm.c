@@ -13,7 +13,7 @@
 #include "ntlm.h"
 #include "authinfo.h"
 #include "auth.h"
-#include "fstdata.h"
+#include "gsosdata.h"
 #include "alloc.h"
 
 static const NTLM_NEGOTIATE_MESSAGE negotiateMessage = {

@@ -1,7 +1,7 @@
 #include "defs.h"
 #include <gsos.h>
 #include <prodos.h>
-#include "fstdata.h"
+#include "gsosdata.h"
 #include "driver.h"
 #include "gsosutils.h"
 

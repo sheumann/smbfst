@@ -1,5 +1,5 @@
 #include <gsos.h>
-#include "fstdata.h"
+#include "gsosdata.h"
 #include "driver.h"
 
 Word WriteGSOSString(Word length, char *str, ResultBufPtr buf);

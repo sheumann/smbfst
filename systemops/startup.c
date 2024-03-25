@@ -3,7 +3,7 @@
 #include <misctool.h>
 #include <orca.h>
 #include <stddef.h>
-#include "fstdata.h"
+#include "gsosdata.h"
 #include "driver.h"
 
 extern pascal void SystemUserID (unsigned, char *);

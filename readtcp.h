@@ -8,7 +8,8 @@ typedef enum {
     rsDone,
     rsMoreProcessingRequired,
     rsError,
-    rsTimedOut
+    rsTimedOut,
+    rsFailed    // got a response with a non-success result code
 } ReadStatus;
 
 ReadStatus ReadTCP(Word ipid, uint16_t size, void *buf);

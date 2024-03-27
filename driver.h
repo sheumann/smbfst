@@ -10,8 +10,6 @@
 
 #define NDIBS 16
 
-typedef LongWord VirtualPointer;
-
 /* device information block */
 typedef struct DIB {
     void *linkPtr;

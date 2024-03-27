@@ -2,8 +2,10 @@
 #define __FSTDATA_H__
 
 #include <types.h>
+#include "smb2proto.h"
 
-/* GS/OS string and result buf types.
+/*
+ * GS/OS string and result buf types.
  *
  * These are not really limited to 255 characters.  That's just how the
  * structures are specified in the C headers.
@@ -19,6 +21,9 @@ typedef GSString255Ptr GSStringPtr;
 #define ALLOC_VCR 0x01fc24
 #define DEREF     0x01fc38
 #define FIND_VCR  0x01fc48
+#define ALLOC_FCR 0x01fc2c
+
+typedef LongWord VirtualPointer;
 
 /* GS/OS direct page structure */
 struct GSOSDP {
@@ -80,7 +85,7 @@ struct GSOSDP {
 
 typedef struct VCR {
     Word id;
-    LongWord name; /* virtual pointer to volume name */
+    VirtualPointer name; /* virtual pointer to volume name */
     Word status;
     Word openCount;
     Word fstID;
@@ -89,6 +94,25 @@ typedef struct VCR {
     
     /* SMB-specific fields would go here */
 } VCR;
+
+typedef struct FCR {
+    Word refNum;
+    VirtualPointer pathName;
+    Word fstID;
+    Word volID;
+    Word level;
+    LongWord newline;
+    Word newlineLen;
+    Word mask;
+    Word access;
+    
+    /* SMB-specific fields go here */
+    SMB2_FILEID fileID;
+} FCR;
+
+/* access bits (in addition to standard access flags in low bits) */
+#define ACCESS_FLAG_CLEAN 0x8000
+#define ACCESS_FLAG_RFORK 0x4000
 
 extern unsigned char *gbuf;
 extern struct GSOSDP *gsosDP;  /* GS/OS direct page ptr */

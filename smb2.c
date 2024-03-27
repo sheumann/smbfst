@@ -72,6 +72,8 @@ static const uint16_t responseStructureSizes[] = {
     [SMB2_OPLOCK_BREAK] = 24,
 };
 
+#define SMB2_ERROR_RESPONSE_STRUCTURE_SIZE 9u
+
 
 static const smb_u128 u128_zero = {0,0};
 
@@ -184,16 +186,22 @@ ReadStatus SendRequestAndGetResponse(Session *session, uint16_t command,
         return rsError;
     
     if (bodySize < (responseStructureSizes[command] & 0xFFFE))
-        return rsError;
+        goto error_response;
     if (msgBodyHeader.StructureSize != responseStructureSizes[command])
-        return rsError;
+        goto error_response;
 
     if (msg.smb2Header.Status == STATUS_SUCCESS) {
         return rsDone;
     } else if (msg.smb2Header.Status == STATUS_MORE_PROCESSING_REQUIRED) {
         return rsMoreProcessingRequired;
+    }
+
+error_response:
+    // Check for something that looks like an SMB2 ERROR Response
+    if (bodySize >= (SMB2_ERROR_RESPONSE_STRUCTURE_SIZE & 0xFFFE)
+        && msgBodyHeader.StructureSize == SMB2_ERROR_RESPONSE_STRUCTURE_SIZE) {
+        return rsFailed;
     } else {
-        // TODO handle errors
         return rsError;
     }
 }

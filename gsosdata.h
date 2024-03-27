@@ -18,10 +18,11 @@ typedef GSString255Ptr GSStringPtr;
 #define GBUF_SIZE 1024
 
 /* System service calls */
-#define ALLOC_VCR 0x01fc24
-#define DEREF     0x01fc38
-#define FIND_VCR  0x01fc48
-#define ALLOC_FCR 0x01fc2c
+#define ALLOC_VCR   0x01fc24
+#define DEREF       0x01fc38
+#define FIND_VCR    0x01fc48
+#define ALLOC_FCR   0x01fc2c
+#define RELEASE_FCR 0x01fc30
 
 typedef LongWord VirtualPointer;
 
@@ -67,11 +68,11 @@ struct GSOSDP {
     Word dev2Num;
     union {
         GSString *path1Ptr;
-        void *fcrPtr;
+        VirtualPointer fcrPtr;
     };
     union {
         GSString *path2Ptr;
-        void *vcrPtr;
+        VirtualPointer vcrPtr;
     };
     Word pathFlag;
     Word span1;

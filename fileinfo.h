@@ -127,3 +127,13 @@ typedef struct {
 typedef struct {
     uint8_t  DeletePending;
 } FILE_DISPOSITION_INFORMATION;
+
+typedef struct {
+    uint64_t AllocationSize;
+    uint64_t EndOfFile;
+    uint32_t NumberOfLinks;
+    uint8_t  DeletePending;
+    uint8_t  Directory;
+    uint16_t Reserved;
+} FILE_STANDARD_INFORMATION;
+

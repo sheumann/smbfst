@@ -30,7 +30,7 @@
  * Verify that a offset/length pair specifying a buffer within the last
  * message received actually refer to locations within that message.
  *
- * Note: argument values should be uint16_t, not 32-bit or larger.
+ * Note: argument values should be in range of uint16_t, not 32-bit or larger.
  */
 #define VerifyBuffer(offset,length) \
     ((uint32_t)(offset) + (length) <= bodySize + sizeof(SMB2Header))

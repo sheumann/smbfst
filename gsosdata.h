@@ -2,6 +2,7 @@
 #define __FSTDATA_H__
 
 #include <types.h>
+#include <stdint.h>
 #include "smb2proto.h"
 
 /*
@@ -109,6 +110,7 @@ typedef struct FCR {
     
     /* SMB-specific fields go here */
     SMB2_FILEID fileID;
+    uint64_t mark;
 } FCR;
 
 /* access bits (in addition to standard access flags in low bits) */

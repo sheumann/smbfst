@@ -162,7 +162,7 @@ fstspec tyx                             ; must be class 1
 
 ; Table of GS/OS calls handled here: max pCount, followed by handler func
 ;
-; ^ = new or updated in System 6
+; ^ = new or updated in System 5.0.3 or later
 ; Everything except JudgeName also has a class 0 version.
 gsos_calls anop
         dc      i1'7',a3'Create'        ; $2001 Create
@@ -185,7 +185,7 @@ gsos_calls anop
         dc      i1'5',a3'Read'          ; $2012 Read
         dc      i1'5',a3'Write'         ; $2013 Write
         dc      i1'1',a3'Close'         ; $2014 Close
-        dc      i1'1',a3'Flush'         ; $2015 Flush
+        dc      i1'2',a3'Flush'         ; $2015 Flush ^
         dc      i1'3',a3'SetMark'       ; $2016 SetMark
         dc      i1'2',a3'GetMark'       ; $2017 GetMark
         dc      i1'3',a3'SetEOF'        ; $2018 SetEOF

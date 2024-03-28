@@ -489,5 +489,16 @@ typedef struct {
     uint16_t StructureSize;
 } SMB2_SET_INFO_Response;
 
+typedef struct {
+    uint16_t StructureSize;
+    uint16_t Reserved1;
+    uint32_t Reserved2;
+    SMB2_FILEID FileId;    
+} SMB2_FLUSH_Request;
+
+typedef struct {
+    uint16_t StructureSize;
+    uint16_t Reserved;
+} SMB2_FLUSH_Response;
 
 #endif

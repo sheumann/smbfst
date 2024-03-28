@@ -25,6 +25,8 @@
 #define queryInfoResponse      (*(SMB2_QUERY_INFO_Response*)msg.body)
 #define setInfoRequest         (*(SMB2_SET_INFO_Request*)msg.body)
 #define setInfoResponse        (*(SMB2_SET_INFO_Response*)msg.body)
+#define flushRequest           (*(SMB2_FLUSH_Request*)msg.body)
+#define flushResponse          (*(SMB2_FLUSH_Response*)msg.body)
 
 /*
  * Verify that a offset/length pair specifying a buffer within the last

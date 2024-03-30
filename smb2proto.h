@@ -411,6 +411,10 @@ typedef struct {
     uint8_t  Buffer[];
 } SMB2_READ_Response;
 
+/* Read response flags (SMB 3.1.1+) */
+#define SMB2_READFLAG_RESPONSE_NONE           0x00000000
+#define SMB2_READFLAG_RESPONSE_RDMA_TRANSFORM 0x00000001
+
 typedef struct {
     uint16_t StructureSize;
     uint16_t Flags;

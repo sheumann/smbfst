@@ -103,7 +103,7 @@ typedef struct FCR {
     Word fstID;
     Word volID;
     Word level;
-    LongWord newline;
+    VirtualPointer newline;
     Word newlineLen;
     Word mask;
     Word access;

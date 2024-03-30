@@ -43,10 +43,15 @@
 // max read/write size that MsgRec is sized to support
 #define IO_BUFFER_SIZE 32768u
 
+// Size of body part of MsgRec.
+// This is sized to accommodate the largest message we support, which is
+// a READ response with IO_BUFFER_SIZE bytes starting at offset 255.
+#define BODY_SIZE (255 - sizeof(SMB2Header) + IO_BUFFER_SIZE)
+
 typedef struct {
     DirectTCPHeader directTCPHeader;
     SMB2Header smb2Header;
-    unsigned char body[sizeof(SMB2_WRITE_Request) + IO_BUFFER_SIZE];
+    unsigned char body[BODY_SIZE];
 } MsgRec;
 
 extern MsgRec msg;

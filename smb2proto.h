@@ -396,6 +396,7 @@ typedef struct {
 #define SMB2_CHANNEL_NONE               0x00000000
 #define SMB2_CHANNEL_RDMA_V1            0x00000001
 #define SMB2_CHANNEL_RDMA_V1_INVALIDATE 0x00000002
+#define SMB2_CHANNEL_RDMA_TRANSFORM     0x00000003
 
 typedef struct {
     uint16_t StructureSize;
@@ -493,12 +494,39 @@ typedef struct {
     uint16_t StructureSize;
     uint16_t Reserved1;
     uint32_t Reserved2;
-    SMB2_FILEID FileId;    
+    SMB2_FILEID FileId;
 } SMB2_FLUSH_Request;
 
 typedef struct {
     uint16_t StructureSize;
     uint16_t Reserved;
 } SMB2_FLUSH_Response;
+
+typedef struct {
+    uint16_t StructureSize;
+    uint16_t DataOffset;
+    uint32_t Length;
+    uint64_t Offset;
+    SMB2_FILEID FileId;
+    uint32_t Channel;
+    uint32_t RemainingBytes;
+    uint16_t WriteChannelInfoOffset;
+    uint16_t WriteChannelInfoLength;
+    uint32_t Flags;
+    uint8_t  Buffer[];
+} SMB2_WRITE_Request;
+
+/* Write request flags */
+#define SMB2_WRITEFLAG_WRITE_THROUGH    0x00000001
+#define SMB2_WRITEFLAG_WRITE_UNBUFFERED 0x00000002
+
+typedef struct {
+    uint16_t StructureSize;
+    uint16_t Reserved;
+    uint32_t Count;
+    uint32_t Remaining;
+    uint16_t WriteChannelInfoOffset;
+    uint16_t WriteChannelInfoLength;
+} SMB2_WRITE_Response;
 
 #endif

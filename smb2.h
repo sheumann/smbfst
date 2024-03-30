@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <stddef.h>
 #include <uchar.h>
 
 #include "smb2proto.h"
@@ -27,6 +28,8 @@
 #define setInfoResponse        (*(SMB2_SET_INFO_Response*)msg.body)
 #define flushRequest           (*(SMB2_FLUSH_Request*)msg.body)
 #define flushResponse          (*(SMB2_FLUSH_Response*)msg.body)
+#define writeRequest           (*(SMB2_WRITE_Request*)msg.body)
+#define writeResponse          (*(SMB2_WRITE_Response*)msg.body)
 
 /*
  * Verify that a offset/length pair specifying a buffer within the last
@@ -37,10 +40,13 @@
 #define VerifyBuffer(offset,length) \
     ((uint32_t)(offset) + (length) <= bodySize + sizeof(SMB2Header))
 
+// max read/write size that MsgRec is sized to support
+#define IO_BUFFER_SIZE 32768u
+
 typedef struct {
     DirectTCPHeader directTCPHeader;
     SMB2Header smb2Header;
-    unsigned char body[32768];
+    unsigned char body[sizeof(SMB2_WRITE_Request) + IO_BUFFER_SIZE];
 } MsgRec;
 
 extern MsgRec msg;

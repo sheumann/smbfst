@@ -16,6 +16,8 @@ segment "AUTOSEG~~~";
 #define min(a,b) ((a)<(b)?(a):(b))
 #define max(a,b) ((a)>(b)?(a):(b))
 
+#define ARRAY_LENGTH(a) (sizeof(a)/sizeof(*(a)))
+
 /* Marinetti buffer types */
 #define buffTypePointer 0x0000
 #define buffTypeHandle 0x0001

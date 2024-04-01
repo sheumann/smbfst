@@ -5,14 +5,14 @@
 #include "driver.h"
 #include "gsosutils.h"
 #include "fstspecific.h"
+#include "helpers/blocks.h"
 
 /*
- * Fake block size/block count information that we return for all volumes.
+ * Fake block count that we return for all volumes.
  */
 // TODO maybe return real information (need to deal with overflows)
 #define TOTAL_BLOCKS 0x7fffff
 #define FREE_BLOCKS  0x7fffff
-#define BLOCK_SIZE   0x000200
 
 Word Volume(void *pblock, struct GSOSDP *gsosDP, Word pcount) {
     unsigned i;

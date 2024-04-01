@@ -17,6 +17,8 @@ typedef struct {
     bool wantSigning; // flag set in Negotiate, but not necessarily in effect yet
     
     Word refCount;
+    
+    int64_t timeDiff; // difference of IIGS local time from server UTC time
 } Connection;
 
 void Connection_Retain(Connection *conn);

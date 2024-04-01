@@ -5,9 +5,12 @@
 #include <orca.h>
 #include <misctool.h>
 #include <string.h>
+#include <stddef.h>
+#include <time.h>
 #include "fstspecific.h"
 #include "smb2.h"
 #include "alloc.h"
+#include "helpers/datetime.h"
 
 // Timeout for TCP connection establishment
 #define TIMEOUT 15 /* seconds */
@@ -84,6 +87,18 @@ Word SMB_Connect(SMBConnectRec *pblock, void *gsosdp, Word pcount) {
         smb_free(connection);
         return networkError;
     }
+
+    /*
+     * Compute difference between IIGS local time and server UTC time.
+     * 
+     * We add in a second because times get truncated to the second both
+     * when getting the local time here and in some subsequent operations,
+     * so we effectively cannot get sub-second accuracy, and having the
+     * time difference be slightly too large may give better results after
+     * subsequent truncations.
+     */
+    connection->timeDiff =
+        TIME_TO_FILETIME(time(NULL) + 1) - negotiateResponse.SystemTime;
     
     connection->wantSigning =
         negotiateResponse.SecurityMode & SMB2_NEGOTIATE_SIGNING_REQUIRED;

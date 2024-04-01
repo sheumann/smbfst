@@ -137,3 +137,10 @@ typedef struct {
     uint16_t Reserved;
 } FILE_STANDARD_INFORMATION;
 
+typedef struct {
+    uint32_t NextEntryOffset;
+    uint32_t StreamNameLength;
+    uint64_t StreamSize;
+    uint64_t StreamAllocationSize;
+    char16_t StreamName[];
+} FILE_STREAM_INFORMATION;

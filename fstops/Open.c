@@ -9,6 +9,7 @@
 #include "gsosutils.h"
 #include "path.h"
 #include "fstspecific.h"
+#include "fstops/GetFileInfo.h"
 
 #define ACCESS_TYPE_COUNT 3
 
@@ -25,6 +26,8 @@ Word Open(void *pblock, void *gsosdp, Word pcount) {
     GSString *volName;
     bool oom;
     FCR *fcr;
+    Word retval = 0;
+    static SMB2_FILEID fileID;
 
     dib = GetDIB(gsosdp, 1);
     if (dib == NULL)
@@ -126,14 +129,18 @@ open_done:
         // TODO give appropriate error code
         return networkError;
     }
+    
+    fileID = createResponse.FileId;
 
     vp = dib->vcrVP;
     DerefVP(vcr,vp);
     vp = vcr->name;
     DerefVP(volName,vp);
     
-    if (volName->length > GBUF_SIZE - 3)
-        return badPathSyntax;
+    if (volName->length > GBUF_SIZE - 3) {
+        retval = badPathSyntax;
+        goto close_on_error2;
+    }
     *(Word*)gbuf = volName->length + 1;
     gbuf[2] = ':';
     memcpy(gbuf+3, volName->text, volName->length);
@@ -153,8 +160,8 @@ open_done:
         rol oom
     }
     if (oom) {
-        // TODO close file on server
-        return outOfMem;
+        retval = outOfMem;
+        goto close_on_error2;
     }
     
     DerefVP(fcr,vp);
@@ -166,9 +173,7 @@ open_done:
     if (pcount >= 4 && ((OpenRecGS*)pblock)->resourceNumber != 0)
          fcr->access |= ACCESS_FLAG_RFORK;
     
-    fcr->fileID = createResponse.FileId;
-    
-    // TODO fill in info, depending on pcount
+    fcr->fileID = fileID;
     
     if (pcount == 0) {
         #define pblock ((OpenRec*)pblock)
@@ -178,11 +183,53 @@ open_done:
         #undef pblock
     } else {
         #define pblock ((OpenRecGS*)pblock)
-        
+
+        if (pcount >= 5) {
+            basicInfo.CreationTime = createResponse.CreationTime;
+            basicInfo.LastWriteTime = createResponse.LastWriteTime;
+            basicInfo.FileAttributes = createResponse.FileAttributes;
+            retval = GetFileInfo_Impl(
+                (char*)&pblock->access - offsetof(FileInfoRecGS, access),
+                gsosdp, pcount - 3, true, createResponse.FileId);
+            if (retval)
+                goto close_on_error1;
+        }
+
         pblock->refNum = fcr->refNum;
-        
+
         #undef pblock
     }
     
     return 0;
+
+close_on_error1:
+    /*
+     * Release VCR if we got an error after it was allocated
+     */
+    i = fcr->refNum;
+    asm {
+        ldx i
+        phd
+        lda gsosdp
+        tcd
+        txa
+        jsl RELEASE_FCR
+        pld
+    }
+
+    vcr->openCount--;
+
+close_on_error2:
+    /*
+     * Close file if we got an error
+     */
+    closeRequest.Flags = 0;
+    closeRequest.Reserved = 0;
+    closeRequest.FileId = fileID;
+
+    result = SendRequestAndGetResponse(dib->session, SMB2_CLOSE,
+        dib->treeId, sizeof(closeRequest));
+    // Ignore error here, since we're already reporting some kind or error
+    
+    return retval;
 }

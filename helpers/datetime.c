@@ -1,9 +1,20 @@
 #include "defs.h"
 #include <time.h>
 #include <misctool.h>
+#include <orca.h>
 #include "helpers/datetime.h"
 #include "session.h"
 #include "connection.h"
+
+typedef union {
+    TimeRec timeRec;
+    ProDOSTime pdosTime;
+} TimeUnion;
+
+static TimeUnion timeUnion;
+
+// TODO Rework these functions to work over the whole range of GS/OS TimeRec
+//      (i.e. avoid dependency on 32-bit time_t).
 
 /*
  * Convert SMB FILETIME (count of 100 nanosecond intervals since Jan 1, 1601)
@@ -38,17 +49,42 @@ TimeRec GetGSTime(uint64_t filetime, Session *session) {
 }
 
 /*
- * Convert SMB FILETIME (count of 100 nanosecond intervals since Jan 1, 1601)
- * to ProDOS date/time format.
+ * Convert SMB FILETIME to ProDOS date/time format.
  */
 ProDOSTime GetProDOSTime(uint64_t filetime, Session *session) {
-    static union {
-        TimeRec timeRec;
-        ProDOSTime pdosTime;
-    } time;
+    timeUnion.timeRec = GetGSTime(filetime, session);
+    ConvSeconds(TimeRec2ProDOS, 0, (Pointer)&timeUnion);
     
-    time.timeRec = GetGSTime(filetime, session);
-    ConvSeconds(TimeRec2ProDOS, 0, (Pointer)&time);
+    return timeUnion.pdosTime;
+}
+
+/*
+ * Convert GS/OS TimeRec to SMB FILETIME.
+ */
+uint64_t GSTimeToFiletime(TimeRec timeRec, Session *session) {
+    static struct tm tm;
+    time_t time;
     
-    return time.pdosTime;
+    tm.tm_mon = timeRec.month;
+    tm.tm_mday = timeRec.day + 1;
+    tm.tm_year = timeRec.year;
+    tm.tm_hour = timeRec.hour;
+    tm.tm_min = timeRec.minute;
+    tm.tm_sec = timeRec.second;
+
+    time = mktime(&tm);
+    
+    return TIME_T_0 + (uint64_t)time * 10000000 - session->connection->timeDiff;
+}
+
+/*
+ * Convert ProDOS date/time format to SMB FILETIME.
+ */
+uint64_t ProDOSTimeToFiletime(ProDOSTime time, Session *session) {
+    timeUnion.pdosTime = time;
+    ConvSeconds(ProDOS2TimeRec, 0, (Pointer)&timeUnion);
+    if (toolerror())
+        return 0;
+    
+    return GSTimeToFiletime(timeUnion.timeRec, session);
 }

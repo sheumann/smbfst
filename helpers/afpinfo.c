@@ -7,7 +7,8 @@
 
 AFPInfo afpInfo;
 
-static char16_t finderInfoSuffix[18] = u":AFP_AfpInfo:$DATA";
+const char16_t afpInfoSuffix[18] = u":AFP_AfpInfo:$DATA";
+const char16_t resourceForkSuffix[19] = u":AFP_Resource:$DATA";
 
 Word GetFinderInfo(DIB *dib, struct GSOSDP *gsosdp) {
     ReadStatus result;
@@ -42,12 +43,12 @@ Word GetFinderInfo(DIB *dib, struct GSOSDP *gsosdp) {
 
     if (createRequest.NameLength >
         sizeof(msg.body) - offsetof(SMB2_CREATE_Request, Buffer)
-        - sizeof(finderInfoSuffix))
+        - sizeof(afpInfoSuffix))
         return badPathSyntax;
 
     memcpy(createRequest.Buffer + createRequest.NameLength,
-        finderInfoSuffix, sizeof(finderInfoSuffix));
-    createRequest.NameLength += sizeof(finderInfoSuffix);
+        afpInfoSuffix, sizeof(afpInfoSuffix));
+    createRequest.NameLength += sizeof(afpInfoSuffix);
     
     result = SendRequestAndGetResponse(dib->session, SMB2_CREATE, dib->treeId,
         sizeof(createRequest) + createRequest.NameLength);

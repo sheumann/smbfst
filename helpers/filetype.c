@@ -3,8 +3,6 @@
 #include <stdint.h>
 #include "helpers/filetype.h"
 
-#define DIRECTORY_FILETYPE 0x0F
-
 typedef struct {
     uint32_t creator;
     uint32_t type;
@@ -20,10 +18,10 @@ typedef struct {
 
 // Macros for forming type/creator codes
 #define TYPE(a,b,c,d) \
-    ((a) | ((uint16_t)b)<<8 | ((uint32_t)(c))<<16 | ((uint32_t)(d))<<24)
+    ((a) | ((uint16_t)(b))<<8 | ((uint32_t)(c))<<16 | ((uint32_t)(d))<<24)
 #define CREATOR(a,b,c,d) TYPE((a),(b),(c),(d))
 
-// type/creator to ProDOS type mappings (type or creator of 0 is wildcard)
+// type/creator to ProDOS type mappings (creator of 0 is wildcard)
 // See Programmer's Reference for System 6.0, p. 336
 TypeCreatorMapRec typeCreatorMap[] = {
     {CREATOR('p','d','o','s'), TYPE('P','S','Y','S'), 0xFF, 0x0000},
@@ -91,8 +89,8 @@ FileType GetFileType(struct GSOSDP *gsosdp, AFPInfo *afpInfo, bool isDirectory) 
     }
 
     // Decode special 'pdos' type/creator codes
-    if (afpInfo->finderInfo.creator == TYPE('p','d','o','s')) {
-        typeCode = (unsigned char*)&afpInfo->finderInfo.fileType;
+    if (afpInfo->finderInfo.typeCreator.creator == TYPE('p','d','o','s')) {
+        typeCode = (unsigned char*)&afpInfo->finderInfo.typeCreator.type;
         if (typeCode[0] == 'p') {
             fileType.fileType = typeCode[1];
             fileType.auxType = ((uint16_t)typeCode[2]) << 8 | typeCode[3];
@@ -110,10 +108,10 @@ FileType GetFileType(struct GSOSDP *gsosdp, AFPInfo *afpInfo, bool isDirectory) 
     
     // Map other known type/creator codes
     for (i = 0; i < ARRAY_LENGTH(typeCreatorMap); i++) {
-        if (typeCreatorMap[i].creator == afpInfo->finderInfo.creator
+        if (typeCreatorMap[i].creator == afpInfo->finderInfo.typeCreator.creator
             || typeCreatorMap[i].creator == 0) {
-            if (typeCreatorMap[i].type == afpInfo->finderInfo.fileType
-                || typeCreatorMap[i].type == 0) {
+            if (typeCreatorMap[i].type == afpInfo->finderInfo.typeCreator.type)
+            {
                 fileType.fileType = typeCreatorMap[i].fileType;
                 fileType.auxType = typeCreatorMap[i].auxType;
                 goto done;
@@ -138,9 +136,33 @@ FileType GetFileType(struct GSOSDP *gsosdp, AFPInfo *afpInfo, bool isDirectory) 
     }
 
 done:
-    // Prevent non-directories from being typed as directories
-    if (fileType.fileType == DIRECTORY_FILETYPE && !isDirectory)
-        fileType.fileType = 0;
-
     return fileType;
+}
+
+/*
+ * Map ProDOS-style file type to Mac-style type/creator code.
+ */
+TypeCreator FileTypeToTypeCreator(FileType type) {
+    TypeCreator tc;
+    unsigned i;
+    
+    tc.creator = CREATOR('p','d','o','s');
+
+    // Map filetypes with specific type/creator code mappings
+    for (i = 0; i < ARRAY_LENGTH(typeCreatorMap); i++) {
+        if (typeCreatorMap[i].fileType == type.fileType &&
+            typeCreatorMap[i].auxType == type.auxType) {
+            tc.type = typeCreatorMap[i].type;
+            if (typeCreatorMap[i].creator != 0)
+                tc.creator = typeCreatorMap[i].creator;
+            goto done;
+        }
+    }
+    
+    // If no specific mapping is found, use general ProDOS mapping
+    tc.type = TYPE('p', type.fileType & 0xFF,
+        (type.auxType >> 8) & 0xFF, type.auxType & 0xFF);
+
+done:
+    return tc;
 }

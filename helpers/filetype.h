@@ -6,9 +6,11 @@
 #include "driver.h"
 #include "helpers/afpinfo.h"
 
+#define DIRECTORY_FILETYPE 0x0F
+
 typedef struct {
-   Word fileType;
-   LongWord auxType;
+    Word fileType;
+    LongWord auxType;
 } FileType;
 
 /*
@@ -16,5 +18,7 @@ typedef struct {
  * for the file, or the file name in the GS/OS DP.
  */
 FileType GetFileType(struct GSOSDP *gsosdp, AFPInfo *afpInfo, bool isDirectory);
+
+TypeCreator FileTypeToTypeCreator(FileType type);
 
 #endif

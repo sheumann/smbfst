@@ -177,15 +177,17 @@ Word GetFileInfo_Impl(void *pblock, void *gsosdp, Word pcount,
             dataEOF = streamInfo->StreamSize;
             dataAlloc = streamInfo->StreamAllocationSize;
         }
-        else if (streamInfo->StreamNameLength == 19*2 &&
-            memcmp(streamInfo->StreamName, u":AFP_Resource:$DATA", 19*2) == 0)
+        else if (streamInfo->StreamNameLength == sizeof(resourceForkSuffix) &&
+            memcmp(streamInfo->StreamName, resourceForkSuffix,
+                sizeof(resourceForkSuffix)) == 0)
         {
             haveResourceFork = true;
             resourceEOF = streamInfo->StreamSize;
             resourceAlloc = streamInfo->StreamAllocationSize;
         }
-        else if (streamInfo->StreamNameLength == 18*2 &&
-            memcmp(streamInfo->StreamName, u":AFP_AfpInfo:$DATA", 18*2) == 0 &&
+        else if (streamInfo->StreamNameLength == sizeof(afpInfoSuffix) &&
+            memcmp(streamInfo->StreamName, afpInfoSuffix,
+                sizeof(afpInfoSuffix)) == 0 &&
             streamInfo->StreamSize >= sizeof(AFPInfo))
         {
             haveAFPInfo = true;

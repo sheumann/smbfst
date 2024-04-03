@@ -355,6 +355,32 @@ typedef struct {
 } SMB2_FILEID;
 
 typedef struct {
+    uint32_t Next;
+    uint16_t NameOffset;
+    uint16_t NameLength;
+    uint16_t Reserved;
+    uint16_t DataOffset;
+    uint32_t DataLength;
+    uint32_t Name;    // Variable-length in principle, but usually 4 bytes
+    uint32_t Padding; // To make Data 8-byte aligned
+    uint8_t  Data[];
+} SMB2_CREATE_CONTEXT;
+
+/* Create context names (to be sent in network byte order) */
+#define SMB2_CREATE_EA_BUFFER                    0x45787441
+#define SMB2_CREATE_SD_BUFFER                    0x53656344
+#define SMB2_CREATE_DURABLE_HANDLE_REQUEST       0x44486e51
+#define SMB2_CREATE_DURABLE_HANDLE_RECONNECT     0x44486e43
+#define SMB2_CREATE_ALLOCATION_SIZE              0x416c5369
+#define SMB2_CREATE_QUERY_MAXIMAL_ACCESS_REQUEST 0x4d784163
+#define SMB2_CREATE_TIMEWARP_TOKEN               0x54577270
+#define SMB2_CREATE_QUERY_ON_DISK_ID             0x51466964
+#define SMB2_CREATE_REQUEST LEASE                0x52714c73
+#define SMB2_CREATE_REQUEST_LEASE_V2             0x52714c73
+#define SMB2_CREATE_DURABLE_HANDLE_REQUEST_V2    0x44483251
+#define SMB2_CREATE_DURABLE_HANDLE_RECONNECT_V2  0x44483243
+
+typedef struct {
     uint16_t StructureSize;
     uint8_t  OplockLevel;
     uint8_t  Flags;

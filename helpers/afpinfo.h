@@ -2,8 +2,17 @@
 #define AFPINFO_H
 
 #include <stdint.h>
+#include <uchar.h>
 #include <types.h>
 #include "driver.h"
+
+/*
+ * Mac-style type/creator code
+ */
+typedef struct {
+    uint32_t type;
+    uint32_t creator;
+} TypeCreator;
 
 /*
  * Finder Info data structure.
@@ -16,33 +25,30 @@
  */
 typedef struct {
     union {
-        struct {                // for files
-            uint32_t fileType;
-            uint32_t creator;
-        };
-        uint64_t windRect;      // for directories
+        TypeCreator typeCreator; // for files
+        uint64_t windRect;       // for directories
     };
     uint16_t finderFlags;
     uint32_t iconLoc;
     union {
-        uint16_t fileWindow;    // for files
-        uint16_t view;          // for directories
+        uint16_t fileWindow;     // for files
+        uint16_t view;           // for directories
     };
     union {
-        struct {                // for files
+        struct {                 // for files
             uint16_t iconID;
             uint16_t reserved1;
         };
-        uint32_t position;      // for directories
+        uint32_t position;       // for directories
     };
     union {
-        uint32_t dateAdded;     // in OS X
-        uint32_t nextID;        // for directories, pre-OS X
-        uint32_t reserved2;     // for files, pre-OS X
+        uint32_t dateAdded;      // in OS X
+        uint32_t nextID;         // for directories, pre-OS X
+        uint32_t reserved2;      // for files, pre-OS X
     };
     union {
-        uint16_t extFlags;      // in OS X
-        uint16_t reserved3;     // pre-OS X
+        uint16_t extFlags;       // in OS X
+        uint16_t reserved3;      // pre-OS X
     };
     uint16_t commentID;
     uint32_t directoryID;
@@ -68,6 +74,9 @@ typedef struct {
     uint8_t  reserved2[6];
     /* Samba may include an extra field beyond this */
 } AFPInfo;
+
+extern const char16_t afpInfoSuffix[18];
+extern const char16_t resourceForkSuffix[19];
 
 extern AFPInfo afpInfo;
 

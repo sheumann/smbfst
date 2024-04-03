@@ -116,8 +116,6 @@ Word SMB_Connect(SMBConnectRec *pblock, void *gsosdp, Word pcount) {
         connection->wantSigning = true;
     }
     
-    // TODO compute time difference based on negotiateResponse.SystemTime
-    
     // Security buffer is currently ignored
     
     connection->refCount = 1;

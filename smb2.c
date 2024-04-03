@@ -20,6 +20,14 @@
 #include "auth.h"
 #include "crypto/sha256.h"
 
+/*
+ * StructureSize values for request structures.
+ *
+ * The low-order bit represents a variable-length portion of the structure,
+ * which can sometimes validly be empty.  However, Windows requires the
+ * actual data size to at least match the structure size, so a byte of
+ * padding must be included in those cases.
+ */
 static const uint16_t requestStructureSizes[] = {
     [SMB2_NEGOTIATE] = 36,
     [SMB2_SESSION_SETUP] = 25,
@@ -170,6 +178,10 @@ ReadStatus SendRequestAndGetResponse(Session *session, uint16_t command,
     uint64_t messageId = connection->nextMessageId;
     
     msgBodyHeader.StructureSize = requestStructureSizes[command];
+    
+    // Pad body to at least equal structure size (required by Windows).
+    if (bodyLength < msgBodyHeader.StructureSize)
+        msg.body[bodyLength++] = 0;
     
     if (SendMessage(session, command, treeId, bodyLength) == false)
         return rsError;

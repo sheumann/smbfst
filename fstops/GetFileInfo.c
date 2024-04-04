@@ -82,41 +82,9 @@ Word GetFileInfo_Impl(void *pblock, void *gsosdp, Word pcount,
         
         fileID = createResponse.FileId;
     
-        /*
-         * Get basic file information
-         */
-        queryInfoRequest.InfoType = SMB2_0_INFO_FILE;
-        queryInfoRequest.FileInfoClass = FileBasicInformation;
-        queryInfoRequest.OutputBufferLength = sizeof(FILE_BASIC_INFORMATION);
-        queryInfoRequest.InputBufferOffset = 0;
-        queryInfoRequest.Reserved = 0;
-        queryInfoRequest.InputBufferLength = 0;
-        queryInfoRequest.AdditionalInformation = 0;
-        queryInfoRequest.Flags = 0;
-        queryInfoRequest.FileId = fileID;
-        
-        result = SendRequestAndGetResponse(dib->session, SMB2_QUERY_INFO,
-            dib->treeId, sizeof(queryInfoRequest));
-        if (result != rsDone) {
-            //TODO error handling
-            return networkError;
-        }
-        
-        if (queryInfoResponse.OutputBufferLength
-            != sizeof(FILE_BASIC_INFORMATION)) {
-            retval = networkError;
-            goto close;
-        }
-    
-        if (!VerifyBuffer(
-            queryInfoResponse.OutputBufferOffset,
-            queryInfoResponse.OutputBufferLength)) {
-            retval = networkError;
-            goto close;
-        }
-    
-        basicInfo = *(FILE_BASIC_INFORMATION *)((unsigned char *)&msg.smb2Header
-            + queryInfoResponse.OutputBufferOffset);
+        basicInfo.CreationTime = createResponse.CreationTime;
+        basicInfo.LastWriteTime = createResponse.LastWriteTime;
+        basicInfo.FileAttributes = createResponse.FileAttributes;
     }
 
     /*

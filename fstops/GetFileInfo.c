@@ -15,6 +15,8 @@
 #include "fstops/GetFileInfo.h"
 
 FILE_BASIC_INFORMATION basicInfo;
+bool haveDataForkSizes;
+uint64_t dataEOF, dataAlloc;
 
 /*
  * This contains the implementation of GetFileInfo, which is also used when
@@ -23,8 +25,9 @@ FILE_BASIC_INFORMATION basicInfo;
  * When used for Open, alreadyOpen is set to true, fileID is provided, and
  * pblock is adjusted to line up corresponding fields (access through 
  * resourceBlocks).  In addition, the CreationTime, LastWriteTime, and
- * FileAttributes fields of basicInfo must be pre-filled in this case.
- 
+ * FileAttributes fields of basicInfo must be pre-filled in this case,
+ * and haveDataForkSizes must be set to indicate whether dataEOF and
+ * dataAlloc have been filled in with the sizes for the data fork.
  */
 Word GetFileInfo_Impl(void *pblock, void *gsosdp, Word pcount,
     bool alreadyOpen, SMB2_FILEID fileID) {
@@ -37,7 +40,6 @@ Word GetFileInfo_Impl(void *pblock, void *gsosdp, Word pcount,
     bool haveAFPInfo = false;
     bool haveResourceFork = false;
 
-    static uint64_t dataEOF = 0, dataAlloc = 0;
     static uint64_t resourceEOF = 0, resourceAlloc = 0;
     static FileType fileType;
     
@@ -85,6 +87,10 @@ Word GetFileInfo_Impl(void *pblock, void *gsosdp, Word pcount,
         basicInfo.CreationTime = createResponse.CreationTime;
         basicInfo.LastWriteTime = createResponse.LastWriteTime;
         basicInfo.FileAttributes = createResponse.FileAttributes;
+        
+        dataEOF = createResponse.EndofFile;
+        dataAlloc = createResponse.AllocationSize;
+        haveDataForkSizes = true;
     }
 
     /*
@@ -140,10 +146,20 @@ Word GetFileInfo_Impl(void *pblock, void *gsosdp, Word pcount,
         if (streamInfo->StreamNameLength == 7*2 &&
             memcmp(streamInfo->StreamName, u"::$DATA", 7*2) == 0)
         {
-            // TODO macOS sets allocation size equal to EOF.
-            // Maybe get it a different way to obtain true allocation size.
-            dataEOF = streamInfo->StreamSize;
-            dataAlloc = streamInfo->StreamAllocationSize;
+            /*
+             * We use the EOF/allocation size from the CREATE response if they
+             * are available and still valid, and if the server claims the
+             * data fork allocation size is equal to its EOF.  The reason
+             * is that macOS reports the true allocation size in the CREATE
+             * response, but not in FILE_STREAM_INFORMATION.
+             */
+            if (streamInfo->StreamSize != streamInfo->StreamAllocationSize
+                || !haveDataForkSizes
+                || streamInfo->StreamSize != dataEOF) {
+                dataEOF = streamInfo->StreamSize;
+                dataAlloc = streamInfo->StreamAllocationSize;
+                haveDataForkSizes = true;
+            }
         }
         else if (streamInfo->StreamNameLength == sizeof(resourceForkSuffix) &&
             memcmp(streamInfo->StreamName, resourceForkSuffix,
@@ -166,6 +182,9 @@ Word GetFileInfo_Impl(void *pblock, void *gsosdp, Word pcount,
         streamInfoLen -= streamInfo->NextEntryOffset;
         streamInfo = (void*)((char*)streamInfo + streamInfo->NextEntryOffset);
     }
+    
+    if (!haveDataForkSizes)
+        dataEOF = dataAlloc = 0;
 
 close:
     if (!alreadyOpen) {

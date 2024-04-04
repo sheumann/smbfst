@@ -188,6 +188,15 @@ open_done:
             basicInfo.CreationTime = createResponse.CreationTime;
             basicInfo.LastWriteTime = createResponse.LastWriteTime;
             basicInfo.FileAttributes = createResponse.FileAttributes;
+            
+            if (((OpenRecGS*)pblock)->resourceNumber == 0) {
+                dataEOF = createResponse.EndofFile;
+                dataAlloc = createResponse.AllocationSize;
+                haveDataForkSizes = true;
+            } else {
+                haveDataForkSizes = false;
+            }
+            
             retval = GetFileInfo_Impl(
                 (char*)&pblock->access - offsetof(FileInfoRecGS, access),
                 gsosdp, pcount - 3, true, createResponse.FileId);

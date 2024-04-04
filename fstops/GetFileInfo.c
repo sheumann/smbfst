@@ -49,6 +49,7 @@ Word GetFileInfo_Impl(void *pblock, void *gsosdp, Word pcount,
     if (dib == NULL)
         return volNotFound;
 
+top:
     if (!alreadyOpen) {
         /*
          * Open file
@@ -110,6 +111,18 @@ Word GetFileInfo_Impl(void *pblock, void *gsosdp, Word pcount,
     result = SendRequestAndGetResponse(dib->session, SMB2_QUERY_INFO,
         dib->treeId, sizeof(queryInfoRequest));
     if (result != rsDone) {
+        /*
+         * macOS will not let us query FileStreamInformation on a resource
+         * fork.  To work around this, we will go back and open the data fork
+         * if we hit this error.
+         */
+        if (alreadyOpen
+            && !haveDataForkSizes
+            && result == rsFailed
+            && msg.smb2Header.Status == STATUS_ACCESS_DENIED) {
+            alreadyOpen = false;
+            goto top;
+        }
         //TODO error handling
         retval = networkError;
         goto close;

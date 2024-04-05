@@ -9,6 +9,7 @@
 #include "driver.h"
 #include "gsosutils.h"
 #include "path.h"
+#include "helpers/errors.h"
 
 Word ChangePath(void *pblock, void *gsosdp, Word pcount) {
     ReadStatus result;
@@ -55,10 +56,8 @@ Word ChangePath(void *pblock, void *gsosdp, Word pcount) {
 
     result = SendRequestAndGetResponse(dib1->session, SMB2_CREATE, dib1->treeId,
         sizeof(createRequest) + createRequest.NameLength);
-    if (result != rsDone) {
-        // TODO give appropriate error code
-        return networkError;
-    }
+    if (result != rsDone)
+        return ConvertError(result);
     
     fileID = createResponse.FileId;
     
@@ -99,10 +98,8 @@ Word ChangePath(void *pblock, void *gsosdp, Word pcount) {
     result = SendRequestAndGetResponse(dib1->session, SMB2_SET_INFO,
         dib1->treeId,
         sizeof(setInfoRequest) + setInfoRequest.BufferLength);
-    if (result != rsDone) {
-        // TODO give appropriate error code
-        retval = networkError;
-    }
+    if (result != rsDone)
+        retval = ConvertError(result);
 
 close:
     /*
@@ -114,9 +111,8 @@ close:
 
     result = SendRequestAndGetResponse(dib1->session, SMB2_CLOSE, dib1->treeId,
         sizeof(closeRequest));
-    if (result != rsDone) {
+    if (result != rsDone)
         return retval ? retval : networkError;
-    }
 
     return retval;
 }

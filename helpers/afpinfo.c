@@ -4,6 +4,7 @@
 #include "smb2.h"
 #include "path.h"
 #include "helpers/afpinfo.h"
+#include "helpers/errors.h"
 
 AFPInfo afpInfo;
 
@@ -53,8 +54,8 @@ Word GetFinderInfo(DIB *dib, struct GSOSDP *gsosdp) {
     result = SendRequestAndGetResponse(dib->session, SMB2_CREATE, dib->treeId,
         sizeof(createRequest) + createRequest.NameLength);
     if (result != rsDone) {
-        // TODO give appropriate error code (maybe none for no Finder Info)
-        return networkError;
+        // TODO maybe give no error for "no Finder Info found"
+        return ConvertError(result);
     }
     
     fileID = createResponse.FileId;
@@ -77,19 +78,17 @@ Word GetFinderInfo(DIB *dib, struct GSOSDP *gsosdp) {
     result = SendRequestAndGetResponse(dib->session, SMB2_READ,
         dib->treeId, sizeof(readRequest));
     if (result != rsDone) {
-        // TODO give appropriate error code
-        retval = networkError;
+        retval = ConvertError(result);
         goto close;
     }
 
     if (readResponse.DataLength != sizeof(AFPInfo)) {
-        // TODO give appropriate error code
+        // TODO maybe just ignore it with no error?
         retval = networkError;
         goto close;
     }
 
     if (!VerifyBuffer(readResponse.DataOffset, readResponse.DataLength)) {
-        // TODO give appropriate error code
         retval = networkError;
         goto close;
     }
@@ -115,7 +114,7 @@ close:
         sizeof(closeRequest));
     if (result != rsDone) {
         // TODO give appropriate error code
-        return retval ? retval : networkError;
+        return retval ? retval : ConvertError(result);
     }
 
     return retval;

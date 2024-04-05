@@ -9,6 +9,7 @@
 #include "driver.h"
 #include "gsosutils.h"
 #include "path.h"
+#include "helpers/errors.h"
 
 Word Destroy(void *pblock, void *gsosdp, Word pcount) {
     ReadStatus result;
@@ -46,10 +47,8 @@ Word Destroy(void *pblock, void *gsosdp, Word pcount) {
 
     result = SendRequestAndGetResponse(dib->session, SMB2_CREATE, dib->treeId,
         sizeof(createRequest) + createRequest.NameLength);
-    if (result != rsDone) {
-        // TODO give appropriate error code
-        return networkError;
-    }
+    if (result != rsDone)
+        return ConvertError(result);
     
     fileID = createResponse.FileId;
 
@@ -70,10 +69,8 @@ Word Destroy(void *pblock, void *gsosdp, Word pcount) {
 
     result = SendRequestAndGetResponse(dib->session, SMB2_SET_INFO, dib->treeId,
         sizeof(setInfoRequest) + sizeof(FILE_DISPOSITION_INFORMATION));
-    if (result != rsDone) {
-        // TODO give appropriate error code
-        retval = networkError;
-    }
+    if (result != rsDone)
+        retval = ConvertError(result);
 
     /*
      * Close file
@@ -84,10 +81,8 @@ Word Destroy(void *pblock, void *gsosdp, Word pcount) {
 
     result = SendRequestAndGetResponse(dib->session, SMB2_CLOSE, dib->treeId,
         sizeof(closeRequest));
-    if (result != rsDone) {
-        // TODO give appropriate error code
-        return retval ? retval : networkError;
-    }
+    if (result != rsDone)
+        return retval ? retval : ConvertError(result);
 
     return retval;
 }

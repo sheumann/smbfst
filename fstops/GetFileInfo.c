@@ -13,6 +13,7 @@
 #include "helpers/afpinfo.h"
 #include "helpers/filetype.h"
 #include "fstops/GetFileInfo.h"
+#include "helpers/errors.h"
 
 FILE_BASIC_INFORMATION basicInfo;
 bool haveDataForkSizes;
@@ -80,10 +81,8 @@ top:
         result = SendRequestAndGetResponse(dib->session,
             SMB2_CREATE, dib->treeId,
             sizeof(createRequest) + createRequest.NameLength);
-        if (result != rsDone) {
-            // TODO give appropriate error code
-            return networkError;
-        }
+        if (result != rsDone)
+            return ConvertError(result);
         
         fileID = createResponse.FileId;
     
@@ -125,8 +124,7 @@ top:
             alreadyOpen = false;
             goto top;
         }
-        //TODO error handling
-        retval = networkError;
+        retval = ConvertError(result);
         goto close;
     }
     
@@ -212,10 +210,8 @@ close:
     
         result = SendRequestAndGetResponse(dib->session, SMB2_CLOSE,
             dib->treeId, sizeof(closeRequest));
-        if (result != rsDone) {
-            // TODO give appropriate error code
-            return retval ? retval : networkError;
-        }
+        if (result != rsDone)
+            return retval ? retval : ConvertError(result);
     }
 
     if (haveAFPInfo && retval == 0) {

@@ -10,6 +10,7 @@
 #include "path.h"
 #include "fstspecific.h"
 #include "fstops/GetFileInfo.h"
+#include "helpers/errors.h"
 
 #define ACCESS_TYPE_COUNT 3
 
@@ -125,10 +126,8 @@ Word Open(void *pblock, void *gsosdp, Word pcount) {
             break;
     }
 open_done:
-    if (result != rsDone) {
-        // TODO give appropriate error code
-        return networkError;
-    }
+    if (result != rsDone)
+        return ConvertError(result);
     
     fileID = createResponse.FileId;
 

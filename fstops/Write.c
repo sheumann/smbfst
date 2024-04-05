@@ -5,6 +5,7 @@
 #include "smb2.h"
 #include "gsosdata.h"
 #include "driver.h"
+#include "helpers/errors.h"
 
 Word Write(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     Word result;
@@ -69,7 +70,6 @@ Word Write(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     if (remainingCount == 0) {
         return 0;
     } else {
-        // TODO give appropriate error code
-        return networkError;
+        return ConvertError(result);
     }
 }

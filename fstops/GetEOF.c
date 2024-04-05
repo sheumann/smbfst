@@ -5,6 +5,7 @@
 #include "gsosdata.h"
 #include "driver.h"
 #include "fileinfo.h"
+#include "helpers/errors.h"
 
 Word GetEOF(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     Word result;
@@ -36,10 +37,8 @@ Word GetEOF(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     
     result = SendRequestAndGetResponse(dibs[i].session, SMB2_QUERY_INFO,
         dibs[i].treeId, sizeof(queryInfoRequest));
-    if (result != rsDone) {
-        //TODO error handling
-        return networkError;
-    }
+    if (result != rsDone)
+        return ConvertError(result);
     
     if (queryInfoResponse.OutputBufferLength
         != sizeof(FILE_STANDARD_INFORMATION))

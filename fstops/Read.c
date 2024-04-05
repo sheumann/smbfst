@@ -5,6 +5,7 @@
 #include "smb2.h"
 #include "gsosdata.h"
 #include "driver.h"
+#include "helpers/errors.h"
 
 Word Read(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     Word result;
@@ -94,8 +95,7 @@ newline_done:
     if (remainingCount == 0) {
         return 0;
     } else {
-        // TODO give appropriate error code
-        retval = networkError;
+        retval = ConvertError(result);
         
         if (retval == eofEncountered && pblock->transferCount !=  0)
             retval = 0;

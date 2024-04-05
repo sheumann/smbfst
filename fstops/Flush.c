@@ -4,6 +4,7 @@
 #include "smb2.h"
 #include "gsosdata.h"
 #include "driver.h"
+#include "helpers/errors.h"
 
 /*
  * Flush pblock, including optional flush type as second parameter.
@@ -49,10 +50,8 @@ Word Flush(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     
     result = SendRequestAndGetResponse(dibs[i].session, SMB2_FLUSH,
         dibs[i].treeId, sizeof(flushRequest));
-    if (result != rsDone) {
-        //TODO error handling
-        return networkError;
-    }
+    if (result != rsDone)
+        return ConvertError(result);
     
     return 0;
 }

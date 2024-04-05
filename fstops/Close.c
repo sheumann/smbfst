@@ -31,9 +31,8 @@ Word Close(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
 
     result = SendRequestAndGetResponse(dibs[i].session, SMB2_CLOSE,
         dibs[i].treeId, sizeof(closeRequest));
-    if (result != rsDone) {
+    if (result != rsDone)
         return networkError;
-    }
     
     i = fcr->refNum;
     asm {

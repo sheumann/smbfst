@@ -14,6 +14,7 @@
 #include "helpers/filetype.h"
 #include "helpers/datetime.h"
 #include "helpers/attributes.h"
+#include "helpers/errors.h"
 
 #define extendExistingFile 0x8005
 
@@ -234,8 +235,10 @@ Word Create(void *pblock, void *gsosdp, Word pcount) {
         result = SendRequestAndGetResponse(dib->session, SMB2_CREATE,
             dib->treeId, msgLen);
         if (result != rsDone) {
-            // TODO handle errors
-            return networkError;
+            retval = ConvertError(result);
+            if (retval == fileNotFound)
+                retval = pathNotFound;
+            return retval;
         }
         
         fileID = createResponse.FileId;
@@ -296,8 +299,13 @@ Word Create(void *pblock, void *gsosdp, Word pcount) {
         result = SendRequestAndGetResponse(dib->session, SMB2_CREATE,
             dib->treeId, msgLen);
         if (result != rsDone) {
-            // TODO handle errors
-            retval = networkError;
+            if (storageType == extendExistingFile
+                && result == rsFailed
+                && msg.smb2Header.Status == STATUS_OBJECT_NAME_COLLISION) {
+                retval = resExistsErr;
+            } else {
+                retval = ConvertError(result);
+            }
             goto close_on_error;
         }
 
@@ -308,8 +316,7 @@ Word Create(void *pblock, void *gsosdp, Word pcount) {
         result = SendRequestAndGetResponse(dib->session, SMB2_CLOSE,
             dib->treeId, sizeof(closeRequest));
         if (result != rsDone) {
-            // TODO handle errors
-            retval = networkError;
+            retval = ConvertError(result);
             goto close_on_error;
         }
     }
@@ -354,8 +361,8 @@ Word Create(void *pblock, void *gsosdp, Word pcount) {
         result = SendRequestAndGetResponse(dib->session, SMB2_CREATE,
             dib->treeId, sizeof(createRequest) + createRequest.NameLength);
         if (result != rsDone) {
-            // TODO handle errors
-            retval = networkError;
+            // TODO add option to ignore errors setting AFP info
+            retval = ConvertError(result);
             goto close_on_error;
         }
 
@@ -388,10 +395,8 @@ Word Create(void *pblock, void *gsosdp, Word pcount) {
 
         result = SendRequestAndGetResponse(dib->session, SMB2_WRITE,
             dib->treeId, sizeof(writeRequest) + sizeof(AFPInfo));
-        if (result != rsDone) {
-            // TODO handle errors
-            retval = networkError;
-        }
+        if (result != rsDone)
+            retval = ConvertError(result);
 
         closeRequest.Flags = 0;
         closeRequest.Reserved = 0;
@@ -399,10 +404,8 @@ Word Create(void *pblock, void *gsosdp, Word pcount) {
     
         result = SendRequestAndGetResponse(dib->session, SMB2_CLOSE,
             dib->treeId, sizeof(closeRequest));
-        if (result != rsDone) {
-            // TODO handle errors
-            retval = retval ? retval : networkError;
-        }
+        if (result != rsDone)
+            retval = retval ? retval : ConvertError(result);
         
         if (retval != 0)
             goto close_on_error;
@@ -432,8 +435,7 @@ Word Create(void *pblock, void *gsosdp, Word pcount) {
                 dib->session, SMB2_SET_INFO, dib->treeId, 
                 sizeof(setInfoRequest) + sizeof(FILE_BASIC_INFORMATION));
             if (result != rsDone) {
-                // TODO give appropriate error code
-                retval = networkError;
+                retval = ConvertError(result);
                 goto close_on_error;
             }
         }

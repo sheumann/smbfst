@@ -9,6 +9,7 @@
 #include "driver.h"
 #include "gsosutils.h"
 #include "path.h"
+#include "helpers/errors.h"
 
 Word ClearBackupBit(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     ReadStatus result;
@@ -46,10 +47,8 @@ Word ClearBackupBit(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
 
     result = SendRequestAndGetResponse(dib->session, SMB2_CREATE, dib->treeId,
         sizeof(createRequest) + createRequest.NameLength);
-    if (result != rsDone) {
-        // TODO give appropriate error code
-        return networkError;
-    }
+    if (result != rsDone)
+        return ConvertError(result);
     
     fileID = createResponse.FileId;
     attributes = createResponse.FileAttributes;
@@ -78,10 +77,8 @@ Word ClearBackupBit(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
 
     result = SendRequestAndGetResponse(dib->session, SMB2_SET_INFO, dib->treeId,
         sizeof(setInfoRequest) + sizeof(FILE_BASIC_INFORMATION));
-    if (result != rsDone) {
-        // TODO give appropriate error code
-        return networkError;
-    }
+    if (result != rsDone)
+        return ConvertError(result);
 
     /*
      * Close file
@@ -92,9 +89,8 @@ Word ClearBackupBit(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
 
     result = SendRequestAndGetResponse(dib->session, SMB2_CLOSE, dib->treeId,
         sizeof(closeRequest));
-    if (result != rsDone) {
-        return networkError;
-    }
+    if (result != rsDone)
+        return ConvertError(result);
 
     return 0;
 }

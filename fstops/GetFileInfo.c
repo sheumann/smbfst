@@ -40,7 +40,7 @@ Word GetFileInfo_Impl(void *pblock, void *gsosdp, Word pcount,
     bool haveAFPInfo = false;
     bool haveResourceFork = false;
 
-    static uint64_t resourceEOF = 0, resourceAlloc = 0;
+    static uint64_t resourceEOF, resourceAlloc;
     static FileType fileType;
     
     static ProDOSTime pdosTime;
@@ -50,6 +50,8 @@ Word GetFileInfo_Impl(void *pblock, void *gsosdp, Word pcount,
         return volNotFound;
 
 top:
+    resourceEOF = resourceAlloc = 0;
+
     if (!alreadyOpen) {
         /*
          * Open file

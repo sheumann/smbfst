@@ -94,6 +94,10 @@ top:
         dataAlloc = createResponse.AllocationSize;
         haveDataForkSizes = true;
     }
+    
+    // Skip remaining queries if we only need access word
+    if (pcount == 2)
+        goto close;
 
     /*
      * Get stream information

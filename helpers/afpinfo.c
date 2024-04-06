@@ -11,7 +11,11 @@ AFPInfo afpInfo;
 const char16_t afpInfoSuffix[18] = u":AFP_AfpInfo:$DATA";
 const char16_t resourceForkSuffix[19] = u":AFP_Resource:$DATA";
 
-Word GetFinderInfo(DIB *dib, struct GSOSDP *gsosdp) {
+/*
+ * Get the AFP Info data stream for a file.
+ * This fills in afpInfo with the info.  Returns a GS/OS result code.
+ */
+Word GetAFPInfo(DIB *dib, struct GSOSDP *gsosdp) {
     ReadStatus result;
     SMB2_FILEID fileID;
     Word retval = 0;
@@ -19,7 +23,7 @@ Word GetFinderInfo(DIB *dib, struct GSOSDP *gsosdp) {
     memset(&afpInfo, 0, sizeof(AFPInfo));
 
     /*
-     * Open Finder Info ADS
+     * Open AFP Info ADS
      */
     createRequest.SecurityFlags = 0;
     createRequest.RequestedOplockLevel = SMB2_OPLOCK_LEVEL_NONE;
@@ -61,7 +65,7 @@ Word GetFinderInfo(DIB *dib, struct GSOSDP *gsosdp) {
     fileID = createResponse.FileId;
 
     /*
-     * Read Finder Info
+     * Read AFP Info
      */
     readRequest.Padding =
         sizeof(SMB2Header) + offsetof(SMB2_READ_Response, Buffer);
@@ -103,7 +107,7 @@ Word GetFinderInfo(DIB *dib, struct GSOSDP *gsosdp) {
     }
 
     /*
-     * Close Finder Info ADS
+     * Close AFP Info ADS
      */
 close:
     closeRequest.Flags = 0;

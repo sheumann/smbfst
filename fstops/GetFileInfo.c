@@ -219,7 +219,7 @@ close:
     }
 
     if (haveAFPInfo && retval == 0) {
-        retval = GetFinderInfo(dib, gsosdp);
+        retval = GetAFPInfo(dib, gsosdp);
     } else {
         memset(&afpInfo, 0, sizeof(AFPInfo));
     }

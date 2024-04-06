@@ -80,6 +80,6 @@ extern const char16_t resourceForkSuffix[19];
 
 extern AFPInfo afpInfo;
 
-Word GetFinderInfo(DIB *dib, struct GSOSDP *gsosdp);
+Word GetAFPInfo(DIB *dib, struct GSOSDP *gsosdp);
 
 #endif

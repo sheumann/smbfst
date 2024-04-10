@@ -23,5 +23,6 @@ TimeRec GetGSTime(uint64_t filetime, Session *session);
 ProDOSTime GetProDOSTime(uint64_t filetime, Session *session);
 uint64_t GSTimeToFiletime(TimeRec timeRec, Session *session);
 uint64_t ProDOSTimeToFiletime(ProDOSTime time, Session *session);
+uint64_t CurrentTime(Session *session);
 
 #endif

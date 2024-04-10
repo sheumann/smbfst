@@ -399,6 +399,12 @@ typedef struct {
     uint8_t  Buffer[];
 } SMB2_CREATE_Response;
 
+/* CreateAction values */
+#define FILE_SUPERSEDED  0x00000000
+#define FILE_OPENED      0x00000001
+#define FILE_CREATED     0x00000002
+#define FILE_OVERWRITTEN 0x00000003
+
 typedef struct {
     uint16_t StructureSize;
     uint8_t  Padding;

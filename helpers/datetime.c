@@ -88,3 +88,12 @@ uint64_t ProDOSTimeToFiletime(ProDOSTime time, Session *session) {
     
     return GSTimeToFiletime(timeUnion.timeRec, session);
 }
+
+/*
+ * Return current time in SMB FILETIME format.
+ */
+uint64_t CurrentTime(Session *session) {
+    return TIME_T_0 + 
+        (uint64_t)time(NULL) * 10000000 - session->connection->timeDiff;
+}
+

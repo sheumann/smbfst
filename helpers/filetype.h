@@ -19,6 +19,6 @@ typedef struct {
  */
 FileType GetFileType(struct GSOSDP *gsosdp, AFPInfo *afpInfo, bool isDirectory);
 
-TypeCreator FileTypeToTypeCreator(FileType type);
+TypeCreator FileTypeToTypeCreator(FileType type, bool *needSpecificCreator);
 
 #endif

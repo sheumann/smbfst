@@ -101,10 +101,8 @@ Word GetAFPInfo(DIB *dib, struct GSOSDP *gsosdp) {
         sizeof(AFPInfo));
     
     /* Do not use AFP info with bad signature or version */
-    if (afpInfo.signature != AFPINFO_SIGNATURE
-        || afpInfo.version != AFPINFO_VERSION) {
-        memset(&afpInfo, 0, sizeof(AFPInfo));
-    }
+    if (!AFPInfoValid(&afpInfo))
+        InitAFPInfo();
 
     /*
      * Close AFP Info ADS
@@ -122,4 +120,24 @@ close:
     }
 
     return retval;
+}
+
+
+/*
+ * Does *info hold a valid AFP Info record?
+ */
+bool AFPInfoValid(AFPInfo *info) {
+    return info->signature == AFPINFO_SIGNATURE
+        && info->version == AFPINFO_VERSION;
+}
+
+
+/*
+ * Initialize afpInfo to a "blank" but valid state.
+ */
+void InitAFPInfo(void) {
+    memset(&afpInfo, 0, sizeof(AFPInfo));
+    afpInfo.signature = AFPINFO_SIGNATURE;
+    afpInfo.version = AFPINFO_VERSION;
+    afpInfo.backupTime = 0x80000000; // indicating "never backed up"
 }

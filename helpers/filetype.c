@@ -141,11 +141,17 @@ done:
 
 /*
  * Map ProDOS-style file type to Mac-style type/creator code.
+ *
+ * If needSpecificCreator is non-null, *needSpecificCreator is set to indicate
+ * whether the specific creator code is needed to represent the type.
  */
-TypeCreator FileTypeToTypeCreator(FileType type) {
+TypeCreator FileTypeToTypeCreator(FileType type, bool *needSpecificCreator) {
     TypeCreator tc;
     unsigned i;
-    
+
+    if (needSpecificCreator)
+        *needSpecificCreator = false;
+
     tc.creator = CREATOR('p','d','o','s');
 
     // Map filetypes with specific type/creator code mappings
@@ -153,8 +159,11 @@ TypeCreator FileTypeToTypeCreator(FileType type) {
         if (typeCreatorMap[i].fileType == type.fileType &&
             typeCreatorMap[i].auxType == type.auxType) {
             tc.type = typeCreatorMap[i].type;
-            if (typeCreatorMap[i].creator != 0)
+            if (typeCreatorMap[i].creator != 0) {
                 tc.creator = typeCreatorMap[i].creator;
+                if (needSpecificCreator)
+                    *needSpecificCreator = true;
+            }
             goto done;
         }
     }
@@ -162,6 +171,8 @@ TypeCreator FileTypeToTypeCreator(FileType type) {
     // If no specific mapping is found, use general ProDOS mapping
     tc.type = TYPE('p', type.fileType & 0xFF,
         (type.auxType >> 8) & 0xFF, type.auxType & 0xFF);
+    if (needSpecificCreator)
+        *needSpecificCreator = true;
 
 done:
     return tc;

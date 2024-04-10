@@ -390,7 +390,8 @@ Word Create(void *pblock, void *gsosdp, Word pcount) {
         afpInfo->prodosType = fileType.fileType;
         afpInfo->prodosAuxType = fileType.auxType;
         if (storageType != directoryFile)
-            afpInfo->finderInfo.typeCreator = FileTypeToTypeCreator(fileType);
+            afpInfo->finderInfo.typeCreator =
+                FileTypeToTypeCreator(fileType, NULL);
 #undef afpInfo
 
         result = SendRequestAndGetResponse(dib->session, SMB2_WRITE,

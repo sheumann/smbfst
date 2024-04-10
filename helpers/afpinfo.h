@@ -2,6 +2,7 @@
 #define AFPINFO_H
 
 #include <stdint.h>
+#include <stdbool.h>
 #include <uchar.h>
 #include <types.h>
 #include "driver.h"
@@ -81,5 +82,7 @@ extern const char16_t resourceForkSuffix[19];
 extern AFPInfo afpInfo;
 
 Word GetAFPInfo(DIB *dib, struct GSOSDP *gsosdp);
+bool AFPInfoValid(AFPInfo *info);
+void InitAFPInfo(void);
 
 #endif

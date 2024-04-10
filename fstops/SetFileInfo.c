@@ -334,6 +334,7 @@ set_info:
                 afpInfo.finderInfo.typeCreator.creator = typeCreator.creator;
         }
 
+        //TODO Mac always ignores ProDOS type -- maybe don't compare it
         if (!infoValid || memcmp(&afpInfo,
             (uint8_t*)&msg.smb2Header + readResponse.DataOffset,
             sizeof(AFPInfo)) != 0) {

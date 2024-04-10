@@ -222,6 +222,7 @@ close:
         retval = GetAFPInfo(dib, gsosdp);
     } else {
         InitAFPInfo();
+        // TODO set type/creator code?
     }
 
     if (retval != 0)

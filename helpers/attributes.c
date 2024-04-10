@@ -3,6 +3,8 @@
 #include "fileinfo.h"
 #include "helpers/attributes.h"
 
+// TODO Mac blocks rename if locked. Adjust attributes accordingly.
+
 /*
  * Convert SMB FileAttributes ([MS-FSCC] section 2.6) to GS/OS access word.
  */

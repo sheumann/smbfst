@@ -144,3 +144,7 @@ typedef struct {
     uint64_t StreamAllocationSize;
     char16_t StreamName[];
 } FILE_STREAM_INFORMATION;
+
+typedef struct {
+    uint64_t EndOfFile;
+} FILE_END_OF_FILE_INFORMATION;

@@ -1,5 +1,5 @@
-#ifndef __FSTDATA_H__
-#define __FSTDATA_H__
+#ifndef GSOSDATA_H
+#define GSOSDATA_H
 
 #include <types.h>
 #include <stdint.h>

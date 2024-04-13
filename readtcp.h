@@ -1,5 +1,5 @@
-#ifndef __READTCP_H__
-#define __READTCP_H__
+#ifndef READTCP_H
+#define READTCP_H
 
 #include <stdint.h>
 #include <types.h>

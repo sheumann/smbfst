@@ -4,6 +4,9 @@
  * See [MS-FSCC].
  */
 
+#ifndef FILEINFO_H
+#define FILEINFO_H
+
 #include <stdint.h>
 #include <uchar.h>
 
@@ -155,3 +158,5 @@ typedef struct {
     uint32_t FileNameLength;
     char16_t FileName[];
 } FILE_NAMES_INFORMATION;
+
+#endif

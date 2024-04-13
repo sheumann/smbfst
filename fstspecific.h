@@ -1,5 +1,5 @@
-#ifndef __FSTSPECIFIC_H__
-#define __FSTSPECIFIC_H__
+#ifndef FSTSPECIFIC_H
+#define FSTSPECIFIC_H
 
 #include <types.h>
 #include <uchar.h>

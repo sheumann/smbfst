@@ -1,3 +1,6 @@
+#ifndef DEFS_H
+#define DEFS_H
+
 #ifdef __ORCAC__
 #pragma lint -1
 #pragma ignore 24
@@ -22,3 +25,5 @@ segment "AUTOSEG~~~";
 #define buffTypePointer 0x0000
 #define buffTypeHandle 0x0001
 #define buffTypeNewHandle 0x0002
+
+#endif

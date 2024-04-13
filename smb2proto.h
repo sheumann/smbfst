@@ -1,5 +1,5 @@
-#ifndef __SMB2PROTO_H__
-#define __SMB2PROTO_H__
+#ifndef SMB2PROTO_H
+#define SMB2PROTO_H
 
 #include <stdint.h>
 

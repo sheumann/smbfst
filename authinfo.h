@@ -1,3 +1,6 @@
+#ifndef AUTHINFO_H
+#define AUTHINFO_H
+
 #include <uchar.h>
 
 extern char16_t password[];
@@ -8,3 +11,5 @@ extern char16_t userDomain[];
 extern char16_t passwordSize;
 extern char16_t userSize;
 extern char16_t userDomainSize;
+
+#endif

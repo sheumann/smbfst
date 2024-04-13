@@ -1,3 +1,6 @@
+#ifndef SMB2_H
+#define SMB2_H
+
 #include <stdint.h>
 #include <stddef.h>
 #include <uchar.h>
@@ -72,3 +75,5 @@ uint32_t SMB_Read(Connection *connection, uint32_t treeId, SMB2_FILEID file,
 void SMB_Close(Connection *connection, uint32_t treeId, SMB2_FILEID file);
 uint16_t QueryDirectory(Connection *connection, uint32_t treeId,
     SMB2_FILEID file, uint16_t length, void *buf);
+
+#endif

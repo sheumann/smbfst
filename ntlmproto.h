@@ -1,3 +1,6 @@
+#ifndef NTLMPROTO_H
+#define NTLMPROTO_H
+
 #include <stdint.h>
 
 #define NTLM_ASSERT_SIZE(type,size) _Static_assert(sizeof(type) == (size), "");
@@ -138,3 +141,5 @@ typedef struct {
     uint64_t Checksum;
     uint32_t SeqNum;
 } NTLMSSP_MESSAGE_SIGNATURE_Extended;
+
+#endif

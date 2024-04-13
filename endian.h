@@ -1,3 +1,6 @@
+#ifndef ENDIAN_H
+#define ENDIAN_H
+
 // Endianness conversion macros intended for use with constant expressions
 
 #define hton16c(x) (((uint16_t)(x)<<8) | ((uint16_t)(x)>>8))
@@ -10,3 +13,5 @@
 
 #define ntoh16(x) hton16c(x)
 #define ntoh32(x) hton32c(x)
+
+#endif

@@ -1,3 +1,6 @@
+#ifndef AUTH_H
+#define AUTH_H
+
 #include <stdint.h>
 #include "fstspecific.h"
 
@@ -22,3 +25,5 @@ void InitAuth(AuthState *state, SMBAuthenticateRec *authRec);
 
 size_t DoAuthStep(AuthState *state, const unsigned char *previousMsg,
                   uint16_t previousSize, unsigned char *msgBuf);
+
+#endif

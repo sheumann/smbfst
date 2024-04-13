@@ -1,5 +1,5 @@
-#ifndef __CONNECTION_H__
-#define __CONNECTION_H__
+#ifndef CONNECTION_H
+#define CONNECTION_H
 
 #include <stdint.h>
 #include <stdbool.h>

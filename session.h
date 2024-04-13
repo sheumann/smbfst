@@ -1,5 +1,5 @@
-#ifndef __SESSION_H__
-#define __SESSION_H__
+#ifndef SESSION_H
+#define SESSION_H
 
 #include <stdint.h>
 #include <stdbool.h>

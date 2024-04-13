@@ -11,6 +11,7 @@
 #include "smb2.h"
 #include "alloc.h"
 #include "helpers/datetime.h"
+#include "systemops/Startup.h"
 
 // Timeout for TCP connection establishment
 #define TIMEOUT 15 /* seconds */
@@ -24,7 +25,13 @@ Word SMB_Connect(SMBConnectRec *pblock, void *gsosdp, Word pcount) {
 
     if (pblock->pCount != 7)
         return invalidPcount;
-    
+
+    if (marinettiStatus != tcpipLoaded)
+        return drvrNoDevice;
+
+    if (!TCPIPGetConnectStatus() || toolerror())
+        return drvrOffLine;
+
     Connection *connection = smb_malloc(sizeof(Connection));
     if (!connection)
         return outOfMem;

@@ -111,6 +111,13 @@ typedef struct FCR {
     /* SMB-specific fields go here */
     SMB2_FILEID fileID;
     uint64_t mark;
+    
+    // number of last dir entry fetched by a GetDirEntry call
+    uint16_t dirEntryNum;
+    
+    // number of next dir entry that would be fetched from server
+    // (. and .. are considered entries -1 and 0; GDE returns entries 1 onward)
+    int32_t nextServerEntryNum; 
 } FCR;
 
 /* access bits (in addition to standard access flags in low bits) */

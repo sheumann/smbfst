@@ -45,7 +45,7 @@ Word ChangePath(void *pblock, void *gsosdp, Word pcount) {
     createRequest.CreateContextsLength = 0;
 
     // translate filename 1 to SMB format
-    createRequest.NameLength = GSPathToSMB(gsosdp, 1, createRequest.Buffer,
+    createRequest.NameLength = GSOSDPPathToSMB(gsosdp, 1, createRequest.Buffer,
         sizeof(msg.body) - offsetof(SMB2_CREATE_Request, Buffer));
     if (createRequest.NameLength == 0xFFFF)
         return badPathSyntax;
@@ -80,7 +80,7 @@ Word ChangePath(void *pblock, void *gsosdp, Word pcount) {
     info->FileName[1] = 0;
 
     // translate filename 2 to SMB format
-    info->FileNameLength = GSPathToSMB(gsosdp, 2, (uint8_t*)info->FileName,
+    info->FileNameLength = GSOSDPPathToSMB(gsosdp, 2, (uint8_t*)info->FileName,
         sizeof(msg.body)
         - sizeof(setInfoRequest)
         - offsetof(FILE_RENAME_INFORMATION_TYPE_2, FileName));

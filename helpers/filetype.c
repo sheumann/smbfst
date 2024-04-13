@@ -66,9 +66,9 @@ static int DeHex(char c) {
 
 /*
  * Determine the file type/auxtype, based on an AFPInfo structure
- * for the file, or the file name in the GS/OS DP.
+ * for the file, or the file name.
  */
-FileType GetFileType(struct GSOSDP *gsosdp, AFPInfo *afpInfo, bool isDirectory) {
+FileType GetFileType(GSString *name, AFPInfo *afpInfo, bool isDirectory) {
     FileType fileType = {0,0};
     unsigned char *typeCode;
     int hexVal1, hexVal2;
@@ -121,8 +121,8 @@ FileType GetFileType(struct GSOSDP *gsosdp, AFPInfo *afpInfo, bool isDirectory) 
     
     // Map file suffixes
     for (i = 0; i < ARRAY_LENGTH(suffixMap); i++) {
-        if (suffixMap[i].ext[0] <= gsosdp->path1Ptr->length) {
-            chPtr = &gsosdp->path1Ptr->text[gsosdp->path1Ptr->length - 1];
+        if (suffixMap[i].ext[0] <= name->length) {
+            chPtr = &name->text[name->length - 1];
             for (j = suffixMap[i].ext[0]; j > 0; j--) {
                 if (tolower(*chPtr--) != suffixMap[i].ext[j])
                     break;

@@ -148,3 +148,10 @@ typedef struct {
 typedef struct {
     uint64_t EndOfFile;
 } FILE_END_OF_FILE_INFORMATION;
+
+typedef struct {
+    uint32_t NextEntryOffset;
+    uint32_t FileIndex;
+    uint32_t FileNameLength;
+    char16_t FileName[];
+} FILE_NAMES_INFORMATION;

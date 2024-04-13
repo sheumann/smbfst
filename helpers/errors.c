@@ -54,6 +54,9 @@ Word ConvertError(ReadStatus rs) {
         case STATUS_TOO_MANY_OPENED_FILES:
             return tooManyFilesOpen;
 
+        case STATUS_NO_MORE_FILES:
+            return endOfDir;
+
         case STATUS_INSUFFICIENT_RESOURCES:
         case STATUS_INSUFF_SERVER_RESOURCES:
         case STATUS_NO_MEMORY:

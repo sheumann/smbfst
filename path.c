@@ -1,6 +1,8 @@
 #include "defs.h"
 #include <string.h>
 #include <uchar.h>
+#include <stdbool.h>
+#include <gsos.h>
 #include "path.h"
 
 static char16_t macRomanToUCS2[128] = {
@@ -22,13 +24,16 @@ static char16_t macRomanToUCS2[128] = {
     /* f8-ff */ 0x00AF, 0x02D8, 0x02D9, 0x02DA, 0x00B8, 0x02DD, 0x02DB, 0x02C7
 };
 
-unsigned GSPathToSMB(
+/*
+ * Translate a path from the GS/OS direct page (path1 or path2, indicated by
+ * num) to SMB format.  It is written to smbpath, with maximum length bufsize.
+ * The size of the resulting path (in bytes) is returned; 0xFFFF indicates an
+ * error.
+ */
+unsigned GSOSDPPathToSMB(
     struct GSOSDP *gsosdp, int num, uint8_t *smbpath, unsigned bufsize) {
 
     GSString *gspath;
-    const char *path;
-    unsigned len;
-    unsigned out_pos = 0;
     
     if (num == 1) {
         if ((gsosdp->pathFlag & HAVE_PATH1) == 0)
@@ -39,6 +44,20 @@ unsigned GSPathToSMB(
             return 0;
         gspath = gsosdp->path2Ptr;
     }
+
+    return GSPathToSMB(gspath, smbpath, bufsize);
+}
+
+
+/*
+ * Translate a path from GS/OS format to SMB format.  It is written to smbpath,
+ * with maximum length bufsize.  The size of the resulting path (in bytes) is
+ * returned; 0xFFFF indicates an error.
+ */
+unsigned GSPathToSMB(GSString *gspath, uint8_t *smbpath, unsigned bufsize) {
+    const char *path;
+    unsigned len;
+    unsigned out_pos = 0;
 
     if (gspath->length != 0 && gspath->text[0] == ':') {
         path = memchr(gspath->text + 1, ':', gspath->length - 1);
@@ -121,4 +140,104 @@ unsigned GSPathToSMB(
     }
     
     return out_pos;
+}
+
+/*
+ * Convert an SMB filename to GS/OS representation.
+ * Returns a GS/OS error code.
+ */
+Word SMBNameToGS(char16_t *name, uint16_t length, ResultBuf* buf) {
+    char16_t ch;
+    unsigned i;
+    bool mapped;
+    unsigned outputLength;
+    unsigned bufSize;
+    char *outPtr;
+    
+    if (length & 0x0001)
+        return badPathSyntax;
+
+    length /= 2;
+ 
+    if (buf->bufSize < 4)
+        return buffTooSmall;
+
+    bufSize = buf->bufSize - 4;
+    outputLength = 0;
+    outPtr = buf->bufString.text;
+
+    while (length-- > 0) {
+        ch = *name++;
+
+        // Assume character will be successfully mapped
+        mapped = true;
+
+        if (ch == 0) {
+            buf->bufString.length = 0;
+            return badPathSyntax;
+        } else if (ch < 0x80) {
+            // leave unchanged
+        } else if (ch >= 0xF001 && ch <= 0xF01F) {
+            ch &= 0x00FF;
+        } else if (ch >= 0xF020 && ch <= 0xF027) {
+            // TODO Map ' ' and '.' at end of name, like macOS does?
+            switch (ch) {
+            case 0xF020:
+                ch = '"';
+                break;
+            case 0xF021:
+                ch = '*';
+                break;
+            case 0xF022:
+                ch = '/';
+                break;
+            case 0xF023:
+                ch = '<';
+                break;
+            case 0xF024:
+                ch = '>';
+                break;
+            case 0xF025:
+                ch = '?';
+                break;
+            case 0xF026:
+                ch = '\\';
+                break;
+            case 0xF028:
+                ch = '|';
+                break;
+            }
+        } else {
+            //TODO maybe limit to characters in Shaston 8?
+            for (i = 0; i < ARRAY_LENGTH(macRomanToUCS2); i++) {
+                if (macRomanToUCS2[i] == ch) {
+                    ch = i & 0x80;
+                    break;
+                }
+            }
+            if (i == ARRAY_LENGTH(macRomanToUCS2))
+                mapped = false;
+        }
+        
+        if (mapped) {
+            if (outputLength < bufSize) {
+                *outPtr++ = ch;
+            }
+            outputLength++;
+        } else {
+            // TODO generate escape sequences for arbitrary Unicode chars
+            if (outputLength < bufSize) {
+                *outPtr++ = '?';
+            }
+            outputLength++;
+        }
+    }
+    
+    buf->bufString.length = outputLength;
+    
+    if (outputLength > bufSize) {
+        return buffTooSmall;
+    } else {
+        return 0;
+    }
 }

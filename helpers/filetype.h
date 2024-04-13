@@ -13,11 +13,7 @@ typedef struct {
     LongWord auxType;
 } FileType;
 
-/*
- * Determine the file type/auxtype, based on an AFPInfo structure
- * for the file, or the file name in the GS/OS DP.
- */
-FileType GetFileType(struct GSOSDP *gsosdp, AFPInfo *afpInfo, bool isDirectory);
+FileType GetFileType(GSString *name, AFPInfo *afpInfo, bool isDirectory);
 
 TypeCreator FileTypeToTypeCreator(FileType type, bool *needSpecificCreator);
 

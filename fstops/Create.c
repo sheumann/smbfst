@@ -217,7 +217,8 @@ Word Create(void *pblock, void *gsosdp, Word pcount) {
         createRequest.ShareAccess = FILE_SHARE_DELETE;
     
         // translate filename to SMB format
-        createRequest.NameLength = GSPathToSMB(gsosdp, 1, createRequest.Buffer,
+        createRequest.NameLength = GSOSDPPathToSMB(gsosdp, 1,
+            createRequest.Buffer,
             sizeof(msg.body) - offsetof(SMB2_CREATE_Request, Buffer));
         if (createRequest.NameLength == 0xFFFF)
             return badPathSyntax;
@@ -272,7 +273,8 @@ Word Create(void *pblock, void *gsosdp, Word pcount) {
         createRequest.ShareAccess = FILE_SHARE_DELETE;
 
         // translate filename to SMB format
-        createRequest.NameLength = GSPathToSMB(gsosdp, 1, createRequest.Buffer,
+        createRequest.NameLength = GSOSDPPathToSMB(gsosdp, 1,
+            createRequest.Buffer,
             sizeof(msg.body) - offsetof(SMB2_CREATE_Request, Buffer));
         if (createRequest.NameLength == 0xFFFF) {
             retval = badPathSyntax;
@@ -342,7 +344,8 @@ Word Create(void *pblock, void *gsosdp, Word pcount) {
         createRequest.ShareAccess = FILE_SHARE_DELETE;
 
         // translate filename to SMB format
-        createRequest.NameLength = GSPathToSMB(gsosdp, 1, createRequest.Buffer,
+        createRequest.NameLength = GSOSDPPathToSMB(gsosdp, 1, 
+            createRequest.Buffer,
             sizeof(msg.body) - offsetof(SMB2_CREATE_Request, Buffer));
         if (createRequest.NameLength == 0xFFFF) {
             retval = badPathSyntax;

@@ -30,7 +30,7 @@ uint64_t dataEOF, dataAlloc;
  * and haveDataForkSizes must be set to indicate whether dataEOF and
  * dataAlloc have been filled in with the sizes for the data fork.
  */
-Word GetFileInfo_Impl(void *pblock, void *gsosdp, Word pcount,
+Word GetFileInfo_Impl(void *pblock, struct GSOSDP *gsosdp, Word pcount,
     bool alreadyOpen, SMB2_FILEID fileID) {
 
     ReadStatus result;
@@ -73,7 +73,8 @@ top:
         createRequest.CreateContextsLength = 0;
     
         // translate filename to SMB format
-        createRequest.NameLength = GSPathToSMB(gsosdp, 1, createRequest.Buffer,
+        createRequest.NameLength = GSOSDPPathToSMB(gsosdp, 1,
+            createRequest.Buffer,
             sizeof(msg.body) - offsetof(SMB2_CREATE_Request, Buffer));
         if (createRequest.NameLength == 0xFFFF)
             return badPathSyntax;
@@ -233,7 +234,7 @@ close:
         
         pblock->fAccess = GetAccess(basicInfo.FileAttributes);
         
-        fileType = GetFileType(gsosdp, &afpInfo,
+        fileType = GetFileType(gsosdp->path1Ptr, &afpInfo,
             (bool)(basicInfo.FileAttributes & FILE_ATTRIBUTE_DIRECTORY));
         pblock->fileType = fileType.fileType;
         pblock->auxType = fileType.auxType;
@@ -263,7 +264,7 @@ close:
         pblock->access = GetAccess(basicInfo.FileAttributes);
         
         if (pcount >= 3) {
-            fileType = GetFileType(gsosdp, &afpInfo,
+            fileType = GetFileType(gsosdp->path1Ptr, &afpInfo,
                 (bool)(basicInfo.FileAttributes & FILE_ATTRIBUTE_DIRECTORY));
             pblock->fileType = fileType.fileType;
 

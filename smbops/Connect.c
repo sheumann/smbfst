@@ -70,7 +70,6 @@ Word SMB_Connect(SMBConnectRec *pblock, void *gsosdp, Word pcount) {
     // assume lowest version until we have negotiated
     connection->dialect = SMB_202;
 
-    negotiateRequest.DialectCount = 1;
     negotiateRequest.SecurityMode = 0;
     negotiateRequest.Reserved = 0;
     negotiateRequest.Capabilities = 0;
@@ -79,9 +78,10 @@ Word SMB_Connect(SMBConnectRec *pblock, void *gsosdp, Word pcount) {
     negotiateRequest.ClientGuid = (smb_u128){0xa248283946289746,0xac65879365873456};
     
     negotiateRequest.ClientStartTime = 0;
-    
+
+    negotiateRequest.DialectCount = 2;
     negotiateRequest.Dialects[0] = SMB_202;
-    negotiateRequest.Dialects[1] = 0;
+    negotiateRequest.Dialects[1] = SMB_21;
     negotiateRequest.Dialects[2] = 0;
     negotiateRequest.Dialects[3] = 0;
     
@@ -110,8 +110,9 @@ Word SMB_Connect(SMBConnectRec *pblock, void *gsosdp, Word pcount) {
     connection->wantSigning =
         negotiateResponse.SecurityMode & SMB2_NEGOTIATE_SIGNING_REQUIRED;
         
-    if (negotiateResponse.DialectRevision != SMB_202) {
-        // TODO handle other dialects
+    if (negotiateResponse.DialectRevision != SMB_202 &&
+        negotiateResponse.DialectRevision != SMB_21) {
+        // TODO handle 3.x dialects
         TCPIPAbortTCP(connection->ipid);
         TCPIPLogout(connection->ipid);
         smb_free(connection);

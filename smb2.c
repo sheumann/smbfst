@@ -131,7 +131,8 @@ bool SendMessage(Session *session, uint16_t command, uint32_t treeId,
     if (connection->dialect == SMB_202) {
         msg.smb2Header.CreditCharge = 0;
     } else {
-        UNIMPLEMENTED
+        // Our messages are always < 64K, so CreditCharge is just 1.
+        msg.smb2Header.CreditCharge = 1;
     }
     
     if (connection->dialect <= SMB_21) {

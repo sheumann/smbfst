@@ -14,7 +14,10 @@ typedef struct {
     uint64_t sessionId; // TODO separate session structure?
     
     bool signingRequired;
-    struct hmac_sha256_context *signingContext;
+    union {
+        struct hmac_sha256_context *hmacSigningContext;
+        struct aes_cmac_context *cmacSigningContext;
+    };
     
     Word refCount;
 } Session;

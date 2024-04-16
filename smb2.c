@@ -19,6 +19,7 @@
 #include "readtcp.h"
 #include "auth.h"
 #include "crypto/sha256.h"
+#include "crypto/aes.h"
 
 /*
  * StructureSize values for request structures.
@@ -138,7 +139,9 @@ bool SendMessage(Session *session, uint16_t command, uint32_t treeId,
     if (connection->dialect <= SMB_21) {
         msg.smb2Header.Status = 0;
     } else {
-        UNIMPLEMENTED
+        // TODO support reconnection with updated ChannelSequence
+        msg.smb2Header.ChannelSequence = 0;
+        msg.smb2Header.Reserved = 0;
     }
 
     msg.smb2Header.Command = command;
@@ -156,10 +159,17 @@ bool SendMessage(Session *session, uint16_t command, uint32_t treeId,
     if (session->signingRequired) {
         msg.smb2Header.Flags |= SMB2_FLAGS_SIGNED;
         
-        hmac_sha256_compute(session->signingContext, (void*)&msg.smb2Header,
-            sizeof(SMB2Header) + bodyLength);
-        memcpy(&msg.smb2Header.Signature,
-            session->signingContext->u[0].ctx.hash, 16);
+        if (connection->dialect <= SMB_21) {
+            hmac_sha256_compute(session->hmacSigningContext,
+                (void*)&msg.smb2Header, sizeof(SMB2Header) + bodyLength);
+            memcpy(&msg.smb2Header.Signature,
+                session->hmacSigningContext->u[0].ctx.hash, 16);
+        } else {
+            aes_cmac_compute(session->cmacSigningContext,
+                (void*)&msg.smb2Header, sizeof(SMB2Header) + bodyLength);
+            memcpy(&msg.smb2Header.Signature,
+                session->cmacSigningContext->ctx.data, 16);
+        }
     }
     
     msg.directTCPHeader.StreamProtocolLength =

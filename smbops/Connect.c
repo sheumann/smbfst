@@ -79,11 +79,11 @@ Word SMB_Connect(SMBConnectRec *pblock, void *gsosdp, Word pcount) {
     
     negotiateRequest.ClientStartTime = 0;
 
-    negotiateRequest.DialectCount = 2;
+    negotiateRequest.DialectCount = 4;
     negotiateRequest.Dialects[0] = SMB_202;
     negotiateRequest.Dialects[1] = SMB_21;
-    negotiateRequest.Dialects[2] = 0;
-    negotiateRequest.Dialects[3] = 0;
+    negotiateRequest.Dialects[2] = SMB_30;
+    negotiateRequest.Dialects[3] = SMB_302;
     
     dummySession.connection = connection;
     result = SendRequestAndGetResponse(&dummySession, SMB2_NEGOTIATE, 0,
@@ -111,7 +111,9 @@ Word SMB_Connect(SMBConnectRec *pblock, void *gsosdp, Word pcount) {
         negotiateResponse.SecurityMode & SMB2_NEGOTIATE_SIGNING_REQUIRED;
         
     if (negotiateResponse.DialectRevision != SMB_202 &&
-        negotiateResponse.DialectRevision != SMB_21) {
+        negotiateResponse.DialectRevision != SMB_21 &&
+        negotiateResponse.DialectRevision != SMB_30 &&
+        negotiateResponse.DialectRevision != SMB_302) {
         // TODO handle 3.x dialects
         TCPIPAbortTCP(connection->ipid);
         TCPIPLogout(connection->ipid);

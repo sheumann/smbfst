@@ -5,12 +5,14 @@
 #include <memory.h>
 #include <orca.h>
 #include <gsos.h>
+#include "gsosdata.h"
 #include "fstspecific.h"
 #include "smb2.h"
 #include "auth.h"
 #include "alloc.h"
 #include "connection.h"
 #include "crypto/sha256.h"
+#include "crypto/aes.h"
 
 Word SMB_Authenticate(SMBAuthenticateRec *pblock, void *gsosdp, Word pcount) {
     static ReadStatus result;
@@ -18,6 +20,7 @@ Word SMB_Authenticate(SMBAuthenticateRec *pblock, void *gsosdp, Word pcount) {
     static size_t authSize;
     static unsigned char *previousAuthMsg;
     static size_t previousAuthSize;
+    static unsigned char cmac_key[16];
     Connection *connection = (Connection *)pblock->connectionID;
     Session *session;
     
@@ -68,14 +71,35 @@ Word SMB_Authenticate(SMBAuthenticateRec *pblock, void *gsosdp, Word pcount) {
                     }
                 
                     session->signingRequired = true;
-                    session->signingContext = (void*)*ctxHandle;
+                    session->hmacSigningContext = (void*)*ctxHandle;
                 
-                    hmac_sha256_init(session->signingContext,
+                    hmac_sha256_init(session->hmacSigningContext,
                         authState.signKey,
                         16);
                 } else {
-                    // TODO SMB 3.x version
-                    UNIMPLEMENTED
+                    Handle ctxHandle = NewHandle(
+                        sizeof(struct aes_cmac_context), userid(), 0x8015, 0);
+                    if (toolerror()) {
+                        // TODO clean up on errors?
+                        smb_free(session);
+                        return outOfMem;
+                    }
+                
+                    session->signingRequired = true;
+                    session->cmacSigningContext = (void*)*ctxHandle;
+
+                    /*
+                     * Compute signing key using a key-derivation function,
+                     * as specified in [MS-SMB2] sections 3.1.4.2 and 3.2.5.3.
+                     */
+                    if (connection->dialect <= SMB_302) {
+                        hmac_sha256_kdf_ctr((struct hmac_sha256_context *)gbuf,
+                            authState.signKey, 16, 128, cmac_key,
+                            "SMB2AESCMAC", 12, "SmbSign", 8);
+                    } else {
+                        UNIMPLEMENTED
+                    }
+                    aes_cmac_init(session->cmacSigningContext, cmac_key);
                 }
             }
 

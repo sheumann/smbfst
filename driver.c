@@ -1,9 +1,9 @@
 #include "defs.h"
 #include <stdlib.h>
-#include <stdio.h>
 #include <string.h>
 #include <stddef.h>
 #include <gsos.h>
+#include <intmath.h>
 #include "driver.h"
 
 #define DRIVER_VERSION 0x001E             /* GS/OS driver version format */
@@ -17,6 +17,9 @@ static Word DoStatus(struct GSOSDP *dp);
 static Word DoEject(struct GSOSDP *dp);
 static Word DoShutdown(struct GSOSDP *dp);
 
+// length of number as a decimal string (assumes it is less than 100)
+#define numlen(x) ((x) >= 10 ? 2 : 1)
+
 void InitDIBs(void) {
     for (unsigned i = 0; i < NDIBS; i++) {
         dibs[i].linkPtr = (i < NDIBS-1) ? &dibs[i+1] : NULL;
@@ -25,7 +28,9 @@ void InitDIBs(void) {
         dibs[i].characteristics = 0x03A4;
         dibs[i].blockCount = 0;
         
-        int nameLen = sprintf(dibs[i].devName + 1, "SMB%u", i+1);
+        memcpy(&dibs[i].devName[1], "SMB", 3);
+        Int2Dec(i+1, &dibs[i].devName[4], numlen(i+1), FALSE);
+        int nameLen = 3 + numlen(i+1);
         dibs[i].devName[0] = nameLen;
         for (unsigned j = nameLen + 1; j < sizeof(dibs[i].devName); j++) {
             dibs[i].devName[j] = ' ';

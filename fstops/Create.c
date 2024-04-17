@@ -15,66 +15,9 @@
 #include "helpers/datetime.h"
 #include "helpers/attributes.h"
 #include "helpers/errors.h"
+#include "helpers/createcontext.h"
 
 #define extendExistingFile 0x8005
-
-/*
- * Add a create context to an otherwise-assembled SMB2 CREATE request.
- *
- * name gives the name of the context (must be 4 bytes).
- * data and dataLen specify the buffer with the context data.
- * *msgLen is the length of the CREATE request, which will be updated.
- *
- * Returns true on success, false on failure (not enough space).
- */
-static bool AddCreateContext(uint32_t name, void *data, uint16_t dataLen,
-    uint16_t *msgLen) {
-
-    uint32_t pos;
-    uint32_t newLen;
-    SMB2_CREATE_CONTEXT *ctx;
-    
-    // calculate position of new context in message (8-byte aligned)
-    pos = ((uint32_t)*msgLen + 7) & 0xFFFFFFF8;
-    
-    // calculate message length with context, and check if it's too big
-    newLen = pos + sizeof(SMB2_CREATE_CONTEXT) + dataLen;
-    if (newLen > sizeof(msg.body))
-        return false;
-    
-    // zero out any padding added for alignment
-    *(uint64_t*)(&msg.body[*msgLen]) = 0;
-    
-    ctx = (SMB2_CREATE_CONTEXT *)(&msg.body[pos]);
-
-    ctx->Next = 0;
-    ctx->NameOffset = offsetof(SMB2_CREATE_CONTEXT, Name);
-    ctx->NameLength = sizeof(ctx->Name);
-    ctx->Reserved = 0;
-    ctx->DataOffset = offsetof(SMB2_CREATE_CONTEXT, Data);
-    ctx->DataLength = dataLen;
-    ctx->Name = hton32(name);
-    ctx->Padding = 0;
-    memcpy(ctx->Data, data, dataLen);
-
-    if (createRequest.CreateContextsOffset == 0) {
-        createRequest.CreateContextsOffset = sizeof(SMB2Header) + pos;
-        createRequest.CreateContextsLength =
-            sizeof(SMB2_CREATE_CONTEXT) + dataLen;
-    } else {
-        ctx = (SMB2_CREATE_CONTEXT *)
-            ((char*)&msg.smb2Header + createRequest.CreateContextsOffset);
-        while (ctx->Next != 0) {
-            ctx = (SMB2_CREATE_CONTEXT *)((char*)ctx + ctx->Next);
-        }
-        ctx->Next = pos - ((char*)ctx - (char*)&msg.body);
-        createRequest.CreateContextsLength += newLen - *msgLen;
-    }
-
-    *msgLen = newLen;
-
-    return true;
-}
 
 /*
  * Notes on Create behavior under ProDOS FST:

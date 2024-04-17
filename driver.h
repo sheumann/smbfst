@@ -31,7 +31,11 @@ typedef struct DIB {
     bool switched;
     VirtualPointer vcrVP;
     Session *session;
+    Word flags;
 } DIB;
+
+/* flags bits */
+#define FLAG_AAPL_READDIR 0x0001
 
 /* list of DIBs (argument to INSTALL_DRIVER) */
 struct DIBList {

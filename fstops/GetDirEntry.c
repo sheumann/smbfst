@@ -3,6 +3,7 @@
 #include <prodos.h>
 #include <string.h>
 #include "smb2.h"
+#include "aapl.h"
 #include "fileinfo.h"
 #include "gsosdata.h"
 #include "driver.h"
@@ -52,6 +53,7 @@ Word GetDirEntry(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     uint32_t count;
     FILE_NAMES_INFORMATION *namesEntry;
     static FILE_DIRECTORY_INFORMATION dirEntry; 
+    FILE_ID_BOTH_DIR_INFORMATION_AAPL *aaplDirEntry;
     uint16_t sizeLeft;
     bool needRestart;
     unsigned char *namePtr;
@@ -199,7 +201,13 @@ Word GetDirEntry(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     needRestart = entryNum < fcr->nextServerEntryNum;
 
     do {
-        queryDirectoryRequest.FileInformationClass = FileDirectoryInformation;
+        if (dibs[i].flags & FLAG_AAPL_READDIR) {
+            queryDirectoryRequest.FileInformationClass =
+                FileIdBothDirectoryInformation;
+        } else {
+            queryDirectoryRequest.FileInformationClass =
+                FileDirectoryInformation;
+        }
         queryDirectoryRequest.Flags = SMB2_RETURN_SINGLE_ENTRY;
         if (needRestart) {
             queryDirectoryRequest.Flags |= SMB2_RESTART_SCANS;
@@ -235,261 +243,327 @@ Word GetDirEntry(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
         if (!VerifyBuffer(queryDirectoryResponse.OutputBufferOffset,
             queryDirectoryResponse.OutputBufferLength))
             return networkError;
-        if (queryDirectoryResponse.OutputBufferLength <
-            sizeof(FILE_DIRECTORY_INFORMATION))
-            return networkError;
+        if (dibs[i].flags & FLAG_AAPL_READDIR) {
+            if (queryDirectoryResponse.OutputBufferLength <
+                sizeof(FILE_ID_BOTH_DIR_INFORMATION_AAPL))
+                return networkError;
+        } else {
+            if (queryDirectoryResponse.OutputBufferLength <
+                sizeof(FILE_DIRECTORY_INFORMATION))
+                return networkError;
+        }
     } while (entryNum != fcr->nextServerEntryNum - 1);
-    
-    // Save directory entry
-    dirEntry = *(FILE_DIRECTORY_INFORMATION *)
-        ((char*)&msg.smb2Header + queryDirectoryResponse.OutputBufferOffset);
 
+    /*
+     * Save directory entry.
+     * Note: The fixed fields of FILE_DIRECTORY_INFORMATION match the beginning
+     * of FILE_ID_BOTH_DIR_INFORMATION_AAPL, so this works for both variants.
+     */
+    dirEntry = *(FILE_DIRECTORY_INFORMATION *)((char*)&msg.smb2Header +
+        queryDirectoryResponse.OutputBufferOffset);
     if (dirEntry.FileNameLength > GBUF_SIZE)
         return networkError;
-    if (sizeof(FILE_DIRECTORY_INFORMATION) + dirEntry.FileNameLength >
-        queryDirectoryResponse.OutputBufferLength)
-        return networkError;
-    
-    // Save file name to gbuf
-    memcpy(gbuf, 
-        (char*)&msg.smb2Header + queryDirectoryResponse.OutputBufferOffset
-        + offsetof(FILE_DIRECTORY_INFORMATION, FileName),
-        dirEntry.FileNameLength);
 
     InitAFPInfo();
-    haveResourceFork = false;
-    resourceEOF = resourceAlloc = 0;
 
-    infoState = usingInfoStream;
-    do {
-        if (infoState == redoWithMainStream)
-            infoState = usingMainStream;
-    
+    if (dibs[i].flags & FLAG_AAPL_READDIR) {
         /*
-         * Open AFP Info ADS (or main stream, for redo)
+         * Get directory information using Apple extensions.
          */
-        createRequest.SecurityFlags = 0;
-        createRequest.RequestedOplockLevel = SMB2_OPLOCK_LEVEL_NONE;
-        createRequest.ImpersonationLevel = Impersonation;
-        createRequest.SmbCreateFlags = 0;
-        createRequest.Reserved = 0;
-        if (infoState == usingInfoStream) {
-            createRequest.DesiredAccess = FILE_READ_DATA | FILE_READ_ATTRIBUTES;
-        } else {
-            createRequest.DesiredAccess = FILE_READ_ATTRIBUTES;
-        }
-        createRequest.FileAttributes = 0;
-        createRequest.ShareAccess = FILE_SHARE_READ;
-        createRequest.CreateDisposition = FILE_OPEN;
-        createRequest.CreateOptions = 0; // TODO maybe FILE_NO_EA_KNOWLEDGE
-        createRequest.NameOffset =
-            sizeof(SMB2Header) + offsetof(SMB2_CREATE_Request, Buffer);
-        createRequest.CreateContextsOffset = 0;
-        createRequest.CreateContextsLength = 0;
-    
-        // translate file path to SMB format (directory\file)
-        vp = fcr->pathName;
-        DerefVP(pathName, vp);
-        namePtr = createRequest.Buffer;
-    #define NAME_SPACE (((char*)msg.body + sizeof(msg.body)) - (char*)namePtr)
+
+        if (sizeof(FILE_ID_BOTH_DIR_INFORMATION_AAPL) + dirEntry.FileNameLength
+            > queryDirectoryResponse.OutputBufferLength)
+            return networkError;
         
-        nameLength =
-            GSPathToSMB(pathName, createRequest.Buffer, NAME_SPACE);
-        if (nameLength == 0xFFFF)
-            return badPathSyntax;    
-        namePtr += nameLength;
-    
-        if (nameLength != 0) {
-            if (NAME_SPACE < sizeof(char16_t))
-                return badPathSyntax;
-            *(char16_t*)namePtr = '\\';
-            namePtr += sizeof(char16_t);
-        }
-    
-        if (NAME_SPACE < dirEntry.FileNameLength)
-            return badPathSyntax;
-        memcpy(namePtr, gbuf, dirEntry.FileNameLength);
-        namePtr += dirEntry.FileNameLength;
-    
-        if (infoState == usingInfoStream) {
-            if (NAME_SPACE < sizeof(afpInfoSuffix))
-                return badPathSyntax;
-            memcpy(namePtr, afpInfoSuffix, sizeof(afpInfoSuffix));
-            namePtr += sizeof(afpInfoSuffix);
-        }
-    
-        createRequest.NameLength = namePtr - createRequest.Buffer;
+        // Save file name to gbuf
+        memcpy(gbuf, 
+            (char*)&msg.smb2Header + queryDirectoryResponse.OutputBufferOffset
+            + offsetof(FILE_ID_BOTH_DIR_INFORMATION_AAPL, FileName),
+            dirEntry.FileNameLength);
+
+        aaplDirEntry = (FILE_ID_BOTH_DIR_INFORMATION_AAPL *)(
+            (char*)&msg.smb2Header + queryDirectoryResponse.OutputBufferOffset);
+
+        resourceEOF = aaplDirEntry->RsrcForkLen;
+        // TODO Maybe figure this out based on server allocation block size
+        resourceAlloc = resourceEOF;
         
-        result = SendRequestAndGetResponse(dibs[i].session, SMB2_CREATE,
-            dibs[i].treeId, sizeof(createRequest) + createRequest.NameLength);
-        if (result == rsFailed) {
+        /*
+         * We don't have a "resource fork exists" flag, so we treat 0-length
+         * resource forks as nonexistent.  This is consistent with the HFS
+         * FST and at least some of the behavior of macOS.
+         */
+        haveResourceFork = resourceEOF != 0;
+
+        /*
+         * Expand compressed Finder Info into the AFP Info structure.
+         * (windRect for directories corresponds to type+creator for files.)
+         */
+        afpInfo.finderInfo.windRect = 
+            aaplDirEntry->CompressedFinderInfo.typeCreator;
+        afpInfo.finderInfo.finderFlags =
+            aaplDirEntry->CompressedFinderInfo.finderFlags;
+        afpInfo.finderInfo.extFlags =
+            aaplDirEntry->CompressedFinderInfo.extFlags;
+        afpInfo.finderInfo.dateAdded =
+            aaplDirEntry->CompressedFinderInfo.dateAdded;
+    } else {
+        /*
+         * Get directory information without using Apple extensions.
+         */
+
+        if (sizeof(FILE_DIRECTORY_INFORMATION) + dirEntry.FileNameLength >
+            queryDirectoryResponse.OutputBufferLength)
+            return networkError;
+        
+        // Save file name to gbuf
+        memcpy(gbuf, 
+            (char*)&msg.smb2Header + queryDirectoryResponse.OutputBufferOffset
+            + offsetof(FILE_DIRECTORY_INFORMATION, FileName),
+            dirEntry.FileNameLength);
+
+        haveResourceFork = false;
+        resourceEOF = resourceAlloc = 0;
+    
+        infoState = usingInfoStream;
+        do {
+            if (infoState == redoWithMainStream)
+                infoState = usingMainStream;
+        
             /*
-             * We ignore errors related to accessing the AFP Info or resource
-             * fork and just behave like they don't exist.  Giving an error
-             * might terminate the whole directory listing, which generally
-             * isn't desirable.
-             *
-             * If we get an error accessing the AFP Info, we try again to
-             * access the resource fork information via the main stream.
-             * This can come up for files created by macOS on a Samba/Windows
-             * server, which may have a resource fork but no AFP Info.
+             * Open AFP Info ADS (or main stream, for redo)
              */
-            // TODO maybe add an option to skip the extra resource fork check
-            // (This situation should not come up if using only the SMB FST.)
+            createRequest.SecurityFlags = 0;
+            createRequest.RequestedOplockLevel = SMB2_OPLOCK_LEVEL_NONE;
+            createRequest.ImpersonationLevel = Impersonation;
+            createRequest.SmbCreateFlags = 0;
+            createRequest.Reserved = 0;
             if (infoState == usingInfoStream) {
-                InitAFPInfo();
-                infoState = redoWithMainStream;
-                continue;
+                createRequest.DesiredAccess =
+                    FILE_READ_DATA | FILE_READ_ATTRIBUTES;
             } else {
-                break;
+                createRequest.DesiredAccess = FILE_READ_ATTRIBUTES;
             }
-        } else if (result != rsDone)
-            return GDEError(result);
-    
-        fileID = createResponse.FileId;
-    
-        if (infoState == usingInfoStream) {
-            /*
-             * Read AFP Info
-             */
-            readRequest.Padding =
-                sizeof(SMB2Header) + offsetof(SMB2_READ_Response, Buffer);
-            readRequest.Flags = 0;
-            readRequest.Length = sizeof(AFPInfo);
-            readRequest.Offset = 0;
-            readRequest.FileId = fileID;
-            readRequest.MinimumCount = sizeof(AFPInfo);
-            readRequest.Channel = 0;
-            readRequest.RemainingBytes = 0;
-            readRequest.ReadChannelInfoOffset = 0;
-            readRequest.ReadChannelInfoLength = 0;
+            createRequest.FileAttributes = 0;
+            createRequest.ShareAccess = FILE_SHARE_READ;
+            createRequest.CreateDisposition = FILE_OPEN;
+            createRequest.CreateOptions = 0; // TODO maybe FILE_NO_EA_KNOWLEDGE
+            createRequest.NameOffset =
+                sizeof(SMB2Header) + offsetof(SMB2_CREATE_Request, Buffer);
+            createRequest.CreateContextsOffset = 0;
+            createRequest.CreateContextsLength = 0;
         
-            result = SendRequestAndGetResponse(dibs[i].session, SMB2_READ,
-                dibs[i].treeId, sizeof(readRequest));
+            // translate file path to SMB format (directory\file)
+            vp = fcr->pathName;
+            DerefVP(pathName, vp);
+            namePtr = createRequest.Buffer;
+#define NAME_SPACE (((char*)msg.body + sizeof(msg.body)) - (char*)namePtr)
+            
+            nameLength =
+                GSPathToSMB(pathName, createRequest.Buffer, NAME_SPACE);
+            if (nameLength == 0xFFFF)
+                return badPathSyntax;    
+            namePtr += nameLength;
+        
+            if (nameLength != 0) {
+                if (NAME_SPACE < sizeof(char16_t))
+                    return badPathSyntax;
+                *(char16_t*)namePtr = '\\';
+                namePtr += sizeof(char16_t);
+            }
+        
+            if (NAME_SPACE < dirEntry.FileNameLength)
+                return badPathSyntax;
+            memcpy(namePtr, gbuf, dirEntry.FileNameLength);
+            namePtr += dirEntry.FileNameLength;
+        
+            if (infoState == usingInfoStream) {
+                if (NAME_SPACE < sizeof(afpInfoSuffix))
+                    return badPathSyntax;
+                memcpy(namePtr, afpInfoSuffix, sizeof(afpInfoSuffix));
+                namePtr += sizeof(afpInfoSuffix);
+            }
+        
+            createRequest.NameLength = namePtr - createRequest.Buffer;
+            
+            result = SendRequestAndGetResponse(dibs[i].session, SMB2_CREATE,
+                dibs[i].treeId,
+                sizeof(createRequest) + createRequest.NameLength);
             if (result == rsFailed) {
-                // just ignore too-short AFP Info or other errors
-                goto get_stream_info;
+                /*
+                 * We ignore errors related to accessing the AFP Info or
+                 * resource fork and just behave like they don't exist.
+                 * Giving an error might terminate the whole directory listing,
+                 * which generally isn't desirable.
+                 *
+                 * If we get an error accessing the AFP Info, we try again to
+                 * access the resource fork information via the main stream.
+                 * This can come up for files created by macOS on a 
+                 * Samba/Windows server, which may have a resource fork but no
+                 * AFP Info.
+                 */
+                // TODO maybe add an option to skip the extra resource fork check
+                // (This situation should not come up if using only the SMB FST.)
+                if (infoState == usingInfoStream) {
+                    InitAFPInfo();
+                    infoState = redoWithMainStream;
+                    continue;
+                } else {
+                    break;
+                }
+            } else if (result != rsDone)
+                return GDEError(result);
+        
+            fileID = createResponse.FileId;
+        
+            if (infoState == usingInfoStream) {
+                /*
+                 * Read AFP Info
+                 */
+                readRequest.Padding =
+                    sizeof(SMB2Header) + offsetof(SMB2_READ_Response, Buffer);
+                readRequest.Flags = 0;
+                readRequest.Length = sizeof(AFPInfo);
+                readRequest.Offset = 0;
+                readRequest.FileId = fileID;
+                readRequest.MinimumCount = sizeof(AFPInfo);
+                readRequest.Channel = 0;
+                readRequest.RemainingBytes = 0;
+                readRequest.ReadChannelInfoOffset = 0;
+                readRequest.ReadChannelInfoLength = 0;
+            
+                result = SendRequestAndGetResponse(dibs[i].session, SMB2_READ,
+                    dibs[i].treeId, sizeof(readRequest));
+                if (result == rsFailed) {
+                    // just ignore too-short AFP Info or other errors
+                    goto get_stream_info;
+                } else if (result != rsDone) {
+                    retval = GDEError(result);
+                    goto close_stream;
+                }
+            
+                if (readResponse.DataLength != sizeof(AFPInfo)) {
+                    retval = networkError;
+                    goto close_stream;
+                }
+            
+                if (!VerifyBuffer(
+                    readResponse.DataOffset,
+                    readResponse.DataLength))
+                {
+                    retval = networkError;
+                    goto close_stream;
+                }
+            
+                memcpy(&afpInfo,
+                    (uint8_t*)&msg.smb2Header + readResponse.DataOffset,
+                    sizeof(AFPInfo));
+                
+                /* Do not use AFP info with bad signature or version */
+                if (!AFPInfoValid(&afpInfo))
+                    InitAFPInfo();
+            }
+    
+get_stream_info:    
+            /*
+             * Get stream information
+             */
+            queryInfoRequest.InfoType = SMB2_0_INFO_FILE;
+            queryInfoRequest.FileInfoClass = FileStreamInformation;
+            queryInfoRequest.OutputBufferLength =
+                sizeof(msg.body) - offsetof(SMB2_QUERY_INFO_Response, Buffer);
+            queryInfoRequest.InputBufferOffset = 0;
+            queryInfoRequest.Reserved = 0;
+            queryInfoRequest.InputBufferLength = 0;
+            queryInfoRequest.AdditionalInformation = 0;
+            queryInfoRequest.Flags = 0;
+            queryInfoRequest.FileId = fileID;
+        
+            result = SendRequestAndGetResponse(dibs[i].session, SMB2_QUERY_INFO,
+                dibs[i].treeId, sizeof(queryInfoRequest));
+            if (result == rsFailed) {
+                /*
+                 * Do not report errors about getting the resource fork size.
+                 *
+                 * If we are querying FileStreamInformation on the AFP Info
+                 * stream, try again with the main stream instead.
+                 * (Samba requires this.)
+                 */
+                if (infoState == usingInfoStream)
+                    infoState = redoWithMainStream;
+                goto close_stream;
             } else if (result != rsDone) {
                 retval = GDEError(result);
                 goto close_stream;
             }
         
-            if (readResponse.DataLength != sizeof(AFPInfo)) {
+            if (queryInfoResponse.OutputBufferLength >
+                sizeof(msg.body) - offsetof(SMB2_QUERY_INFO_Response, Buffer)) {
                 retval = networkError;
                 goto close_stream;
             }
         
-            if (!VerifyBuffer(readResponse.DataOffset, readResponse.DataLength))
-            {
+            if (!VerifyBuffer(
+                queryInfoResponse.OutputBufferOffset,
+                queryInfoResponse.OutputBufferLength)) {
                 retval = networkError;
                 goto close_stream;
             }
         
-            memcpy(&afpInfo,
-                (uint8_t*)&msg.smb2Header + readResponse.DataOffset,
-                sizeof(AFPInfo));
-            
-            /* Do not use AFP info with bad signature or version */
-            if (!AFPInfoValid(&afpInfo))
-                InitAFPInfo();
-        }
-
-get_stream_info:    
-        /*
-         * Get stream information
-         */
-        queryInfoRequest.InfoType = SMB2_0_INFO_FILE;
-        queryInfoRequest.FileInfoClass = FileStreamInformation;
-        queryInfoRequest.OutputBufferLength =
-            sizeof(msg.body) - offsetof(SMB2_QUERY_INFO_Response, Buffer);
-        queryInfoRequest.InputBufferOffset = 0;
-        queryInfoRequest.Reserved = 0;
-        queryInfoRequest.InputBufferLength = 0;
-        queryInfoRequest.AdditionalInformation = 0;
-        queryInfoRequest.Flags = 0;
-        queryInfoRequest.FileId = fileID;
-    
-        result = SendRequestAndGetResponse(dibs[i].session, SMB2_QUERY_INFO,
-            dibs[i].treeId, sizeof(queryInfoRequest));
-        if (result == rsFailed) {
+            streamInfoLen = queryInfoResponse.OutputBufferLength;
+            streamInfo = (FILE_STREAM_INFORMATION *)(
+                (unsigned char *)&msg.smb2Header +
+                queryInfoResponse.OutputBufferOffset);
+        
+            while (streamInfoLen >= sizeof(FILE_STREAM_INFORMATION)) {
+                if (streamInfo->NextEntryOffset > streamInfoLen) {
+                    retval = networkError;
+                    goto close_stream;
+                }
+                if (streamInfo->StreamNameLength >
+                    streamInfoLen
+                    - offsetof(FILE_STREAM_INFORMATION, StreamName)) {
+                    retval = networkError;
+                    goto close_stream;
+                }
+        
+                if (streamInfo->StreamNameLength == sizeof(resourceForkSuffix)
+                    && memcmp(streamInfo->StreamName, resourceForkSuffix,
+                        sizeof(resourceForkSuffix)) == 0)
+                {
+                    haveResourceFork = true;
+                    resourceEOF = streamInfo->StreamSize;
+                    resourceAlloc = streamInfo->StreamAllocationSize;
+                    break;
+                }
+        
+                if (streamInfo->NextEntryOffset == 0)
+                    break;
+                streamInfoLen -= streamInfo->NextEntryOffset;
+                streamInfo =
+                    (void*)((char*)streamInfo + streamInfo->NextEntryOffset);
+            }
+        
             /*
-             * Do not report errors about getting the resource fork size.
-             *
-             * If we are querying FileStreamInformation on the AFP Info stream,
-             * try again with the main stream instead.  (Samba requires this.)
+             * Close AFP Info ADS (or main stream, for redo)
              */
-            if (infoState == usingInfoStream)
-                infoState = redoWithMainStream;
-            goto close_stream;
-        } else if (result != rsDone) {
-            retval = GDEError(result);
-            goto close_stream;
-        }
-    
-        if (queryInfoResponse.OutputBufferLength >
-            sizeof(msg.body) - offsetof(SMB2_QUERY_INFO_Response, Buffer)) {
-            retval = networkError;
-            goto close_stream;
-        }
-    
-        if (!VerifyBuffer(
-            queryInfoResponse.OutputBufferOffset,
-            queryInfoResponse.OutputBufferLength)) {
-            retval = networkError;
-            goto close_stream;
-        }
-    
-        streamInfoLen = queryInfoResponse.OutputBufferLength;
-        streamInfo = (FILE_STREAM_INFORMATION *)((unsigned char *)&msg.smb2Header +
-            queryInfoResponse.OutputBufferOffset);
-    
-        while (streamInfoLen >= sizeof(FILE_STREAM_INFORMATION)) {
-            if (streamInfo->NextEntryOffset > streamInfoLen) {
-                retval = networkError;
-                goto close_stream;
-            }
-            if (streamInfo->StreamNameLength >
-                streamInfoLen - offsetof(FILE_STREAM_INFORMATION, StreamName)) {
-                retval = networkError;
-                goto close_stream;
-            }
-    
-            if (streamInfo->StreamNameLength == sizeof(resourceForkSuffix) &&
-                memcmp(streamInfo->StreamName, resourceForkSuffix,
-                    sizeof(resourceForkSuffix)) == 0)
-            {
-                haveResourceFork = true;
-                resourceEOF = streamInfo->StreamSize;
-                resourceAlloc = streamInfo->StreamAllocationSize;
-                break;
-            }
-    
-            if (streamInfo->NextEntryOffset == 0)
-                break;
-            streamInfoLen -= streamInfo->NextEntryOffset;
-            streamInfo = (void*)((char*)streamInfo + streamInfo->NextEntryOffset);
-        }
-    
-        /*
-         * Close AFP Info ADS (or main stream, for redo)
-         */
 close_stream:
-        closeRequest.Flags = 0;
-        closeRequest.Reserved = 0;
-        closeRequest.FileId = fileID;
-    
-        result = SendRequestAndGetResponse(dibs[i].session, SMB2_CLOSE,
-            dibs[i].treeId, sizeof(closeRequest));
-        if (result == rsFailed) {
-            // ignore errors
-        } else if (result != rsDone) {
-            return retval ? retval : GDEError(result);
-        }
+            closeRequest.Flags = 0;
+            closeRequest.Reserved = 0;
+            closeRequest.FileId = fileID;
         
-        if (retval)
-            return retval;
-    } while (infoState == redoWithMainStream);
-
+            result = SendRequestAndGetResponse(dibs[i].session, SMB2_CLOSE,
+                dibs[i].treeId, sizeof(closeRequest));
+            if (result == rsFailed) {
+                // ignore errors
+            } else if (result != rsDone) {
+                return retval ? retval : GDEError(result);
+            }
+            
+            if (retval)
+                return retval;
+        } while (infoState == redoWithMainStream);
+    }
 
     /*
      * Advance the entry number if we got to the stage of returning results,

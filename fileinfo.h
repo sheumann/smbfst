@@ -159,4 +159,24 @@ typedef struct {
     char16_t FileName[];
 } FILE_NAMES_INFORMATION;
 
+typedef struct {
+    uint32_t NextEntryOffset;
+    uint32_t FileIndex;
+    uint64_t CreationTime;
+    uint64_t LastAccessTime;
+    uint64_t LastWriteTime;
+    uint64_t ChangeTime;
+    uint64_t EndOfFile;
+    uint64_t AllocationSize;
+    uint32_t FileAttributes;
+    uint32_t FileNameLength;
+    uint32_t EaSize;
+    uint8_t  ShortNameLength;
+    uint8_t  Reserved1;
+    uint8_t  ShortName[24];
+    uint16_t Reserved2;
+    uint64_t FileId;
+    char16_t FileName[];
+} FILE_ID_BOTH_DIR_INFORMATION;
+
 #endif

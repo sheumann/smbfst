@@ -36,6 +36,7 @@ typedef struct DIB {
 
 /* flags bits */
 #define FLAG_AAPL_READDIR 0x0001
+#define FLAG_READONLY     0x0002
 
 /* list of DIBs (argument to INSTALL_DRIVER) */
 struct DIBList {

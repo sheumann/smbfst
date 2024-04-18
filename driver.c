@@ -24,8 +24,8 @@ void InitDIBs(void) {
     for (unsigned i = 0; i < NDIBS; i++) {
         dibs[i].linkPtr = (i < NDIBS-1) ? &dibs[i+1] : NULL;
         dibs[i].entryPtr = DriverWrapper;
-            /* speed-independent, block device, read allowed, removable */
-        dibs[i].characteristics = 0x03A4;
+            /* speed-independent, block device, read/write allowed, removable */
+        dibs[i].characteristics = 0x03E4;
         dibs[i].blockCount = 0;
         
         memcpy(&dibs[i].devName[1], "SMB", 3);
@@ -213,7 +213,9 @@ static Word DoStatus(struct GSOSDP *dp) {
     }
     //TODO disk-switched logic
     if (dp->dibPointer->extendedDIBPtr != NULL) {
-        dsRec->statusWord = 0x0014;
+        dsRec->statusWord = 0x0010;
+        if (dp->dibPointer->flags & FLAG_READONLY)
+            dsRec->statusWord |= 0x0004;
     } else {
         dsRec->statusWord = 0;
     }

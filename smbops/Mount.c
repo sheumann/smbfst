@@ -94,6 +94,18 @@ Word SMB_Mount(SMBMountRec *pblock, void *gsosdp, Word pcount) {
     vcr->devNum = dibs[dibIndex].DIBDevNum;
 
     /*
+     * Flag if the share is read-only.
+     * We intentionally do not include DELETE permission in this check,
+     * because Samba reports it as enabled even for read-only shares.
+     * The absence of the other permissions (including FILE_DELETE_CHILD)
+     * should be sufficient to indicate that the share is read-only.
+     */
+    if ((treeConnectResponse.MaximalAccess & 
+        (FILE_WRITE_DATA | FILE_APPEND_DATA | FILE_DELETE_CHILD |
+        FILE_WRITE_ATTRIBUTES | GENERIC_WRITE)) == 0)
+        dibs[dibIndex].flags |= FLAG_READONLY;
+
+    /*
      * Try to open root directory with AAPL create context
      */
     createRequest.SecurityFlags = 0;

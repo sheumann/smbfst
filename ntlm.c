@@ -15,6 +15,7 @@
 #include "auth.h"
 #include "gsosdata.h"
 #include "alloc.h"
+#include "utils/random.h"
 
 static const NTLM_NEGOTIATE_MESSAGE negotiateMessage = {
     .Signature = "NTLMSSP",
@@ -152,12 +153,12 @@ unsigned char *NTLM_HandleChallenge(NTLM_Context *ctx,
     unsigned char *payloadPtr;
     char16_t *userNameUpperCase;
     unsigned i;
+    unsigned char *randPtr;
     
     // Nonce used for session key generation
-    // TODO generate a random number for this
-    static unsigned char exportedSessionKey[16] = 
-        {13,123,123,4,3,242,234,23,123,13,31,45,34,143,234,171};
-    
+    static unsigned char exportedSessionKey[16];
+
+    static uint64_t clientChallenge;
     
     // Check that this is a valid challenge message
     if (challengeSize < sizeof(NTLM_CHALLENGE_MESSAGE))
@@ -176,6 +177,11 @@ unsigned char *NTLM_HandleChallenge(NTLM_Context *ctx,
         // TODO properly uppercase non-ASCII characters
         userNameUpperCase[i] = toupper(authRec->userName[i]);
     }
+
+    /* Generate random values for use in NTLM */
+    randPtr = GetRandom();
+    memcpy(exportedSessionKey, randPtr, 16);
+    clientChallenge = *(uint64_t*)(randPtr + 20);
 
     /* Compute NT one-way function v2 */
     NTOWFv2(authRec->passwordSize, authRec->password,
@@ -200,8 +206,6 @@ unsigned char *NTLM_HandleChallenge(NTLM_Context *ctx,
         memcpy(tempBuf+8, infoPtr, 8);
     
     // client challenge
-    // TODO Generate random ClientChallenge
-    static uint64_t clientChallenge = 0x5e4cabd35234cd45;
     memcpy(tempBuf+16, &clientChallenge, 8);
 
     payloadPtr = tempBuf + 28;

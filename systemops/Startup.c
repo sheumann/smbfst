@@ -7,6 +7,7 @@
 #include "gsosdata.h"
 #include "driver.h"
 #include "systemops/Startup.h"
+#include "utils/random.h"
 
 extern pascal void SystemUserID (unsigned, char *);
 
@@ -60,6 +61,8 @@ int Startup(void) {
     if (result == 0) {
         oldPriorityVector = priorityVector;
         priorityVector = JML | ((uintptr_t)PriorityHandler << 8);
+        
+        InitRandom();
     }
 
     return result;
@@ -92,6 +95,8 @@ static void LoadTCPTool(void) {
         SetDefaultTPT();
         
         marinettiStatus = tcpipLoaded;
+        
+        SeedEntropy();
     }
 }
 #pragma databank 0

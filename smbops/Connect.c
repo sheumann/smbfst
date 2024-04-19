@@ -7,9 +7,9 @@
 #include <string.h>
 #include <stddef.h>
 #include <time.h>
-#include "fstspecific.h"
-#include "smb2.h"
-#include "alloc.h"
+#include "fst/fstspecific.h"
+#include "smb2/smb2.h"
+#include "utils/alloc.h"
 #include "helpers/datetime.h"
 #include "systemops/Startup.h"
 

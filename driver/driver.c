@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <gsos.h>
 #include <intmath.h>
-#include "driver.h"
+#include "driver/driver.h"
 
 #define DRIVER_VERSION 0x001E             /* GS/OS driver version format */
 

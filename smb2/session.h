@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <types.h>
-#include "connection.h"
+#include "smb2/connection.h"
 
 struct hmac_sha256_context;
 

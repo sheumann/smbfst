@@ -4,7 +4,7 @@
 #include <misctool.h>
 #include <orca.h>
 
-#include "readtcp.h"
+#include "utils/readtcp.h"
 #include "defs.h"
 
 /* Time out if no new data is received for this long */

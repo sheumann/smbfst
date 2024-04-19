@@ -2,8 +2,8 @@
 
 #include <string.h>
 
-#include "auth.h"
-#include "ntlm.h"
+#include "auth/auth.h"
+#include "auth/ntlm.h"
 
 // Type we use for length of items in X.690 encoding
 typedef uint16_t length_t;

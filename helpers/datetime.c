@@ -3,8 +3,8 @@
 #include <misctool.h>
 #include <orca.h>
 #include "helpers/datetime.h"
-#include "session.h"
-#include "connection.h"
+#include "smb2/session.h"
+#include "smb2/connection.h"
 
 typedef union {
     TimeRec timeRec;

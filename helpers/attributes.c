@@ -1,6 +1,6 @@
 #include "defs.h"
 #include <gsos.h>
-#include "fileinfo.h"
+#include "smb2/fileinfo.h"
 #include "helpers/attributes.h"
 
 // TODO Mac blocks rename if locked. Adjust attributes accordingly.

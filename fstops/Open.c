@@ -4,11 +4,11 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include <string.h>
-#include "smb2.h"
-#include "driver.h"
-#include "gsosutils.h"
-#include "path.h"
-#include "fstspecific.h"
+#include "smb2/smb2.h"
+#include "driver/driver.h"
+#include "gsos/gsosutils.h"
+#include "helpers/path.h"
+#include "fst/fstspecific.h"
 #include "fstops/GetFileInfo.h"
 #include "helpers/errors.h"
 #include "helpers/afpinfo.h"

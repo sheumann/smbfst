@@ -11,13 +11,13 @@
 #include <stdio.h>
 
 #include "defs.h"
-#include "connection.h"
-#include "session.h"
-#include "endian.h"
-#include "smb2proto.h"
-#include "smb2.h"
-#include "readtcp.h"
-#include "auth.h"
+#include "smb2/connection.h"
+#include "smb2/session.h"
+#include "utils/endian.h"
+#include "smb2/smb2proto.h"
+#include "smb2/smb2.h"
+#include "utils/readtcp.h"
+#include "auth/auth.h"
 #include "crypto/sha256.h"
 #include "crypto/aes.h"
 

@@ -1,7 +1,7 @@
 #include "defs.h"
 #include <memory.h>
 #include <orca.h>
-#include "alloc.h"
+#include "utils/alloc.h"
 
 void *smb_malloc(size_t size) {
     Handle handle;

@@ -1,8 +1,8 @@
 #include "defs.h"
 #include <stdbool.h>
 #include <string.h>
-#include "smb2.h"
-#include "endian.h"
+#include "smb2/smb2.h"
+#include "utils/endian.h"
 #include "helpers/createcontext.h"
 
 /*

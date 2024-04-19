@@ -1,7 +1,7 @@
 #include "defs.h"
 #include <misctool.h>
 #include <tcpip.h>
-#include "gsosdata.h"
+#include "gsos/gsosdata.h"
 #include "crypto/sha256.h"
 #include "utils/random.h"
 

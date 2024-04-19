@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include <uchar.h>
 #include <types.h>
-#include "driver.h"
+#include "driver/driver.h"
 
 /*
  * Mac-style type/creator code

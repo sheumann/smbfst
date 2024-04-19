@@ -2,8 +2,8 @@
 #include <gsos.h>
 #include <prodos.h>
 #undef JudgeName
-#include "gsosdata.h"
-#include "fstspecific.h"
+#include "gsos/gsosdata.h"
+#include "fst/fstspecific.h"
 #include <misctool.h>
 
 // JudgeName name types

@@ -1,8 +1,8 @@
 #include "defs.h"
 
 #include <tcpip.h>
-#include "connection.h"
-#include "alloc.h"
+#include "smb2/connection.h"
+#include "utils/alloc.h"
 
 void Connection_Retain(Connection *conn) {
     ++conn->refCount;

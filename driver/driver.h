@@ -3,9 +3,9 @@
 
 #include <stdbool.h>
 #include <types.h>
-#include "gsosdata.h"
-#include "session.h"
-#include "smb2.h"
+#include "gsos/gsosdata.h"
+#include "smb2/session.h"
+#include "smb2/smb2.h"
 
 #define DEVICE_FILE_SERVER 0x0010
 

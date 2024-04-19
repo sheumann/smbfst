@@ -2,7 +2,7 @@
 #define ERRORS_H
 
 #include <types.h>
-#include "readtcp.h"
+#include "utils/readtcp.h"
 
 /*
  * Convert an SMB error code to a GS/OS error.

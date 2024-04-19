@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#include "ntstatus.h"
+#include "smb2/ntstatus.h"
 
 #define SMB2_ASSERT_SIZE(type,size) _Static_assert(sizeof(type) == (size), "");
 

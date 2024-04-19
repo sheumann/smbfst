@@ -5,10 +5,10 @@
 #include <stddef.h>
 #include <uchar.h>
 
-#include "smb2proto.h"
-#include "connection.h"
-#include "session.h"
-#include "readtcp.h"
+#include "smb2/smb2proto.h"
+#include "smb2/connection.h"
+#include "smb2/session.h"
+#include "utils/readtcp.h"
 
 #define msgBodyHeader          (*(SMB2_Common_Header*)msg.body)
 #define negotiateRequest       (*(SMB2_NEGOTIATE_Request*)msg.body)

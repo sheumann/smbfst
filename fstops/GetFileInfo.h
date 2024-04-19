@@ -2,8 +2,8 @@
 #define GETFILEINFO_H
 
 #include <types.h>
-#include "smb2proto.h"
-#include "fileinfo.h"
+#include "smb2/smb2proto.h"
+#include "smb2/fileinfo.h"
 
 extern FILE_BASIC_INFORMATION basicInfo;
 extern bool haveDataForkSizes;

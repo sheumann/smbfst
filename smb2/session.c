@@ -1,10 +1,10 @@
 #include "defs.h"
 
 #include <tcpip.h>
-#include "session.h"
-#include "connection.h"
-#include "alloc.h"
-#include "smb2.h"
+#include "smb2/session.h"
+#include "smb2/connection.h"
+#include "utils/alloc.h"
+#include "smb2/smb2.h"
 
 void Session_Retain(Session *sess) {
     ++sess->refCount;

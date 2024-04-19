@@ -3,7 +3,7 @@
 
 #include <types.h>
 #include <stdint.h>
-#include "session.h"
+#include "smb2/session.h"
 
 // FILETIME corresponding to (time_t)0 in ORCA/C (Nov 13, 1969)
 #define TIME_T_0 116402400000000000

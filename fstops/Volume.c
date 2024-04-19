@@ -2,9 +2,9 @@
 #include <string.h>
 #include <gsos.h>
 #include <prodos.h>
-#include "driver.h"
-#include "gsosutils.h"
-#include "fstspecific.h"
+#include "driver/driver.h"
+#include "gsos/gsosutils.h"
+#include "fst/fstspecific.h"
 #include "helpers/blocks.h"
 
 /*

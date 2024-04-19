@@ -3,11 +3,11 @@
 #include <string.h>
 #include <stdbool.h>
 #include <gsos.h>
-#include "smb2.h"
-#include "aapl.h"
-#include "fstspecific.h"
-#include "driver.h"
-#include "gsosutils.h"
+#include "smb2/smb2.h"
+#include "smb2/aapl.h"
+#include "fst/fstspecific.h"
+#include "driver/driver.h"
+#include "gsos/gsosutils.h"
 #include "helpers/createcontext.h"
 
 #ifndef devListFull

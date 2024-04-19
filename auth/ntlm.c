@@ -10,11 +10,10 @@
 #include "crypto/md5.h"
 #include "crypto/rc4.h"
 
-#include "ntlm.h"
-#include "authinfo.h"
-#include "auth.h"
-#include "gsosdata.h"
-#include "alloc.h"
+#include "auth/ntlm.h"
+#include "auth/auth.h"
+#include "gsos/gsosdata.h"
+#include "utils/alloc.h"
 #include "utils/random.h"
 
 static const NTLM_NEGOTIATE_MESSAGE negotiateMessage = {

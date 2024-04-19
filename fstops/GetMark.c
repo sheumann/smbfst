@@ -1,7 +1,7 @@
 #include "defs.h"
 #include <gsos.h>
 #include <prodos.h>
-#include "gsosdata.h"
+#include "gsos/gsosdata.h"
 
 Word GetMark(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     VirtualPointer vp;

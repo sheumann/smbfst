@@ -4,8 +4,8 @@
 #include <orca.h>
 #include <stddef.h>
 #include <locator.h>
-#include "gsosdata.h"
-#include "driver.h"
+#include "gsos/gsosdata.h"
+#include "driver/driver.h"
 #include "systemops/Startup.h"
 #include "utils/random.h"
 

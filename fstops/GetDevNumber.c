@@ -1,9 +1,9 @@
 #include "defs.h"
 #include <gsos.h>
 #include <prodos.h>
-#include "gsosdata.h"
-#include "driver.h"
-#include "gsosutils.h"
+#include "gsos/gsosdata.h"
+#include "driver/driver.h"
+#include "gsos/gsosutils.h"
 
 Word GetDevNumber(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     Word devNum = gsosdp->dev1Num;

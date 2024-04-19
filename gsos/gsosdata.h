@@ -3,7 +3,7 @@
 
 #include <types.h>
 #include <stdint.h>
-#include "smb2proto.h"
+#include "smb2/smb2proto.h"
 
 /*
  * GS/OS string and result buf types.

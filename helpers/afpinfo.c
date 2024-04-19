@@ -1,8 +1,8 @@
 #include "defs.h"
 #include <string.h>
 #include <gsos.h>
-#include "smb2.h"
-#include "path.h"
+#include "smb2/smb2.h"
+#include "helpers/path.h"
 #include "helpers/afpinfo.h"
 #include "helpers/errors.h"
 

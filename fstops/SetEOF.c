@@ -2,10 +2,10 @@
 #include <gsos.h>
 #include <prodos.h>
 #include <stddef.h>
-#include "smb2.h"
-#include "fileinfo.h"
-#include "gsosdata.h"
-#include "driver.h"
+#include "smb2/smb2.h"
+#include "smb2/fileinfo.h"
+#include "gsos/gsosdata.h"
+#include "driver/driver.h"
 #include "helpers/position.h"
 #include "helpers/errors.h"
 

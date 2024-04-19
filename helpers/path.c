@@ -3,7 +3,7 @@
 #include <uchar.h>
 #include <stdbool.h>
 #include <gsos.h>
-#include "path.h"
+#include "helpers/path.h"
 
 static char16_t macRomanToUCS2[128] = {
     /* 80-87 */ 0x00C4, 0x00C5, 0x00C7, 0x00C9, 0x00D1, 0x00D6, 0x00DC, 0x00E1,

@@ -1,8 +1,8 @@
 #ifndef NTLM_H
 #define NTLM_H
 
-#include "ntlmproto.h"
-#include "fstspecific.h"
+#include "auth/ntlmproto.h"
+#include "fst/fstspecific.h"
 
 typedef struct {
     unsigned char signkey[16];

@@ -1,8 +1,8 @@
 #include "defs.h"
 #include <gsos.h>
-#include "smb2.h"
+#include "smb2/smb2.h"
 #include "helpers/errors.h"
-#include "ntstatus.h"
+#include "smb2/ntstatus.h"
 
 /*
  * Convert an SMB error code to a GS/OS error.

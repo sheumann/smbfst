@@ -11,7 +11,7 @@
 
 #include <memory.h>
 
-#include "fstspecific.h"
+#include "fst/fstspecific.h"
 
 SMBConnectRec connectPB = {
     .pCount = 7,

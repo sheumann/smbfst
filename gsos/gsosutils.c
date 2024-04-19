@@ -1,8 +1,7 @@
 #include "defs.h"
 #include <gsos.h>
 #include <string.h>
-#include "gsosutils.h"
-#include "driver.h"
+#include "gsos/gsosutils.h"
 
 Word WriteGSOSString(Word length, char *str, ResultBufPtr buf) {
     char *outStr;

@@ -2,7 +2,7 @@
 #define AUTH_H
 
 #include <stdint.h>
-#include "fstspecific.h"
+#include "fst/fstspecific.h"
 
 /* This size must be sufficient to hold any mechList we may produce. */
 #define MAX_MECHLIST_SIZE 100

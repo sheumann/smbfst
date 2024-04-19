@@ -5,12 +5,12 @@
 #include <memory.h>
 #include <orca.h>
 #include <gsos.h>
-#include "gsosdata.h"
-#include "fstspecific.h"
-#include "smb2.h"
-#include "auth.h"
-#include "alloc.h"
-#include "connection.h"
+#include "gsos/gsosdata.h"
+#include "fst/fstspecific.h"
+#include "smb2/smb2.h"
+#include "auth/auth.h"
+#include "utils/alloc.h"
+#include "smb2/connection.h"
 #include "crypto/sha256.h"
 #include "crypto/aes.h"
 

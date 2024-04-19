@@ -4,11 +4,11 @@
 #include <uchar.h>
 #include <stddef.h>
 #include <string.h>
-#include "smb2.h"
-#include "fileinfo.h"
-#include "driver.h"
-#include "gsosutils.h"
-#include "path.h"
+#include "smb2/smb2.h"
+#include "smb2/fileinfo.h"
+#include "driver/driver.h"
+#include "gsos/gsosutils.h"
+#include "helpers/path.h"
 #include "helpers/errors.h"
 
 Word ChangePath(void *pblock, void *gsosdp, Word pcount) {

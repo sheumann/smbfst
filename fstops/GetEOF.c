@@ -1,10 +1,10 @@
 #include "defs.h"
 #include <gsos.h>
 #include <prodos.h>
-#include "smb2.h"
-#include "gsosdata.h"
-#include "driver.h"
-#include "fileinfo.h"
+#include "smb2/smb2.h"
+#include "gsos/gsosdata.h"
+#include "driver/driver.h"
+#include "smb2/fileinfo.h"
 #include "helpers/errors.h"
 
 Word GetEOF(void *pblock, struct GSOSDP *gsosdp, Word pcount) {

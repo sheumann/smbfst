@@ -1,7 +1,7 @@
 #include "defs.h"
 #include <gsos.h>
-#include "smb2.h"
-#include "fileinfo.h"
+#include "smb2/smb2.h"
+#include "smb2/fileinfo.h"
 #include "helpers/position.h"
 #include "helpers/errors.h"
 

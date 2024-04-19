@@ -4,9 +4,9 @@
 #include <uchar.h>
 #include <stddef.h>
 #include <string.h>
-#include "smb2.h"
-#include "gsosutils.h"
-#include "path.h"
+#include "smb2/smb2.h"
+#include "gsos/gsosutils.h"
+#include "helpers/path.h"
 #include "helpers/attributes.h"
 #include "helpers/blocks.h"
 #include "helpers/datetime.h"

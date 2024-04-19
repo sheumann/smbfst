@@ -2,8 +2,8 @@
 #define GSOSUTILS_H
 
 #include <gsos.h>
-#include "gsosdata.h"
-#include "driver.h"
+#include "gsos/gsosdata.h"
+#include "driver/driver.h"
 
 Word WriteGSOSString(Word length, char *str, ResultBufPtr buf);
 Word WritePString(Word length, char *str, char *buf);

@@ -1,8 +1,8 @@
 #include "defs.h"
 
 #include <gsos.h>
-#include "session.h"
-#include "fstspecific.h"
+#include "smb2/session.h"
+#include "fst/fstspecific.h"
 
 Word SMB_Session_Retain(SMBSessionRec *pblock, void *gsosdp, Word pcount) {
     if (pblock->pCount != 3)

@@ -3,7 +3,7 @@
 
 #include <types.h>
 #include <stdbool.h>
-#include "driver.h"
+#include "driver/driver.h"
 #include "helpers/afpinfo.h"
 
 #define DIRECTORY_FILETYPE 0x0F

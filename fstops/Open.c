@@ -11,10 +11,9 @@
 #include "fstspecific.h"
 #include "fstops/GetFileInfo.h"
 #include "helpers/errors.h"
+#include "helpers/afpinfo.h"
 
 #define ACCESS_TYPE_COUNT 3
-
-static char16_t resourceForkSuffix[19] = u":AFP_Resource:$DATA";
 
 Word Open(void *pblock, void *gsosdp, Word pcount) {
     static Word requestAccess[ACCESS_TYPE_COUNT];
@@ -29,6 +28,7 @@ Word Open(void *pblock, void *gsosdp, Word pcount) {
     FCR *fcr;
     Word retval = 0;
     static SMB2_FILEID fileID;
+    enum {openDataFork, openResourceFork, openOrCreateResourceFork} forkOp;
 
     dib = GetDIB(gsosdp, 1);
     if (dib == NULL)
@@ -43,7 +43,16 @@ Word Open(void *pblock, void *gsosdp, Word pcount) {
         requestAccess[1] = readEnable;
         requestAccess[2] = writeEnable;
     }
+    
+    if (pcount >= 4 && ((OpenRecGS*)pblock)->resourceNumber != 0) {
+        if (((OpenRecGS*)pblock)->resourceNumber != 1)
+            return paramRangeErr;
+        forkOp = openResourceFork;
+    } else {
+        forkOp = openDataFork;
+    }
 
+retry:
     /*
      * Open file
      */
@@ -53,12 +62,17 @@ Word Open(void *pblock, void *gsosdp, Word pcount) {
     createRequest.SmbCreateFlags = 0;
     createRequest.Reserved = 0;
     createRequest.FileAttributes = 0;
-    createRequest.CreateDisposition = FILE_OPEN;
     createRequest.CreateOptions = 0; // TODO maybe FILE_NO_EA_KNOWLEDGE
     createRequest.NameOffset =
         sizeof(SMB2Header) + offsetof(SMB2_CREATE_Request, Buffer);
     createRequest.CreateContextsOffset = 0;
     createRequest.CreateContextsLength = 0;
+
+    if (forkOp == openOrCreateResourceFork) {
+        createRequest.CreateDisposition = FILE_OPEN_IF;
+    } else {
+        createRequest.CreateDisposition = FILE_OPEN;
+    }
 
     // translate filename to SMB format
     createRequest.NameLength = GSOSDPPathToSMB(gsosdp, 1, createRequest.Buffer,
@@ -66,9 +80,7 @@ Word Open(void *pblock, void *gsosdp, Word pcount) {
     if (createRequest.NameLength == 0xFFFF)
         return badPathSyntax;
 
-    if (pcount >= 4 && ((OpenRecGS*)pblock)->resourceNumber != 0) {
-        if (((OpenRecGS*)pblock)->resourceNumber != 1)
-            return paramRangeErr;
+    if (forkOp >= openResourceFork) {
         if (createRequest.NameLength >
             sizeof(msg.body) - offsetof(SMB2_CREATE_Request, Buffer)
             - sizeof(resourceForkSuffix))
@@ -126,8 +138,65 @@ Word Open(void *pblock, void *gsosdp, Word pcount) {
             break;
     }
 open_done:
-    if (result != rsDone)
+    if (result != rsDone) {
+        if (result == rsFailed
+        && msg.smb2Header.Status == STATUS_OBJECT_NAME_NOT_FOUND) {
+            if (forkOp == openResourceFork) {
+                /*
+                 * macOS will give STATUS_OBJECT_NAME_NOT_FOUND when trying to
+                 * open a 0-length resource fork, even if we previously created
+                 * it successfully.  To work around this, we check if the file
+                 * exists at all, and if it does then we open the resource fork
+                 * with the "create if not present" setting.  This means that
+                 * resource forks can be created just by opening them, but that
+                 * shouldn't be a problem -- it's similar to HFS.
+                 */
+                createRequest.SecurityFlags = 0;
+                createRequest.RequestedOplockLevel = SMB2_OPLOCK_LEVEL_NONE;
+                createRequest.ImpersonationLevel = Impersonation;
+                createRequest.SmbCreateFlags = 0;
+                createRequest.Reserved = 0;
+                createRequest.DesiredAccess = FILE_READ_ATTRIBUTES;
+                createRequest.FileAttributes = 0;
+                createRequest.ShareAccess =
+                    FILE_SHARE_READ | FILE_SHARE_WRITE;
+                createRequest.CreateDisposition = FILE_OPEN;
+                createRequest.CreateOptions = 0;
+                createRequest.NameOffset =
+                    sizeof(SMB2Header) + offsetof(SMB2_CREATE_Request, Buffer);
+                createRequest.CreateContextsOffset = 0;
+                createRequest.CreateContextsLength = 0;
+
+                createRequest.NameLength = GSOSDPPathToSMB(gsosdp, 1,
+                    createRequest.Buffer,
+                    sizeof(msg.body) - offsetof(SMB2_CREATE_Request, Buffer));
+                if (createRequest.NameLength == 0xFFFF)
+                    return badPathSyntax;
+
+                result = SendRequestAndGetResponse(dib->session, SMB2_CREATE,
+                    dib->treeId,
+                    sizeof(createRequest) + createRequest.NameLength);
+                if (result != rsDone)
+                    return ConvertError(result);
+                
+                fileID = createResponse.FileId;
+                
+                closeRequest.Flags = 0;
+                closeRequest.Reserved = 0;
+                closeRequest.FileId = fileID;
+
+                result = SendRequestAndGetResponse(dib->session, SMB2_CLOSE,
+                    dib->treeId, sizeof(closeRequest));
+                // ignore any errors on close
+                
+                forkOp = openOrCreateResourceFork;
+                goto retry;
+            } else if (forkOp == openOrCreateResourceFork) {
+                return resForkNotFound;
+            }
+        }
         return ConvertError(result);
+    }
     
     fileID = createResponse.FileId;
 
@@ -169,7 +238,7 @@ open_done:
     fcr->fstID = smbFSID;
     fcr->volID = vcr->id;
     fcr->access = requestAccess[i] | ACCESS_FLAG_CLEAN;
-    if (pcount >= 4 && ((OpenRecGS*)pblock)->resourceNumber != 0)
+    if (forkOp >= openResourceFork)
          fcr->access |= ACCESS_FLAG_RFORK;
     
     fcr->fileID = fileID;

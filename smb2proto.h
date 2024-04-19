@@ -156,6 +156,16 @@ SMB2_ASSERT_SIZE(SMB2_NEGOTIATE_Response,64)
 
 typedef struct {
     uint16_t StructureSize;
+    uint16_t Reserved;
+} SMB2_LOGOFF_Request;
+
+typedef struct {
+    uint16_t StructureSize;
+    uint16_t Reserved;
+} SMB2_LOGOFF_Response;
+
+typedef struct {
+    uint16_t StructureSize;
     uint8_t  Flags;
     uint8_t  SecurityMode;
     uint32_t Capabilities;
@@ -236,6 +246,16 @@ typedef struct {
 #define SMB2_SHARE_CAP_CLUSTER                 0x00000040
 #define SMB2_SHARE_CAP_ASYMMETRIC              0x00000080
 #define SMB2_SHARE_CAP_REDIRECT_TO_OWNER       0x00000100
+
+typedef struct {
+    uint16_t StructureSize;
+    uint16_t Reserved;
+} SMB2_TREE_DISCONNECT_Request;
+
+typedef struct {
+    uint16_t StructureSize;
+    uint16_t Reserved;
+} SMB2_TREE_DISCONNECT_Response;
 
 typedef struct {
     uint16_t StructureSize;

@@ -4,6 +4,7 @@
 #include "session.h"
 #include "connection.h"
 #include "alloc.h"
+#include "smb2.h"
 
 void Session_Retain(Session *sess) {
     ++sess->refCount;
@@ -11,7 +12,10 @@ void Session_Retain(Session *sess) {
 
 void Session_Release(Session *sess) {
     if (--sess->refCount == 0) {
-        // TODO send LOGOFF message to server
+        logoffRequest.Reserved = 0;
+        SendRequestAndGetResponse(sess, SMB2_LOGOFF, 0, sizeof(logoffRequest));
+        // ignore errors from logoff
+
         Connection_Release(sess->connection);
         smb_free(sess);
     }

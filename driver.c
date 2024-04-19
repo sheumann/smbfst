@@ -232,7 +232,22 @@ static Word DoStatus(struct GSOSDP *dp) {
 }
 
 static Word DoEject(struct GSOSDP *dp) {
-    // TODO
+    DIB *dib = dp->dibPointer;
+
+    if (dib->extendedDIBPtr != NULL) {
+        treeDisconnectRequest.Reserved = 0;
+        SendRequestAndGetResponse(dib->session, SMB2_TREE_DISCONNECT,
+            dib->treeId, sizeof(treeDisconnectRequest));
+        // ignore errors from tree disconnect
+
+        Session_Release(dib->session);
+        dib->session = NULL;
+        dib->treeId = 0;
+        dib->switched = true;
+        dib->vcrVP = 0;
+        dib->flags = 0;
+        dib->extendedDIBPtr = NULL;
+    }
     
     dp->transferCount = 0;
     return 0;

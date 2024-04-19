@@ -5,6 +5,7 @@
 #include <types.h>
 #include "gsosdata.h"
 #include "session.h"
+#include "smb2.h"
 
 #define DEVICE_FILE_SERVER 0x0010
 

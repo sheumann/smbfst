@@ -307,9 +307,22 @@ Word Create(void *pblock, void *gsosdp, Word pcount) {
         result = SendRequestAndGetResponse(dib->session, SMB2_CREATE,
             dib->treeId, sizeof(createRequest) + createRequest.NameLength);
         if (result != rsDone) {
-            // TODO add option to ignore errors setting AFP info
-            retval = ConvertError(result);
-            goto close_on_error;
+            /*
+             * If we get STATUS_OBJECT_NAME_INVALID for the AFP info (after
+             * successfully creating the main stream with the same base name),
+             * this presumably means that the filesystem does not support
+             * named streams.  We will not report this as an error, because
+             * if we did it would prevent us from creating files on such
+             * filesystems at all.  This way, we can at least create files,
+             * although the filetype and Finder Info will not be set correctly.
+             */
+            if (result == rsFailed
+                && msg.smb2Header.Status == STATUS_OBJECT_NAME_INVALID) {
+                goto set_attributes;
+            } else {
+                retval = ConvertError(result);
+                goto close_on_error;
+            }
         }
 
         infoFileID = createResponse.FileId;
@@ -356,7 +369,8 @@ Word Create(void *pblock, void *gsosdp, Word pcount) {
         
         if (retval != 0)
             goto close_on_error;
-        
+
+set_attributes:
         if (attributes != initialAttributes || creationTime != 0) {
             /*
              * Set final attributes and creation time

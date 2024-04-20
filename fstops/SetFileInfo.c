@@ -221,9 +221,21 @@ Word SetFileInfo(void *pblock, void *gsosdp, Word pcount) {
                 dib->treeId, sizeof(createRequest) + createRequest.NameLength);
             if (result == rsDone)
                 break;
+            /*
+             * If we get STATUS_OBJECT_NAME_INVALID for the AFP info (after
+             * successfully accessing the main stream with the same base name),
+             * this presumably means that the filesystem does not support
+             * named streams.  We will not report this as an error, because
+             * if we did it would prevent us from setting file info on such
+             * filesystems at all.  This way, we can at least set attributes
+             * and dates, although the filetype and Finder Info will not be
+             * set correctly.
+             */
+            if (result == rsFailed
+                && msg.smb2Header.Status == STATUS_OBJECT_NAME_INVALID)
+                goto finish;
         }
         if (result != rsDone) {
-            // TODO maybe have flag to prevent errors setting AFP Info
             retval = ConvertError(result);
             goto finish;
         }

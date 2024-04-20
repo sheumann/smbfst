@@ -129,7 +129,19 @@ top:
             alreadyOpen = false;
             goto top;
         }
-        retval = ConvertError(result);
+        /*
+         * STATUS_INVALID_PARAMETER presumably means that we cannot get stream
+         * information because named streams are not supported (e.g. on Windows
+         * serving a FAT filesystem).  Just act like AFP Info & resource fork
+         * are not available, but don't treat this as an error.
+         */
+        if (result == rsFailed
+            && msg.smb2Header.Status == STATUS_INVALID_PARAMETER
+            && haveDataForkSizes) {
+            // do nothing
+        } else {
+            retval = ConvertError(result);
+        }
         goto close;
     }
     

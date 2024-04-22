@@ -24,12 +24,28 @@ extern pascal void SystemUserID (unsigned, char *);
  */
 #define priorityVector (*(LongWord*)0xe1103a)
 
+/*
+ * This vector is called when switching to/from P8 or shutting down.
+ * It passes an argument in A.
+ */
+#define p8SwitchVector (*(LongWord*)0xe100b4)
+
+/*
+ * Indicates whether we are doing warm (i.e. switch to/from P8) or cold 
+ * startup/shutdown.
+ */
+#define warm_cold_flag (*(Word*)0xe101d0)
+
 static LongWord oldPriorityVector;
+static LongWord oldP8SwitchVector;
 
 enum MarinettiStatus marinettiStatus = tcpipUnloaded;
 
 static asm void PriorityHandler(void);
+static asm void P8SwitchHandler(void);
+
 static void LoadTCPTool(void);
+static void HandleOSSwitch(int a);
 
 /*
  * Called when GS/OS starts up, either on boot or when switching back from P8.
@@ -62,6 +78,9 @@ int Startup(void) {
         oldPriorityVector = priorityVector;
         priorityVector = JML | ((uintptr_t)PriorityHandler << 8);
         
+        oldP8SwitchVector = p8SwitchVector;
+        p8SwitchVector = JML | ((uintptr_t)P8SwitchHandler << 8);
+
         InitRandom();
     }
 
@@ -97,6 +116,34 @@ static void LoadTCPTool(void) {
         marinettiStatus = tcpipLoaded;
         
         SeedEntropy();
+    }
+}
+#pragma databank 0
+
+static asm void P8SwitchHandler(void) {
+    pha
+    pha
+    jsl >HandleOSSwitch
+    pla
+    jml >oldP8SwitchVector
+}
+
+/*
+ * This is called at shutdown time or when switching to/from GS/OS.
+ *
+ * A=1 indicates quitting GS/OS, either to shut down or switch to P8.
+ */
+#pragma databank 1
+static void HandleOSSwitch(int a) {
+    unsigned i;
+
+    /*
+     * If system is shutting down, unmount all SMB volumes.
+     */
+    if (a == 1 && warm_cold_flag == 0) {
+        for (i = 0; i < NDIBS; i++) {
+            UnmountSMBVolume(&dibs[i]);
+        }
     }
 }
 #pragma databank 0

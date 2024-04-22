@@ -231,9 +231,7 @@ static Word DoStatus(struct GSOSDP *dp) {
     return 0;
 }
 
-static Word DoEject(struct GSOSDP *dp) {
-    DIB *dib = dp->dibPointer;
-
+void UnmountSMBVolume(DIB *dib) {
     if (dib->extendedDIBPtr != NULL) {
         treeDisconnectRequest.Reserved = 0;
         SendRequestAndGetResponse(dib->session, SMB2_TREE_DISCONNECT,
@@ -248,7 +246,10 @@ static Word DoEject(struct GSOSDP *dp) {
         dib->flags = 0;
         dib->extendedDIBPtr = NULL;
     }
-    
+}
+
+static Word DoEject(struct GSOSDP *dp) {
+    UnmountSMBVolume(dp->dibPointer);
     dp->transferCount = 0;
     return 0;
 }

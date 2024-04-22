@@ -75,5 +75,6 @@ extern struct DIBList dibList;
 
 void InitDIBs(void);
 Word DriverDispatch(Word callNum, struct GSOSDP *dp);
+void UnmountSMBVolume(DIB *dib);
 
 #endif

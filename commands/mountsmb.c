@@ -1,3 +1,4 @@
+#define GENERATE_ROOT
 #include "defs.h"
 #include <gsos.h>
 #include <stdio.h>
@@ -89,7 +90,7 @@ int main(int argc, char *argv[]) {
 
     FSTSpecific(&connectPB);
     if (toolerror()) {
-        printf("connect error = %04x\n", toolerror());
+        printf("Connect error: $%02x\n", toolerror());
         return 0;
     }
     
@@ -141,7 +142,7 @@ int main(int argc, char *argv[]) {
 
     FSTSpecific(&authenticatePB);
     if (toolerror()) {
-        printf("authenticate error = %04x\n", toolerror());
+        printf("Authenticate error: $%02x\n", toolerror());
         connectionReleasePB.connectionID = connectPB.connectionID;
         FSTSpecific(&connectionReleasePB);
         return 0;
@@ -153,10 +154,11 @@ int main(int argc, char *argv[]) {
     mountPB.sessionID = authenticatePB.sessionID;
     FSTSpecific(&mountPB);
 
-    if (!toolerror()) {
-        printf("Mounted on device %u\n", mountPB.devNum);
-    } else {
-        printf("Error $%x\n", toolerror());
+    if (toolerror()) {
+        printf("Mount error: $%02x\n", toolerror());
+        sessionReleasePB.sessionID = authenticatePB.sessionID;
+        FSTSpecific(&sessionReleasePB);
+        return 0;
     }
 
     sessionReleasePB.sessionID = authenticatePB.sessionID;
@@ -165,29 +167,23 @@ int main(int argc, char *argv[]) {
     dInfoPB.devNum = mountPB.devNum;
     DInfo(&dInfoPB);
     if (toolerror()) {
-        printf("DInfo error $%x\n", toolerror());
+        printf("DInfo error: $%02x\n", toolerror());
         return 0;
-    } else {
-        printf("Device name = ");
-        for (unsigned i = 0; i < devName.bufString.length; i++) {
-            putchar(devName.bufString.text[i]);
-        }
-        printf("\n");
     }
 
     Volume(&volumePB);
     if (toolerror()) {
-        printf("VolumeGS error $%x\n", toolerror());
-    } else {
-        printf("Volume name length = %u\n", volName.bufString.length);
-        printf("Volume name = ");
-        for (unsigned i = 0; i < volName.bufString.length; i++) {
-            putchar(volName.bufString.text[i]);
-        }
-        printf("\n");
-        printf("Total blocks = %lu\n", volumePB.totalBlocks);
-        printf("Free blocks  = %lu\n", volumePB.freeBlocks);
-        printf("Block size   = %u\n",  volumePB.blockSize);
-        printf("FSID         = %x\n",  volumePB.fileSysID);
+        printf("VolumeGS error: $%02x\n", toolerror());
+        return 0;
     }
+    
+    printf("Mounted ");
+    for (unsigned i = 0; i < volName.bufString.length; i++) {
+        putchar(volName.bufString.text[i]);
+    }
+    printf(" on device ");
+    for (unsigned i = 0; i < devName.bufString.length; i++) {
+        putchar(devName.bufString.text[i]);
+    }
+    printf("\n");
 }

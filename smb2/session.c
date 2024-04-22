@@ -1,5 +1,6 @@
 #include "defs.h"
 
+#include <memory.h>
 #include <tcpip.h>
 #include "smb2/session.h"
 #include "smb2/connection.h"
@@ -15,6 +16,9 @@ void Session_Release(Session *sess) {
         logoffRequest.Reserved = 0;
         SendRequestAndGetResponse(sess, SMB2_LOGOFF, 0, sizeof(logoffRequest));
         // ignore errors from logoff
+
+        if (sess->hmacSigningContext != NULL)
+            DisposeHandle(FindHandle((Pointer)sess->hmacSigningContext));
 
         Connection_Release(sess->connection);
         smb_free(sess);

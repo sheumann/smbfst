@@ -195,29 +195,31 @@ ReadStatus SendRequestAndGetResponse(Session *session, uint16_t command,
     if (SendMessage(session, command, treeId, bodyLength) == false)
         return rsError;
 
-    if (ReadMessage(connection) != rsDone)
-        return rsError;
+    do {
+        if (ReadMessage(connection) != rsDone)
+            return rsError;
+        
+        // Check that the message received is a response to the one sent.
+        if (!(msg.smb2Header.Flags & SMB2_FLAGS_SERVER_TO_REDIR))
+            return rsError;
+        if (msg.smb2Header.MessageId != messageId)
+            return rsError;
+        if (msg.smb2Header.Command != command)
+            return rsError;
+        
+        if (bodySize < (responseStructureSizes[command] & 0xFFFE))
+            continue;
+        if (msgBodyHeader.StructureSize != responseStructureSizes[command])
+            continue;
     
-    // Check that the message received is a response to the one sent.
-    if (!(msg.smb2Header.Flags & SMB2_FLAGS_SERVER_TO_REDIR))
-        return rsError;
-    if (msg.smb2Header.MessageId != messageId)
-        return rsError;
-    if (msg.smb2Header.Command != command)
-        return rsError;
-    
-    if (bodySize < (responseStructureSizes[command] & 0xFFFE))
-        goto error_response;
-    if (msgBodyHeader.StructureSize != responseStructureSizes[command])
-        goto error_response;
+        if (msg.smb2Header.Status == STATUS_SUCCESS) {
+            return rsDone;
+        } else if (msg.smb2Header.Status == STATUS_MORE_PROCESSING_REQUIRED) {
+            return rsMoreProcessingRequired;
+        }
+    } while (msg.smb2Header.Status == STATUS_PENDING &&
+        (msg.smb2Header.Flags & SMB2_FLAGS_ASYNC_COMMAND));
 
-    if (msg.smb2Header.Status == STATUS_SUCCESS) {
-        return rsDone;
-    } else if (msg.smb2Header.Status == STATUS_MORE_PROCESSING_REQUIRED) {
-        return rsMoreProcessingRequired;
-    }
-
-error_response:
     // Check for something that looks like an SMB2 ERROR Response
     if (bodySize >= (SMB2_ERROR_RESPONSE_STRUCTURE_SIZE & 0xFFFE)
         && msgBodyHeader.StructureSize == SMB2_ERROR_RESPONSE_STRUCTURE_SIZE) {

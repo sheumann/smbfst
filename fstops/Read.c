@@ -46,7 +46,11 @@ Word Read(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
             sizeof(SMB2Header) + offsetof(SMB2_READ_Response, Buffer);
         readRequest.Flags = 0;
         readRequest.Length = transferCount;
-        readRequest.Offset = fcr->mark;
+        if (dibs[i].flags & FLAG_PIPE_SHARE) {
+            readRequest.Offset = 0;
+        } else {
+            readRequest.Offset = fcr->mark;
+        }
         readRequest.FileId = fcr->fileID;
         readRequest.MinimumCount = 1;
         readRequest.Channel = 0;

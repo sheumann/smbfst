@@ -44,7 +44,11 @@ Word Write(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
         writeRequest.DataOffset =
             sizeof(SMB2Header) + offsetof(SMB2_WRITE_Request, Buffer);
         writeRequest.Length = transferCount;
-        writeRequest.Offset = fcr->mark;
+        if (dibs[i].flags & FLAG_PIPE_SHARE) {
+            writeRequest.Offset = 0;
+        } else {
+            writeRequest.Offset = fcr->mark;
+        }
         writeRequest.FileId = fcr->fileID;
         writeRequest.Channel = 0;
         writeRequest.RemainingBytes = 0;

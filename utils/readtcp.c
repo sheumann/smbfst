@@ -25,5 +25,10 @@ ReadStatus ReadTCP(Word ipid, uint16_t size, void *buf) {
         buf = (char*)buf + rrBuf.rrBuffCount;
     } while (size != 0 && GetTick() - startTime < READ_TIMEOUT * 60);
 
-    return size == 0 ? rsDone : rsTimedOut;
+    if (size == 0) {
+        return rsDone;
+    } else {
+        TCPIPAbortTCP(ipid);
+        return rsTimedOut;
+    }
 }

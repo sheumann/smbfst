@@ -1,0 +1,3 @@
+[submodule "crypto"]
+	path = crypto
+	url = https://github.com/sheumann/65816-crypto.git

@@ -214,6 +214,15 @@ ReadStatus SendRequestAndGetResponse(Session *session, uint16_t command,
     
         if (msg.smb2Header.Status == STATUS_SUCCESS) {
             return rsDone;
+        } else if ((msg.smb2Header.Status == STATUS_BUFFER_OVERFLOW)
+            && (msg.smb2Header.Command == SMB2_READ)) {
+            /*
+             * STATUS_BUFFER_OVERFLOW may be returned on a named pipe read to
+             * indicate that only part of the message would fit in the buffer.
+             * This is not a failure, and the data that fits is still returned.
+             * See [MS-SMB2] section 3.3.4.4.
+             */
+            return rsDone;
         } else if (msg.smb2Header.Status == STATUS_MORE_PROCESSING_REQUIRED) {
             return rsMoreProcessingRequired;
         }

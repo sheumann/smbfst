@@ -81,6 +81,7 @@ resource rIcon (1) {
 
 #define cdevWindow          1000
 #define helpWindow          2000
+#define loginWindow         3000
 
 #define serverAddressTxt    2
 #define addressLine         3
@@ -119,14 +120,12 @@ resource rControlTemplate (cdevWindow+addressLine) {
     {15, 10, 28, 310},
     editLineControl {{
         0,
-        $7000+RefIsResource,
+        $7000,
         0,
         255,                                /* max size */
-        cdevWindow+addressLine              /* text ref */
+        0                                   /* text ref */
     }};
 };
-
-resource rPString (cdevWindow+addressLine) { "" };
 
 resource rControlTemplate (cdevWindow+connectBtn) {
     connectBtn,
@@ -167,6 +166,8 @@ resource rTextForLETextBox2 (helpWindow+helpTxt) {
     "The SMB Mounter control panel allows you to connect to "
     "file servers using the SMB protocol."
 };
+
+#include "cdev/loginwindow.rez"
 
 /*
  * Error messages

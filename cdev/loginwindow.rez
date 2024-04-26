@@ -1,0 +1,192 @@
+/*
+ * Login window
+ */
+
+#define loginTxt        1
+#define serverNameTxt   2
+#define nameTxt         3
+#define nameLine        4
+#define passwordTxt     5
+#define passwordLine    6
+#define domainTxt       7
+#define domainLine      8
+#define cancelBtn       9
+#define loginBtn        10
+
+resource rWindParam1 (loginWindow) {
+    fAlert+fCtlTie,                     /* wFrameBits */
+    loginWindow,                        /* wTitle */
+    0,                                  /* wRefCon */
+    {0,0,0,0},                          /* ZoomRect */
+    0,                                  /* wColor ID */
+    {0,0},                              /* Origin */
+    {0,0},                              /* data size */
+    {0,0},                              /* max height-width */
+    {0,0},                              /* scroll vertical, horizontal */
+    {0,0},                              /* page vertical, horizontal */
+    0,                                  /* wInfoRefCon */
+    0,                                  /* wInfoHeight */
+    {47, 10, 47+105, 310},              /* wPosition */
+    infront,                            /* wPlane */
+    loginWindow,                        /* wStorage */
+    $0A09                               /* wInVerb */
+};
+
+resource rPString (loginWindow) { "" };
+
+resource rControlList (loginWindow) {
+    {
+        loginWindow+loginBtn,
+        loginWindow+cancelBtn,
+        loginWindow+domainTxt,
+        loginWindow+domainLine,
+        loginWindow+passwordTxt,
+        loginWindow+passwordLine,
+        loginWindow+nameTxt,
+        loginWindow+nameLine,
+        loginWindow+serverNameTxt,
+        loginWindow+loginTxt,
+    };
+};
+
+resource rControlTemplate (loginWindow+loginTxt) {
+    loginTxt,                               /* control ID */
+    {4, 10, 15, 290},                       /* control rect */
+    statTextControl {{
+        fBlastText,                         /* flags */
+        $1000+RefIsResource,                /* moreFlags */
+        0,                                  /* refCon */
+        loginWindow+loginTxt                /* title ref */
+    }};
+};
+
+resource rTextForLETextBox2 (loginWindow+loginTxt) {
+    "Enter your login information for"
+};
+
+resource rControlTemplate (loginWindow+serverNameTxt) {
+    serverNameTxt,                          /* control ID */
+    {15, 10, 26, 290},                      /* control rect */
+    statTextControl {{
+        fSubstituteText,                         /* flags */
+        $1000+RefIsResource,                /* moreFlags */
+        0,                                  /* refCon */
+        loginWindow+serverNameTxt           /* title ref */
+    }};
+};
+
+resource rTextForLETextBox2 (loginWindow+serverNameTxt) {
+    "*0:"
+};
+
+resource rControlTemplate (loginWindow+nameTxt) {
+    nameTxt,                                /* control ID */
+    {30, 10, 41, 80},                       /* control rect */
+    statTextControl {{
+        fBlastText,                         /* flags */
+        $1000+RefIsResource,                /* moreFlags */
+        0,                                  /* refCon */
+        loginWindow+nameTxt                 /* title ref */
+    }};
+};
+
+resource rTextForLETextBox2 (loginWindow+nameTxt) {
+    "Name:"
+};
+
+resource rControlTemplate (loginWindow+nameLine) {
+    nameLine,
+    {29, 80, 42, 290},
+    editLineControl {{
+        0,
+        $7000,
+        0,
+        255,                                /* max size */
+        0                                   /* text ref */
+    }};
+};
+
+resource rControlTemplate (loginWindow+passwordTxt) {
+    passwordTxt,                            /* control ID */
+    {47, 10, 58, 80},                       /* control rect */
+    statTextControl {{
+        fBlastText,                         /* flags */
+        $1000+RefIsResource,                /* moreFlags */
+        0,                                  /* refCon */
+        loginWindow+passwordTxt             /* title ref */
+    }};
+};
+
+resource rTextForLETextBox2 (loginWindow+passwordTxt) {
+    "Password:"
+};
+
+resource rControlTemplate (loginWindow+passwordLine) {
+    passwordLine,
+    {46, 80, 59, 290},
+    editLineControl {{
+        0,
+        $7000,
+        0,
+        255,                                /* max size */
+        0,                                  /* text ref */
+        '\$D7'                              /* password character */
+    }};
+};
+
+resource rControlTemplate (loginWindow+domainTxt) {
+    domainTxt,                              /* control ID */
+    {64, 10, 75, 80},                       /* control rect */
+    statTextControl {{
+        fBlastText,                         /* flags */
+        $1000+RefIsResource,                /* moreFlags */
+        0,                                  /* refCon */
+        loginWindow+domainTxt               /* title ref */
+    }};
+};
+
+resource rTextForLETextBox2 (loginWindow+domainTxt) {
+    "Domain:"
+};
+
+resource rControlTemplate (loginWindow+domainLine) {
+    domainLine,
+    {63, 80, 76, 290},
+    editLineControl {{
+        0,
+        $7000,
+        0,
+        255,                                /* max size */
+        0                                   /* text ref */
+    }};
+};
+
+resource rControlTemplate (loginWindow+cancelBtn) {
+    cancelBtn,
+    {85, 127, 0, 0},
+    SimpleButtonControl {{
+        NormalButton,
+        $3000+RefIsResource,
+        0,
+        cdevWindow+cancelBtn,
+        0,                                  /* color table ref */
+        {"\$1B","\$1B",0,0}                 /* key equivalent = Escape */
+    }};
+};
+
+resource rPString(cdevWindow+cancelBtn) { "Cancel" };
+
+resource rControlTemplate (loginWindow+loginBtn) {
+    loginBtn,
+    {85, 220, 0, 0},
+    SimpleButtonControl {{
+        DefaultButton,
+        $3000+RefIsResource,
+        0,
+        cdevWindow+loginBtn,
+        0,                                  /* color table ref */
+        {"\$0D","\$0D",0,0}                 /* key equivalent = Return */
+    }};
+};
+
+resource rPString(cdevWindow+loginBtn) { "Login" };

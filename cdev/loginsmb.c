@@ -1,31 +1,117 @@
 #include "defs.h"
+#include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
+#include <quickdraw.h>
+#include <window.h>
+#include <resources.h>
+#include <control.h>
+#include <lineedit.h>
+#include <tcpip.h>
 #include <gsos.h>
 #include <orca.h>
+#include "cdev/smbcdev.h"
 #include "cdev/loginsmb.h"
 #include "cdev/charset.h"
 #include "cdev/errorcodes.h"
 #include "fst/fstspecific.h"
 
-SMBAuthenticateRec authenticatePB = {
+#define loginWindow     3000
+
+#define loginTxt        1
+#define serverNameTxt   2
+#define nameTxt         3
+#define nameLine        4
+#define passwordTxt     5
+#define passwordLine    6
+#define domainTxt       7
+#define domainLine      8
+#define cancelBtn       9
+#define loginBtn        10
+
+static SMBAuthenticateRec authenticatePB = {
     .pCount = 11,
     .fileSysID = smbFSID,
     .commandNum = SMB_AUTHENTICATE,
     .flags = 0,
 };
 
-unsigned LoginToSMBServer(char *username, char *password, char *domain,
-    LongWord connectionID, LongWord *sessionID) {
+static GrafPortPtr oldPort;
+static Pointer oldParamPtr;
+static WindowPtr windPtr = NULL;
+static EventRecord eventRec;
+static bool setParamPtr = false;
+
+static char username[257];
+static char password[257];
+static char domain[257];
+
+static bool DoLoginWindow(AddressParts *address) {
+    LongWord controlID;
+
+    if (windPtr == NULL) {
+        oldPort = GetPort();
+        oldParamPtr = GetCtlParamPtr();
+        SetCtlParamPtr((Pointer)&address->host);
+        setParamPtr = true;
+
+        windPtr = NewWindow2(NULL, 0, NULL, NULL, refIsResource, loginWindow,
+            rWindParam1);
+        if (toolerror()) {
+            windPtr = NULL;
+            return false;
+        }
+        SetPort(windPtr);
+
+        SetLETextByID(windPtr, nameLine, (StringPtr)username);
+        SetLETextByID(windPtr, passwordLine, (StringPtr)password);
+        SetLETextByID(windPtr, domainLine, (StringPtr)domain);
+        if (username[0] != 0 && password[0] == 0)
+            MakeThisCtlTarget(GetCtlHandleFromID(windPtr, passwordLine));
+
+        if (GetMasterSCB() & scbColorMode)
+            MoveWindow(10+160, 47, windPtr);
+
+        ShowWindow(windPtr);
+    }
+    
+    do {
+        controlID = DoModalWindow(&eventRec, NULL, NULL, NULL, mwIBeam);
+        TCPIPPoll();
+    } while (controlID != cancelBtn && controlID != loginBtn);
+
+    InitCursor();
+
+    GetLETextByID(windPtr, nameLine, (StringPtr)username);
+    GetLETextByID(windPtr, passwordLine, (StringPtr)password);
+    GetLETextByID(windPtr, domainLine, (StringPtr)domain);
+
+    return (controlID == loginBtn);
+}
+
+static void CloseLoginWindow(void) {
+    if (setParamPtr) {
+        SetCtlParamPtr(oldParamPtr);
+        setParamPtr = false;
+    }
+    if (windPtr) {
+        CloseWindow(windPtr);
+        SetPort(oldPort);
+        windPtr = NULL;
+    }
+}
+
+static unsigned TryLogin(LongWord connectionID, LongWord *sessionID) {
     unsigned result = 0;
 
     UTF16String *user = NULL;
     UTF16String *pass = NULL;
     UTF16String *dom = NULL;
 
-    user = MacRomanToUTF16(username);
-    pass = MacRomanToUTF16(password);
-    dom = MacRomanToUTF16(domain);
-    
+    user = MacRomanToUTF16(username+1);
+    pass = MacRomanToUTF16(password+1);
+    dom = MacRomanToUTF16(domain+1);
+
     if (user == NULL || pass == NULL || dom == NULL) {
         result = oomError;
         goto cleanup;
@@ -42,14 +128,56 @@ unsigned LoginToSMBServer(char *username, char *password, char *domain,
     FSTSpecific(&authenticatePB);
     if (toolerror()) {
         result = authenticateError;
+        DisplayError(authenticateError);
         goto cleanup;
     }
 
     *sessionID = authenticatePB.sessionID;
 
 cleanup:
+    if (pass)
+        memset(pass->text, 0, pass->length);
     free(user);
     free(pass);
     free(dom);
+    return result;
+}
+
+unsigned LoginToSMBServer(AddressParts *address, LongWord connectionID,
+    LongWord *sessionID) {
+    unsigned result = 0;
+
+    if (address->username != NULL) {
+        strncpy(username+1, address->username, sizeof(username)-2);
+        username[0] = strlen(username+1);
+    }
+    if (address->password != NULL) {
+        strncpy(password+1, address->password, sizeof(password)-2);
+        password[0] = strlen(password+1);
+    }
+    if (address->domain != NULL) {
+        strncpy(domain+1, address->domain, sizeof(domain)-2);
+        domain[0] = strlen(domain+1);
+    }
+    
+    if (address->username != NULL && address->password != NULL) {
+        result = TryLogin(connectionID, sessionID);
+        if (result == 0)
+            goto done;
+    }
+    
+    do {
+        if (!DoLoginWindow(address)) {
+            result = canceled;
+            goto done;
+        }
+        result = TryLogin(connectionID, sessionID);
+    } while (result != 0);
+
+done:
+    memset(username, 0, sizeof(username));
+    memset(password, 0, sizeof(password));
+    memset(domain, 0, sizeof(domain));
+    CloseLoginWindow();
     return result;
 }

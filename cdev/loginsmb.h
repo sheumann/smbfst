@@ -2,8 +2,9 @@
 #define LOGINSMB_H
 
 #include <types.h>
+#include "cdev/addressparser.h"
 
-unsigned LoginToSMBServer(char *username, char *password, char *domain,
-        LongWord connectionID, LongWord *sessionID);
+unsigned LoginToSMBServer(AddressParts *address, LongWord connectionID,
+    LongWord *sessionID);
 
 #endif

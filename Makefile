@@ -1,49 +1,15 @@
 CC = occ
 CFLAGS = -O-1 -w-1
 
-HEADERS =  defs.h \
-           auth/auth.h \
-           auth/ntlm.h \
-           auth/ntlmproto.h \
-           crypto/aes.h \
-           crypto/md4.h \
-           crypto/md5.h \
-           crypto/rc4.h \
-           crypto/sha1.h \
-           crypto/sha256.h \
-           driver/driver.h \
-           fst/fstspecific.h \
-           fstops/GetFileInfo.h \
-           gsos/gsosdata.h \
-           gsos/gsosutils.h \
-           helpers/afpinfo.h \
-           helpers/attributes.h \
-           helpers/blocks.h \
-           helpers/createcontext.h \
-           helpers/datetime.h \
-           helpers/errors.h \
-           helpers/filetype.h \
-           helpers/path.h \
-           helpers/position.h \
-           rpc/ndr.h \
-           rpc/rpc.h \
-           rpc/rpcpdu.h \
-           rpc/srvsvc.h \
-           rpc/srvsvcproto.h \
-           smb2/aapl.h \
-           smb2/connection.h \
-           smb2/fileinfo.h \
-           smb2/ntstatus.h \
-           smb2/session.h \
-           smb2/smb2.h \
-           smb2/smb2proto.h \
-           systemops/Startup.h \
-           utils/alloc.h \
-           utils/endian.h \
-           utils/guid.h \
-           utils/macromantable.h \
-           utils/random.h \
-           utils/readtcp.h
+CRYPTO_SRC = \
+           crypto/*.c \
+           crypto/*.cc \
+           crypto/*.h \
+           crypto/*.asm \
+           crypto/*.macros \
+           crypto/Makefile
+
+HEADERS =  *.h */*.h
 
 FST_OBJ =  fst/smbfst.A \
            smb2/connection.a \
@@ -106,15 +72,6 @@ FST_LIBS = crypto/lib65816crypto \
 FEXT_OBJ = finderext/longnames.a \
            finderext/namespatch.A
 
-CDEV_HEADERS = \
-           cdev/addressparser.h \
-           cdev/charset.h \
-           cdev/connectsmb.h \
-           cdev/errorcodes.h \
-           cdev/loginsmb.h \
-           cdev/mountsmbvol.h \
-           cdev/strncasecmp.h
-
 CDEV_OBJ = cdev/smbcdev.a \
            cdev/addressparser.a \
            cdev/strncasecmp.a \
@@ -124,7 +81,9 @@ CDEV_OBJ = cdev/smbcdev.a \
            cdev/charset.a \
            utils/macromantable.a
 
-CDEV_RSRC = cdev/smbcdev.rez
+CDEV_RSRC = \
+           cdev/smbcdev.rez \
+           cdev/loginwindow.rez
 
 CDEV_CODE_BINARY = cdev/SMBMounter.obj
 
@@ -141,7 +100,7 @@ BINARIES = SMB.FST LongNamesPatch SMBMounter mountsmb listshares
 .PHONY: all
 all: $(BINARIES)
 
-%.a: %.c $(HEADERS) $(CDEV_HEADERS)
+%.a: %.c $(HEADERS)
 	$(CC) $(CFLAGS) -c $<
 
 %.A: %.asm
@@ -168,7 +127,7 @@ mountsmb: $(MOUNTSMB_OBJ)
 listshares: $(LISTSHARES_OBJ)
 	$(CC) $^ -o $@
 
-crypto/lib65816crypto crypto/lib65816hash &: crypto/*.* crypto/Makefile
+crypto/lib65816crypto crypto/lib65816hash &: $(CRYPTO_SRC)
 	cd crypto && make lib65816crypto lib65816hash
 	touch crypto/lib65816crypto crypto/lib65816hash
 

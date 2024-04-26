@@ -55,8 +55,22 @@ WindowPtr wPtr = NULL;
 Word modifiers = 0;
 
 void DisplayError(unsigned errorCode) {
+    if (errorCode != canceled) {
         AlertWindow(awResource+awButtonLayout, NULL, errorCode);
+    }
 }
+
+#pragma databank 1
+static void DrawContents(void) {
+    Word origResourceApp = GetCurResourceApp();
+    SetCurResourceApp(MMStartUp());
+
+    PenNormal();                    /* use a "normal" pen */
+    DrawControls(GetPort());        /* draw controls in window */
+
+    SetCurResourceApp(origResourceApp);
+}
+#pragma databank 0
 
 static void ReleaseConnection(LongWord connectionID) {
     static SMBConnectionRec connectionRec = {
@@ -122,8 +136,7 @@ void DoConnect(void)
         goto fixcaret;
     }
     
-    errorCode = LoginToSMBServer(addressParts.username, addressParts.password,
-        addressParts.domain, connectionID, &sessionID);
+    errorCode = LoginToSMBServer(&addressParts, connectionID, &sessionID);
     if (errorCode) {
         ReleaseConnection(connectionID);
         DisplayError(errorCode);

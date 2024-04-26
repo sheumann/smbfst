@@ -8,3 +8,5 @@
 #define oomError                    4005
 #define authenticateError           4006
 #define mountError                  4007
+
+#define canceled                    5000

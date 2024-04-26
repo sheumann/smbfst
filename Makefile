@@ -41,6 +41,7 @@ HEADERS =  defs.h \
            utils/alloc.h \
            utils/endian.h \
            utils/guid.h \
+           utils/macromantable.h \
            utils/random.h \
            utils/readtcp.h
 
@@ -95,6 +96,7 @@ FST_OBJ =  fst/smbfst.A \
            helpers/path.a \
            helpers/position.a \
            utils/alloc.a \
+           utils/macromantable.a \
            utils/random.a \
            utils/readtcp.a
 
@@ -104,6 +106,28 @@ FST_LIBS = crypto/lib65816crypto \
 FEXT_OBJ = finderext/longnames.a \
            finderext/namespatch.A
 
+CDEV_HEADERS = \
+           cdev/addressparser.h \
+           cdev/charset.h \
+           cdev/connectsmb.h \
+           cdev/errorcodes.h \
+           cdev/loginsmb.h \
+           cdev/mountsmbvol.h \
+           cdev/strncasecmp.h
+
+CDEV_OBJ = cdev/smbcdev.a \
+           cdev/addressparser.a \
+           cdev/strncasecmp.a \
+           cdev/connectsmb.a \
+           cdev/loginsmb.a \
+           cdev/mountsmbvol.a \
+           cdev/charset.a \
+           utils/macromantable.a
+
+CDEV_RSRC = cdev/smbcdev.rez
+
+CDEV_CODE_BINARY = cdev/SMBMounter.obj
+
 MOUNTSMB_OBJ = commands/mountsmb.a
 
 LISTSHARES_OBJ = \
@@ -112,12 +136,12 @@ LISTSHARES_OBJ = \
            rpc/ndr.a \
            rpc/srvsvc.a
 
-BINARIES = SMB.FST LongNamesPatch mountsmb listshares
+BINARIES = SMB.FST LongNamesPatch SMBMounter mountsmb listshares
 
 .PHONY: all
 all: $(BINARIES)
 
-%.a: %.c $(HEADERS)
+%.a: %.c $(HEADERS) $(CDEV_HEADERS)
 	$(CC) $(CFLAGS) -c $<
 
 %.A: %.asm
@@ -130,6 +154,13 @@ SMB.FST: $(FST_OBJ) $(FST_LIBS)
 LongNamesPatch: $(FEXT_OBJ)
 	$(CC) $^ -o $@
 	iix chtyp -t 0xBC -a 0x0001 LongNamesPatch
+
+$(CDEV_CODE_BINARY): $(CDEV_OBJ)
+	$(CC) -X $^ -o $@
+
+SMBMounter: $(CDEV_RSRC) $(CDEV_CODE_BINARY)
+	$(CC) -c $< -o $@
+	iix chtyp -tcdv $@
 
 mountsmb: $(MOUNTSMB_OBJ)
 	$(CC) $^ -o $@
@@ -144,4 +175,4 @@ crypto/lib65816crypto crypto/lib65816hash &: crypto/*.* crypto/Makefile
 .PHONY: clean
 clean:
 	cd crypto && make clean
-	rm -f */*.a */*.A */*.root */*.ROOT $(BINARIES)
+	rm -f */*.a */*.A */*.root */*.ROOT $(BINARIES) $(CDEV_CODE_BINARY)

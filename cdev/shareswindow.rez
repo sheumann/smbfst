@@ -1,0 +1,102 @@
+/*
+ * Share list window
+ */
+
+#define selectSharesTxt 1
+#define sharesLst       3
+#define cancelMountBtn  4
+#define mountBtn        5
+
+resource rWindParam1 (sharesWindow) {
+    fAlert+fCtlTie,                     /* wFrameBits */
+    sharesWindow,                       /* wTitle */
+    0,                                  /* wRefCon */
+    {0,0,0,0},                          /* ZoomRect */
+    0,                                  /* wColor ID */
+    {0,0},                              /* Origin */
+    {0,0},                              /* data size */
+    {0,0},                              /* max height-width */
+    {0,0},                              /* scroll vertical, horizontal */
+    {0,0},                              /* page vertical, horizontal */
+    0,                                  /* wInfoRefCon */
+    0,                                  /* wInfoHeight */
+    {22, 10, 22+155, 310},              /* wPosition */
+    infront,                            /* wPlane */
+    sharesWindow,                       /* wStorage */
+    $0A09                               /* wInVerb */
+};
+
+resource rPString (sharesWindow) { "" };
+
+resource rControlList (sharesWindow) {
+    {
+        sharesWindow+mountBtn,
+        sharesWindow+cancelMountBtn,
+        sharesWindow+sharesLst,
+        sharesWindow+selectSharesTxt,
+    };
+};
+
+resource rControlTemplate (sharesWindow+selectSharesTxt) {
+    selectSharesTxt,                        /* control ID */
+    {4, 10, 15, 290},                       /* control rect */
+    statTextControl {{
+        fBlastText,                         /* flags */
+        $1000+RefIsResource,                /* moreFlags */
+        0,                                  /* refCon */
+        sharesWindow+selectSharesTxt        /* title ref */
+    }};
+};
+
+resource rTextForLETextBox2 (sharesWindow+selectSharesTxt) {
+    "Select the shares you want to mount:"
+};
+
+resource rControlTemplate (sharesWindow+sharesLst) {
+    sharesLst,                          /* control ID */
+    {20, 10, 122, 287},                 /* control rect */
+    ListControl {{
+        $0000,                          /* flags */
+        $1400,                          /* more flags */
+        0,                              /* refcon */
+        0,                              /* list size */
+        10,                              /* List View */
+        $0005,                          /* List Type */
+        0,                              /* List Start */
+        10,                             /* ListMemHeight */
+        7,                              /* List Mem Size */
+        0,                              /* List Ref */
+        0                               /* Color Ref */
+    }};
+};
+
+
+resource rControlTemplate (sharesWindow+cancelMountBtn) {
+    cancelMountBtn,
+    {135, 123, 0, 0},
+    SimpleButtonControl {{
+        NormalButton,
+        $3000+RefIsResource,
+        0,
+        sharesWindow+cancelMountBtn,
+        0,                                  /* color table ref */
+        {"\$1B","\$1B",0,0}                 /* key equivalent = Escape */
+    }};
+};
+
+resource rPString(sharesWindow+cancelMountBtn) { "Cancel" };
+
+resource rControlTemplate (sharesWindow+mountBtn) {
+    mountBtn,
+    {135, 216, 0, 0},
+    SimpleButtonControl {{
+        DefaultButton,
+        $3000+RefIsResource,
+        0,
+        sharesWindow+mountBtn,
+        0,                                  /* color table ref */
+        {"\$0D","\$0D",0,0}                 /* key equivalent = Return */
+    }};
+};
+
+resource rPString(sharesWindow+mountBtn) { "Mount" };

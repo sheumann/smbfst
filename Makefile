@@ -79,11 +79,15 @@ CDEV_OBJ = cdev/smbcdev.a \
            cdev/loginsmb.a \
            cdev/mountsmbvol.a \
            cdev/charset.a \
-           utils/macromantable.a
+           utils/macromantable.a \
+           rpc/rpc.a \
+           rpc/ndr.a \
+           rpc/srvsvc.a
 
 CDEV_RSRC = \
            cdev/smbcdev.rez \
-           cdev/loginwindow.rez
+           cdev/loginwindow.rez \
+           cdev/shareswindow.rez
 
 CDEV_CODE_BINARY = cdev/SMBMounter.obj
 

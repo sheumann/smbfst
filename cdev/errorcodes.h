@@ -8,5 +8,7 @@
 #define oomError                    4005
 #define authenticateError           4006
 #define mountError                  4007
+#define shareEnumerationError       4008
+#define noSharesError               4009
 
 #define canceled                    5000

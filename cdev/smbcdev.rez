@@ -82,6 +82,7 @@ resource rIcon (1) {
 #define cdevWindow          1000
 #define helpWindow          2000
 #define loginWindow         3000
+#define sharesWindow        5000
 
 #define serverAddressTxt    2
 #define addressLine         3
@@ -169,6 +170,8 @@ resource rTextForLETextBox2 (helpWindow+helpTxt) {
 
 #include "cdev/loginwindow.rez"
 
+#include "cdev/shareswindow.rez"
+
 /*
  * Error messages
  */
@@ -219,6 +222,19 @@ resource rAlertString (authenticateError) {
 
 resource rAlertString (mountError) {
     "32:"
-    "The specified volume could note be mounted."
+    "One or more of the selected volumes could not be mounted."
     ":^#0\$00"
 };
+
+resource rAlertString (shareEnumerationError) {
+    "32:"
+    "There was an error getting the list of shares on the server."
+    ":^#0\$00"
+};
+
+resource rAlertString (noSharesError) {
+    "32:"
+    "No shares are available to mount the server."
+    ":^#0\$00"
+};
+

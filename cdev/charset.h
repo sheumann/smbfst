@@ -10,5 +10,6 @@ typedef struct {
 } UTF16String;
 
 UTF16String *MacRomanToUTF16(char *str);
+char *UTF16ToMacRoman(uint32_t len, char16_t utfStr[]);
 
 #endif

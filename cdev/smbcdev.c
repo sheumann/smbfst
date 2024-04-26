@@ -144,7 +144,7 @@ void DoConnect(void)
     }
     ReleaseConnection(connectionID);
 
-    errorCode = MountSMBVolumes(addressParts.share, sessionID);
+    errorCode = MountSMBVolumes(&addressParts, sessionID);
     if (errorCode) {
         ReleaseSession(sessionID);
         DisplayError(errorCode);

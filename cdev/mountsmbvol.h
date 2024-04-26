@@ -2,7 +2,8 @@
 #define MOUNTSMBVOL_H
 
 #include <types.h>
+#include "cdev/addressparser.h"
 
-unsigned MountSMBVolumes(char *share, LongWord sessionID);
+unsigned MountSMBVolumes(AddressParts *address, LongWord sessionID);
 
 #endif

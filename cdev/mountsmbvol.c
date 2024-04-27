@@ -38,13 +38,13 @@ typedef struct {
     unsigned index;
 } ListEntry;
 
-GSString255 volNameBuffer;
+GSString32 volNameBuffer;
 
 static SMBMountRec mountPB = {
     .pCount = 7,
     .fileSysID = smbFSID,
     .commandNum = SMB_MOUNT,
-    .volName = &volNameBuffer,
+    .volName = (GSString255*)&volNameBuffer,
 };
 
 ResultBuf32 devName = {32};
@@ -136,8 +136,18 @@ static unsigned MountVolume(char16_t *shareName, uint16_t shareNameSize,
         return oomError;
     }
     
-    volNameBuffer.length = min(strlen(volName), sizeof(volNameBuffer.text));
+    /*
+     * We limit the volume name to 31 characters, truncating longer ones with
+     * an ellipsis.  GS/OS can handle longer volume names, but the Finder can
+     * only handle up to 31 characters and Standard File can handle up to 33,
+     * so volume names longer than that are not really usable in desktop apps.
+     */
+    volNameBuffer.length = min(strlen(volName), 32);
     memcpy(volNameBuffer.text, volName, volNameBuffer.length);
+    if (volNameBuffer.length == 32) {
+        volNameBuffer.length = 31;
+        volNameBuffer.text[30] = '\xC9';  // ... character
+    }
     
     // Construct UNC path for share (\\hostname\sharename)
     nameBuffer[0] = '\\';

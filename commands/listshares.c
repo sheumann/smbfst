@@ -45,10 +45,16 @@ SMBSessionRec sessionReleasePB = {
     .commandNum = SMB_SESSION_RELEASE,
 };
 
+struct {
+    Word length;
+    char text[4];
+} volName = {4, "IPC$"};
+
 SMBMountRec mountPB = {
-    .pCount = 6,
+    .pCount = 7,
     .fileSysID = smbFSID,
     .commandNum = SMB_MOUNT,
+    .volName = (GSString255*)&volName,
 };
 
 DAccessRecGS dControlPB = {

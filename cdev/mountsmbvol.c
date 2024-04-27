@@ -38,10 +38,13 @@ typedef struct {
     unsigned index;
 } ListEntry;
 
+GSString255 volNameBuffer;
+
 static SMBMountRec mountPB = {
-    .pCount = 6,
+    .pCount = 7,
     .fileSysID = smbFSID,
     .commandNum = SMB_MOUNT,
+    .volName = &volNameBuffer,
 };
 
 ResultBuf32 devName = {32};
@@ -112,10 +115,10 @@ static void CloseSharesWindow(void) {
 }
 
 static unsigned MountVolume(char16_t *shareName, uint16_t shareNameSize,
-    AddressParts *address, LongWord sessionID) {
+    char *volName, AddressParts *address, LongWord sessionID) {
     UTF16String *hostName;
     uint32_t nameLen;
-    char16_t *nameBuffer;
+    char16_t *nameBuffer;    
     
     hostName = MacRomanToUTF16(address->host);
     if (hostName == NULL)
@@ -132,6 +135,9 @@ static unsigned MountVolume(char16_t *shareName, uint16_t shareNameSize,
         free(hostName);
         return oomError;
     }
+    
+    volNameBuffer.length = min(strlen(volName), sizeof(volNameBuffer.text));
+    memcpy(volNameBuffer.text, volName, volNameBuffer.length);
     
     // Construct UNC path for share (\\hostname\sharename)
     nameBuffer[0] = '\\';
@@ -233,8 +239,8 @@ static unsigned MountSelectedShares(const ListEntry *list, unsigned listSize,
                 result = mountError;
                 continue;
             }
-            if (MountVolume(shareName->str, (shareName->len-1) * 2, address,
-                sessionID)) {
+            if (MountVolume(shareName->str, (shareName->len-1) * 2, 
+                list[i].memPtr, address, sessionID)) {
                 result = mountError;
             }
         }
@@ -267,14 +273,15 @@ unsigned MountSMBVolumes(AddressParts *address, LongWord sessionID) {
         if (shareName == NULL)
             return oomError;
         
-        result =
-            MountVolume(shareName->text, shareName->length, address, sessionID);
+        result = MountVolume(shareName->text, shareName->length,
+            address->share, address, sessionID);
         
         free(shareName);
         return result;
     } else {
         // Mount IPC$ share
-        result = MountVolume(u"IPC$", 4*sizeof(char16_t), address, sessionID);
+        result = MountVolume(u"IPC$", 4*sizeof(char16_t), "IPC$", address,
+            sessionID);
     
         // Get list of shares on server
         infoHandle = EnumerateShares(mountPB.devNum);

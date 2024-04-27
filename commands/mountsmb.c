@@ -43,14 +43,15 @@ SMBSessionRec sessionReleasePB = {
     .commandNum = SMB_SESSION_RELEASE,
 };
 
-SMBMountRec mountPB = {
-    .pCount = 6,
-    .fileSysID = smbFSID,
-    .commandNum = SMB_MOUNT,
-};
-
 ResultBuf32 devName = {32};
 ResultBuf255 volName = {255};
+
+SMBMountRec mountPB = {
+    .pCount = 7,
+    .fileSysID = smbFSID,
+    .commandNum = SMB_MOUNT,
+    .volName = &volName.bufString
+};
 
 DInfoRec dInfoPB = {
     .pCount = 2,
@@ -139,6 +140,9 @@ int main(int argc, char *argv[]) {
     }
     mountPB.shareName = share;
     mountPB.shareNameSize = i*2;
+    
+    volName.bufString.length = min(strlen(argv[5]), 255);
+    memcpy(volName.bufString.text, argv[5], volName.bufString.length);
 
     FSTSpecific(&authenticatePB);
     if (toolerror()) {

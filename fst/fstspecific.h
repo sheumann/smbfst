@@ -62,6 +62,7 @@ typedef struct SMBMountRec {
     char16_t *shareName;
     char16_t shareNameSize;
     Word devNum; /* out */
+    GSString255 *volName;
 } SMBMountRec;
 
 #endif

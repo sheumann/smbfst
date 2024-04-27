@@ -15,12 +15,6 @@
 #endif
 
 Word SMB_Mount(SMBMountRec *pblock, void *gsosdp, Word pcount) {
-    // TODO use real volume name
-    static struct {
-        Word len;
-        char str[10];
-    } volName = {7, "testvol"};
-
     static ReadStatus result;
     unsigned dibIndex;
     bool oom;
@@ -31,8 +25,9 @@ Word SMB_Mount(SMBMountRec *pblock, void *gsosdp, Word pcount) {
     uint16_t dataLen;
     AAPL_SERVER_QUERY_RESPONSE *aaplResponse;
     static SMB2_FILEID fileID;
+    GSString *volName;
 
-    if (pblock->pCount != 6)
+    if (pblock->pCount != 7)
         return invalidPcount;
 
     for (dibIndex = 0; dibIndex < NDIBS; dibIndex++) {
@@ -54,14 +49,15 @@ Word SMB_Mount(SMBMountRec *pblock, void *gsosdp, Word pcount) {
         return networkError;
     }
 
+    volName = pblock->volName;
     asm {
         stz oom
+        ldx volName
+        ldy volName+2
         phd
         lda gsosdp
         tcd
         lda #sizeof(VCR)
-        ldx #volName
-        ldy #^volName
         jsl ALLOC_VCR
         pld
         stx vcrVP

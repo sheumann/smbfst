@@ -1,9 +1,18 @@
 #include "defs.h"
 
 #include <tcpip.h>
+#include <gsos.h>
+#include <misctool.h>
+#include <time.h>
+#include <orca.h>
+#include "smb2/smb2.h"
 #include "smb2/connection.h"
 #include "utils/alloc.h"
 #include "driver/driver.h"
+#include "helpers/datetime.h"
+
+// Timeout for TCP connection establishment
+#define TIMEOUT 15 /* seconds */
 
 DIB fakeDIB = {0};
 
@@ -17,4 +26,100 @@ void Connection_Release(Connection *conn) {
         TCPIPLogout(conn->ipid);
         smb_free(conn);
     }
+}
+
+Word Connect(Connection *connection) {
+    static ReadStatus result;
+    static Word tcpError;
+    static srBuff status;
+    static Long startTime;
+    static Session dummySession = {0};
+
+    connection->ipid = TCPIPLogin(userid(), connection->serverIP,
+        connection->serverPort, 0, 64);
+    if (toolerror()) {
+        return networkError;
+    }
+
+    tcpError = TCPIPOpenTCP(connection->ipid);
+    if (tcpError || toolerror()) {
+        TCPIPLogout(connection->ipid);
+        return networkError;
+    }
+    
+    startTime = GetTick();
+    do {
+        TCPIPPoll();
+        TCPIPStatusTCP(connection->ipid, &status);
+    } while (
+        status.srState != TCPSESTABLISHED && status.srState != TCPSCLOSED
+        && GetTick() - startTime < TIMEOUT * 60);
+    
+    if (status.srState != TCPSESTABLISHED) {
+        TCPIPAbortTCP(connection->ipid);
+        TCPIPLogout(connection->ipid);
+        return networkError;
+    }
+
+    // assume lowest version until we have negotiated
+    connection->dialect = SMB_202;
+
+    negotiateRequest.SecurityMode = 0;
+    negotiateRequest.Reserved = 0;
+    negotiateRequest.Capabilities = 0;
+    
+    // TODO generate real GUID
+    negotiateRequest.ClientGuid = (smb_u128){0xa248283946289746,0xac65879365873456};
+    
+    negotiateRequest.ClientStartTime = 0;
+
+    negotiateRequest.DialectCount = 4;
+    negotiateRequest.Dialects[0] = SMB_202;
+    negotiateRequest.Dialects[1] = SMB_21;
+    negotiateRequest.Dialects[2] = SMB_30;
+    negotiateRequest.Dialects[3] = SMB_302;
+    
+    dummySession.connection = connection;
+    fakeDIB.session = &dummySession;
+    result = SendRequestAndGetResponse(&fakeDIB, SMB2_NEGOTIATE,
+        sizeof(negotiateRequest) + 4*sizeof(negotiateRequest.Dialects[0]));
+    if (result != rsDone) {
+        TCPIPAbortTCP(connection->ipid);
+        TCPIPLogout(connection->ipid);
+        return networkError;
+    }
+
+    /*
+     * Compute difference between IIGS local time and server UTC time.
+     * 
+     * We add in a second because times get truncated to the second both
+     * when getting the local time here and in some subsequent operations,
+     * so we effectively cannot get sub-second accuracy, and having the
+     * time difference be slightly too large may give better results after
+     * subsequent truncations.
+     */
+    connection->timeDiff =
+        TIME_TO_FILETIME(time(NULL) + 1) - negotiateResponse.SystemTime;
+    
+    connection->wantSigning =
+        negotiateResponse.SecurityMode & SMB2_NEGOTIATE_SIGNING_REQUIRED;
+        
+    if (negotiateResponse.DialectRevision != SMB_202 &&
+        negotiateResponse.DialectRevision != SMB_21 &&
+        negotiateResponse.DialectRevision != SMB_30 &&
+        negotiateResponse.DialectRevision != SMB_302) {
+        // TODO handle 3.x dialects
+        TCPIPAbortTCP(connection->ipid);
+        TCPIPLogout(connection->ipid);
+        return networkError;
+    }
+    connection->dialect = negotiateResponse.DialectRevision;
+    
+    if (negotiateResponse.SecurityMode & SMB2_NEGOTIATE_SIGNING_REQUIRED) {
+        connection->wantSigning = true;
+    }
+    
+    // Security buffer is currently ignored
+    
+    return 0;
 }

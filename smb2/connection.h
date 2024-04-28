@@ -20,11 +20,15 @@ typedef struct {
     Word refCount;
     
     int64_t timeDiff; // difference of IIGS local time from server UTC time
+
+    LongWord serverIP;
+    LongWord serverPort;
 } Connection;
 
 extern DIB fakeDIB;
 
 void Connection_Retain(Connection *conn);
 void Connection_Release(Connection *conn);
+Word Connect(Connection *connection);
 
 #endif

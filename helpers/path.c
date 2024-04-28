@@ -7,6 +7,13 @@
 #include "utils/macromantable.h"
 
 /*
+ * This is the mask for the characters that we use to start Unicode escape
+ * sequences.  Specifically, we map an untranslatable UTF-16 code unit
+ * 0bxxyyyyyyyzzzzzzz to the sequence 0b111111xx 0b1yyyyyyy 0b1zzzzzzz.
+ */
+#define ESCAPE_CHAR_MASK 0xFC
+
+/*
  * Translate a path from the GS/OS direct page (path1 or path2, indicated by
  * num) to SMB format.  It is written to smbpath, with maximum length bufsize.
  * The size of the resulting path (in bytes) is returned; 0xFFFF indicates an
@@ -111,8 +118,18 @@ unsigned GSPathToSMB(GSString *gspath, uint8_t *smbpath, unsigned bufsize) {
             break;
 
         default:
-            if (ch & 0x80)
-                ch = macRomanToUCS2[ch & 0x7f];
+            if (ch & 0x80) {
+                if (ch >= ESCAPE_CHAR_MASK && len >= 2
+                    && (path[0] & 0x80) && (path[1] & 0x80)) {
+                    // Convert a Unicode escape sequence
+                    ch = ((ch & 0x03) << 14) 
+                        | ((path[0] & 0x7f) << 7) | (path[1] & 0x7f);
+                    len -= 2;
+                    path += 2;
+                } else {
+                    ch = macRomanToUCS2[ch & 0x7f];
+                }
+            }
         }
 
         if (out_pos >= bufsize)
@@ -140,6 +157,10 @@ Word SMBNameToGS(char16_t *name, uint16_t length, ResultBuf* buf) {
         return badPathSyntax;
 
     length /= 2;
+
+    // Ensure outputLength won't overflow, accounting for Unicode escapes
+    if (length > UINT16_MAX / 3)
+        return badPathSyntax;
  
     if (buf->bufSize < 4)
         return buffTooSmall;
@@ -185,32 +206,35 @@ Word SMBNameToGS(char16_t *name, uint16_t length, ResultBuf* buf) {
             case 0xF026:
                 ch = '\\';
                 break;
-            case 0xF028:
+            case 0xF027:
                 ch = '|';
                 break;
             }
         } else {
-            //TODO maybe limit to characters in Shaston 8?
-            for (i = 0; i < ARRAY_LENGTH(macRomanToUCS2); i++) {
+            for (i = 0; i < (ESCAPE_CHAR_MASK & 0x7F); i++) {
                 if (macRomanToUCS2[i] == ch) {
-                    ch = i & 0x80;
+                    ch = i | 0x80;
                     break;
                 }
             }
-            if (i == ARRAY_LENGTH(macRomanToUCS2))
+            if (i == (ESCAPE_CHAR_MASK & 0x7F))
                 mapped = false;
         }
         
         if (mapped) {
-            if (outputLength < bufSize) {
+            if (outputLength < bufSize)
                 *outPtr++ = ch;
-            }
             outputLength++;
         } else {
-            // TODO generate escape sequences for arbitrary Unicode chars
-            if (outputLength < bufSize) {
-                *outPtr++ = '?';
-            }
+            // Generate escape sequence for an unmapped UTF-16 code unit
+            if (outputLength < bufSize)
+                *outPtr++ = ESCAPE_CHAR_MASK | (ch >> 14);
+            outputLength++;
+            if (outputLength < bufSize)
+                *outPtr++ = 0x80 | ((ch >> 7) & 0x7f);
+            outputLength++;
+            if (outputLength < bufSize)
+                *outPtr++ = 0x80 | (ch & 0x7f);
             outputLength++;
         }
     }

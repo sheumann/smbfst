@@ -15,6 +15,7 @@ FST_OBJ =  fst/smbfst.A \
            smb2/connection.a \
            smb2/session.a \
            smb2/smb2.a \
+           smb2/treeconnect.a \
            systemops/DeferredFlush.a \
            systemops/Shutdown.a \
            systemops/Startup.a \

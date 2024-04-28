@@ -5,14 +5,12 @@
 #include <gsos.h>
 #include "smb2/smb2.h"
 #include "smb2/aapl.h"
+#include "smb2/treeconnect.h"
 #include "fst/fstspecific.h"
 #include "driver/driver.h"
 #include "gsos/gsosutils.h"
 #include "helpers/createcontext.h"
-
-#ifndef devListFull
-#define devListFull 0x0068
-#endif
+#include "utils/alloc.h"
 
 Word SMB_Mount(SMBMountRec *pblock, void *gsosdp, Word pcount) {
     static ReadStatus result;
@@ -26,6 +24,7 @@ Word SMB_Mount(SMBMountRec *pblock, void *gsosdp, Word pcount) {
     AAPL_SERVER_QUERY_RESPONSE *aaplResponse;
     static SMB2_FILEID fileID;
     GSString *volName;
+    Word errCode;
 
     if (pblock->pCount != 7)
         return invalidPcount;
@@ -37,17 +36,18 @@ Word SMB_Mount(SMBMountRec *pblock, void *gsosdp, Word pcount) {
     if (dibIndex == NDIBS)
         return devListFull;
 
-    treeConnectRequest.Reserved = 0;
-    treeConnectRequest.PathOffset =
-        sizeof(SMB2Header) + offsetof(SMB2_TREE_CONNECT_Request, Buffer);
-    treeConnectRequest.PathLength = pblock->shareNameSize;
-    memcpy(treeConnectRequest.Buffer, pblock->shareName, pblock->shareNameSize);
+    dibs[dibIndex].shareName = smb_malloc(pblock->shareNameSize);
+    if (dibs[dibIndex].shareName == NULL)
+        return outOfMem;
+    memcpy(dibs[dibIndex].shareName, pblock->shareName, pblock->shareNameSize);
+    dibs[dibIndex].shareNameSize = pblock->shareNameSize;
+    dibs[dibIndex].session = session;
+    dibs[dibIndex].treeId = 0;
     
-    fakeDIB.session = session;
-    result = SendRequestAndGetResponse(&fakeDIB, SMB2_TREE_CONNECT,
-        sizeof(treeConnectRequest) + pblock->shareNameSize);
-    if (result != rsDone) {
-        return networkError;
+    errCode = TreeConnect(&dibs[dibIndex]);
+    if (errCode) {
+        smb_free(dibs[dibIndex].shareName);
+        return errCode;
     }
 
     volName = pblock->volName;
@@ -73,6 +73,7 @@ Word SMB_Mount(SMBMountRec *pblock, void *gsosdp, Word pcount) {
          * but we currently don't.  There is a risk that Marinetti may not
          * work right if it cannot allocate memory.
          */
+        smb_free(dibs[dibIndex].shareName);
         return outOfMem;
     }
 
@@ -80,7 +81,6 @@ Word SMB_Mount(SMBMountRec *pblock, void *gsosdp, Word pcount) {
     dibs[dibIndex].switched = true;
     dibs[dibIndex].extendedDIBPtr = &dibs[dibIndex].treeId;
     dibs[dibIndex].vcrVP = vcrVP;
-    dibs[dibIndex].session = session;
     dibs[dibIndex].flags = 0;
 
     DerefVP(vcr, vcrVP);

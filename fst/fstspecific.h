@@ -3,6 +3,7 @@
 
 #include <types.h>
 #include <uchar.h>
+#include <stdint.h>
 
 #define smbFSID 0x400e
 
@@ -60,7 +61,7 @@ typedef struct SMBMountRec {
     Word commandNum;
     LongWord sessionID;
     char16_t *shareName;
-    char16_t shareNameSize;
+    uint16_t shareNameSize;
     Word devNum; /* out */
     GSString255 *volName;
 } SMBMountRec;

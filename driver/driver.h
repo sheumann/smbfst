@@ -33,6 +33,8 @@ struct DIB {
     VirtualPointer vcrVP;
     Session *session;
     Word flags;
+    char16_t *shareName;
+    uint16_t shareNameSize;
 };
 
 /* flags bits */

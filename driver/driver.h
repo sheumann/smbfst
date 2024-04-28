@@ -5,14 +5,14 @@
 #include <types.h>
 #include "gsos/gsosdata.h"
 #include "smb2/session.h"
-#include "smb2/smb2.h"
+#include "driver/dib.h"
 
 #define DEVICE_FILE_SERVER 0x0010
 
 #define NDIBS 16
 
 /* device information block */
-typedef struct DIB {
+struct DIB {
     void *linkPtr;
     void *entryPtr;
     Word characteristics;
@@ -33,7 +33,7 @@ typedef struct DIB {
     VirtualPointer vcrVP;
     Session *session;
     Word flags;
-} DIB;
+};
 
 /* flags bits */
 #define FLAG_AAPL_READDIR 0x0001

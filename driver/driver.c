@@ -5,6 +5,7 @@
 #include <gsos.h>
 #include <intmath.h>
 #include "driver/driver.h"
+#include "smb2/smb2.h"
 
 #define DRIVER_VERSION 0x001E             /* GS/OS driver version format */
 
@@ -234,8 +235,8 @@ static Word DoStatus(struct GSOSDP *dp) {
 void UnmountSMBVolume(DIB *dib) {
     if (dib->extendedDIBPtr != NULL) {
         treeDisconnectRequest.Reserved = 0;
-        SendRequestAndGetResponse(dib->session, SMB2_TREE_DISCONNECT,
-            dib->treeId, sizeof(treeDisconnectRequest));
+        SendRequestAndGetResponse(dib, SMB2_TREE_DISCONNECT,
+            sizeof(treeDisconnectRequest));
         // ignore errors from tree disconnect
 
         Session_Release(dib->session);

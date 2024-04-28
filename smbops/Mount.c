@@ -43,7 +43,8 @@ Word SMB_Mount(SMBMountRec *pblock, void *gsosdp, Word pcount) {
     treeConnectRequest.PathLength = pblock->shareNameSize;
     memcpy(treeConnectRequest.Buffer, pblock->shareName, pblock->shareNameSize);
     
-    result = SendRequestAndGetResponse(session, SMB2_TREE_CONNECT, 0,
+    fakeDIB.session = session;
+    result = SendRequestAndGetResponse(&fakeDIB, SMB2_TREE_CONNECT,
         sizeof(treeConnectRequest) + pblock->shareNameSize);
     if (result != rsDone) {
         return networkError;
@@ -134,8 +135,8 @@ Word SMB_Mount(SMBMountRec *pblock, void *gsosdp, Word pcount) {
         AddCreateContext(SMB2_CREATE_AAPL, &aaplContext,
             sizeof(AAPL_SERVER_QUERY_REQUEST), &msgLen);
     
-        result = SendRequestAndGetResponse(
-            session, SMB2_CREATE, dibs[dibIndex].treeId, msgLen);
+        result = 
+            SendRequestAndGetResponse(&dibs[dibIndex], SMB2_CREATE, msgLen);
         if (result != rsDone) {
             // TODO better error handling
             goto finish;
@@ -169,8 +170,8 @@ close:
         closeRequest.Reserved = 0;
         closeRequest.FileId = fileID;
     
-        result = SendRequestAndGetResponse(session, SMB2_CLOSE,
-            dibs[dibIndex].treeId, sizeof(closeRequest));
+        result = SendRequestAndGetResponse(&dibs[dibIndex], SMB2_CLOSE,
+            sizeof(closeRequest));
         // ignore any errors here
     } else if (treeConnectResponse.ShareType == SMB2_SHARE_TYPE_PIPE) {
         dibs[dibIndex].flags |= FLAG_PIPE_SHARE;

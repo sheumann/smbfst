@@ -9,6 +9,7 @@
 #include "smb2/connection.h"
 #include "smb2/session.h"
 #include "utils/readtcp.h"
+#include "driver/driver.h"
 
 #define msgBodyHeader          (*(SMB2_Common_Header*)msg.body)
 #define negotiateRequest       (*(SMB2_NEGOTIATE_Request*)msg.body)
@@ -65,19 +66,7 @@ extern MsgRec msg;
 
 extern uint16_t bodySize;   // size of last message received
 
-ReadStatus SendRequestAndGetResponse(Session *session, uint16_t command,
-                                     uint32_t treeId, uint16_t bodyLength);
-
-void Negotiate(Connection *connection);
-void SessionSetup(Connection *connection);
-uint32_t TreeConnect(Connection *connection, char16_t share[],
-    uint16_t shareSize);
-SMB2_FILEID SMB_Open(Connection *connection, uint32_t treeId,
-    char16_t file[], uint16_t fileSize);
-uint32_t SMB_Read(Connection *connection, uint32_t treeId, SMB2_FILEID file,
-    uint64_t offset, uint16_t length, void *buf);
-void SMB_Close(Connection *connection, uint32_t treeId, SMB2_FILEID file);
-uint16_t QueryDirectory(Connection *connection, uint32_t treeId,
-    SMB2_FILEID file, uint16_t length, void *buf);
+ReadStatus SendRequestAndGetResponse(DIB *dib, uint16_t command,
+                                     uint16_t bodyLength);
 
 #endif

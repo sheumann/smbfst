@@ -54,7 +54,7 @@ Word ChangePath(void *pblock, void *gsosdp, Word pcount) {
         return invalidAccess;
     }
 
-    result = SendRequestAndGetResponse(dib1->session, SMB2_CREATE, dib1->treeId,
+    result = SendRequestAndGetResponse(dib1, SMB2_CREATE,
         sizeof(createRequest) + createRequest.NameLength);
     if (result != rsDone)
         return ConvertError(result);
@@ -95,8 +95,7 @@ Word ChangePath(void *pblock, void *gsosdp, Word pcount) {
         setInfoRequest.BufferLength = FILE_RENAME_INFORMATION_TYPE_2_MIN_SIZE;
 #undef info
     
-    result = SendRequestAndGetResponse(dib1->session, SMB2_SET_INFO,
-        dib1->treeId,
+    result = SendRequestAndGetResponse(dib1, SMB2_SET_INFO,
         sizeof(setInfoRequest) + setInfoRequest.BufferLength);
     if (result != rsDone)
         retval = ConvertError(result);
@@ -109,8 +108,7 @@ close:
     closeRequest.Reserved = 0;
     closeRequest.FileId = fileID;
 
-    result = SendRequestAndGetResponse(dib1->session, SMB2_CLOSE, dib1->treeId,
-        sizeof(closeRequest));
+    result = SendRequestAndGetResponse(dib1, SMB2_CLOSE, sizeof(closeRequest));
     if (result != rsDone)
         return retval ? retval : networkError;
 

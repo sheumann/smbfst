@@ -86,7 +86,8 @@ Word SMB_Connect(SMBConnectRec *pblock, void *gsosdp, Word pcount) {
     negotiateRequest.Dialects[3] = SMB_302;
     
     dummySession.connection = connection;
-    result = SendRequestAndGetResponse(&dummySession, SMB2_NEGOTIATE, 0,
+    fakeDIB.session = &dummySession;
+    result = SendRequestAndGetResponse(&fakeDIB, SMB2_NEGOTIATE,
         sizeof(negotiateRequest) + 4*sizeof(negotiateRequest.Dialects[0]));
     if (result != rsDone) {
         TCPIPAbortTCP(connection->ipid);

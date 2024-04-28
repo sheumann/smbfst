@@ -14,7 +14,8 @@ void Session_Retain(Session *sess) {
 void Session_Release(Session *sess) {
     if (--sess->refCount == 0) {
         logoffRequest.Reserved = 0;
-        SendRequestAndGetResponse(sess, SMB2_LOGOFF, 0, sizeof(logoffRequest));
+        fakeDIB.session = sess;
+        SendRequestAndGetResponse(&fakeDIB, SMB2_LOGOFF, sizeof(logoffRequest));
         // ignore errors from logoff
 
         if (sess->hmacSigningContext != NULL)

@@ -31,8 +31,8 @@ Word CalcPosition(FCR* fcr, DIB* dib, Word base, uint32_t displacement,
         queryInfoRequest.Flags = 0;
         queryInfoRequest.FileId = fcr->fileID;
         
-        result = SendRequestAndGetResponse(dib->session, SMB2_QUERY_INFO,
-            dib->treeId, sizeof(queryInfoRequest));
+        result = SendRequestAndGetResponse(dib, SMB2_QUERY_INFO,
+            sizeof(queryInfoRequest));
         if (result != rsDone)
             return ConvertError(result);
         

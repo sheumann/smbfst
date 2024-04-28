@@ -79,8 +79,7 @@ top:
         if (createRequest.NameLength == 0xFFFF)
             return badPathSyntax;
     
-        result = SendRequestAndGetResponse(dib->session,
-            SMB2_CREATE, dib->treeId,
+        result = SendRequestAndGetResponse(dib, SMB2_CREATE,
             sizeof(createRequest) + createRequest.NameLength);
         if (result != rsDone)
             return ConvertError(result);
@@ -114,8 +113,8 @@ top:
     queryInfoRequest.Flags = 0;
     queryInfoRequest.FileId = fileID;
 
-    result = SendRequestAndGetResponse(dib->session, SMB2_QUERY_INFO,
-        dib->treeId, sizeof(queryInfoRequest));
+    result = SendRequestAndGetResponse(dib, SMB2_QUERY_INFO,
+        sizeof(queryInfoRequest));
     if (result != rsDone) {
         /*
          * macOS will not let us query FileStreamInformation on a resource
@@ -225,8 +224,8 @@ close:
         closeRequest.Reserved = 0;
         closeRequest.FileId = fileID;
     
-        result = SendRequestAndGetResponse(dib->session, SMB2_CLOSE,
-            dib->treeId, sizeof(closeRequest));
+        result = SendRequestAndGetResponse(dib, SMB2_CLOSE,
+            sizeof(closeRequest));
         if (result != rsDone)
             return retval ? retval : ConvertError(result);
     }

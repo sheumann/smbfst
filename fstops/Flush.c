@@ -48,8 +48,8 @@ Word Flush(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     flushRequest.Reserved2 = 0;
     flushRequest.FileId = fcr->fileID;
     
-    result = SendRequestAndGetResponse(dibs[i].session, SMB2_FLUSH,
-        dibs[i].treeId, sizeof(flushRequest));
+    result = SendRequestAndGetResponse(&dibs[i], SMB2_FLUSH,
+        sizeof(flushRequest));
     if (result != rsDone)
         return ConvertError(result);
     

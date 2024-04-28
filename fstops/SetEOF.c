@@ -64,8 +64,8 @@ Word SetEOF(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
 #define info ((FILE_END_OF_FILE_INFORMATION *)setInfoRequest.Buffer)
     info->EndOfFile = eof;
 
-    result = SendRequestAndGetResponse(dibs[i].session, SMB2_SET_INFO,
-        dibs[i].treeId, sizeof(setInfoRequest) + setInfoRequest.BufferLength);
+    result = SendRequestAndGetResponse(&dibs[i], SMB2_SET_INFO,
+        sizeof(setInfoRequest) + setInfoRequest.BufferLength);
     if (result != rsDone)
         return ConvertError(result);
 

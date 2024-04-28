@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <types.h>
+#include "driver/dib.h"
 
 struct hmac_sha256_context;
 
@@ -20,6 +21,8 @@ typedef struct {
     
     int64_t timeDiff; // difference of IIGS local time from server UTC time
 } Connection;
+
+extern DIB fakeDIB;
 
 void Connection_Retain(Connection *conn);
 void Connection_Release(Connection *conn);

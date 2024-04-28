@@ -116,7 +116,7 @@ Word SetFileInfo(void *pblock, void *gsosdp, Word pcount) {
     if (createRequest.NameLength == 0xFFFF)
         return badPathSyntax;
 
-    result = SendRequestAndGetResponse(dib->session, SMB2_CREATE, dib->treeId,
+    result = SendRequestAndGetResponse(dib, SMB2_CREATE,
         sizeof(createRequest) + createRequest.NameLength);
     if (result != rsDone)
         return ConvertError(result);
@@ -162,8 +162,7 @@ Word SetFileInfo(void *pblock, void *gsosdp, Word pcount) {
             info->Reserved = 0;
 #undef info
         
-            result = SendRequestAndGetResponse(dib->session, SMB2_SET_INFO,
-                dib->treeId,
+            result = SendRequestAndGetResponse(dib, SMB2_SET_INFO,
                 sizeof(setInfoRequest) + sizeof(FILE_BASIC_INFORMATION));
             // ignore errors here
 
@@ -217,8 +216,8 @@ Word SetFileInfo(void *pblock, void *gsosdp, Word pcount) {
                 createRequest.DesiredAccess = FILE_READ_DATA;
             }
 
-            result = SendRequestAndGetResponse(dib->session, SMB2_CREATE,
-                dib->treeId, sizeof(createRequest) + createRequest.NameLength);
+            result = SendRequestAndGetResponse(dib, SMB2_CREATE,
+                sizeof(createRequest) + createRequest.NameLength);
             if (result == rsDone)
                 break;
             /*
@@ -258,8 +257,8 @@ Word SetFileInfo(void *pblock, void *gsosdp, Word pcount) {
             readRequest.ReadChannelInfoOffset = 0;
             readRequest.ReadChannelInfoLength = 0;
         
-            result = SendRequestAndGetResponse(dib->session, SMB2_READ,
-                dib->treeId, sizeof(readRequest));
+            result = SendRequestAndGetResponse(dib, SMB2_READ,
+                sizeof(readRequest));
             if (result != rsDone) {
                 /*
                  * If pcount == 3, we are supposed to set a new filetype with
@@ -366,8 +365,8 @@ set_info:
             
             memcpy(writeRequest.Buffer, &afpInfo, sizeof(AFPInfo));
     
-            result = SendRequestAndGetResponse(dib->session, SMB2_WRITE,
-                dib->treeId, sizeof(writeRequest) + sizeof(AFPInfo));
+            result = SendRequestAndGetResponse(dib, SMB2_WRITE,
+                sizeof(writeRequest) + sizeof(AFPInfo));
             if (result != rsDone)
                 retval = ConvertError(result);
         }
@@ -377,8 +376,8 @@ close_afp_info:
         closeRequest.Reserved = 0;
         closeRequest.FileId = infoFileID;
     
-        result = SendRequestAndGetResponse(dib->session, SMB2_CLOSE,
-            dib->treeId, sizeof(closeRequest));
+        result = SendRequestAndGetResponse(dib, SMB2_CLOSE,
+            sizeof(closeRequest));
         // ignore errors here
     }
 
@@ -416,8 +415,7 @@ finish:
         info->Reserved = 0;
 #undef info
     
-        result = SendRequestAndGetResponse(dib->session, SMB2_SET_INFO,
-            dib->treeId,
+        result = SendRequestAndGetResponse(dib, SMB2_SET_INFO,
             sizeof(setInfoRequest) + sizeof(FILE_BASIC_INFORMATION));
         if (result != rsDone)
             retval = retval ? retval : ConvertError(result);
@@ -430,8 +428,7 @@ finish:
     closeRequest.Reserved = 0;
     closeRequest.FileId = fileID;
 
-    result = SendRequestAndGetResponse(dib->session, SMB2_CLOSE, dib->treeId,
-        sizeof(closeRequest));
+    result = SendRequestAndGetResponse(dib, SMB2_CLOSE, sizeof(closeRequest));
     // ignore errors here
 
     return retval;

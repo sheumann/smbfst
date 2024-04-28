@@ -3,6 +3,9 @@
 #include <tcpip.h>
 #include "smb2/connection.h"
 #include "utils/alloc.h"
+#include "driver/driver.h"
+
+DIB fakeDIB = {0};
 
 void Connection_Retain(Connection *conn) {
     ++conn->refCount;

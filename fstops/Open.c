@@ -130,8 +130,8 @@ retry:
             return invalidAccess;
         }
 
-        result = SendRequestAndGetResponse(dib->session, SMB2_CREATE,
-            dib->treeId, sizeof(createRequest) + createRequest.NameLength);
+        result = SendRequestAndGetResponse(dib, SMB2_CREATE,
+            sizeof(createRequest) + createRequest.NameLength);
         if (result != rsFailed)
             break;
         if (msg.smb2Header.Status == STATUS_OBJECT_NAME_NOT_FOUND)
@@ -173,8 +173,7 @@ open_done:
                 if (createRequest.NameLength == 0xFFFF)
                     return badPathSyntax;
 
-                result = SendRequestAndGetResponse(dib->session, SMB2_CREATE,
-                    dib->treeId,
+                result = SendRequestAndGetResponse(dib, SMB2_CREATE,
                     sizeof(createRequest) + createRequest.NameLength);
                 if (result != rsDone)
                     return ConvertError(result);
@@ -185,8 +184,8 @@ open_done:
                 closeRequest.Reserved = 0;
                 closeRequest.FileId = fileID;
 
-                result = SendRequestAndGetResponse(dib->session, SMB2_CLOSE,
-                    dib->treeId, sizeof(closeRequest));
+                result = SendRequestAndGetResponse(dib, SMB2_CLOSE,
+                    sizeof(closeRequest));
                 // ignore any errors on close
                 
                 forkOp = openOrCreateResourceFork;
@@ -306,8 +305,7 @@ close_on_error2:
     closeRequest.Reserved = 0;
     closeRequest.FileId = fileID;
 
-    result = SendRequestAndGetResponse(dib->session, SMB2_CLOSE,
-        dib->treeId, sizeof(closeRequest));
+    result = SendRequestAndGetResponse(dib, SMB2_CLOSE, sizeof(closeRequest));
     // Ignore error here, since we're already reporting some kind or error
     
     return retval;

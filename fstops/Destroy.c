@@ -45,7 +45,7 @@ Word Destroy(void *pblock, void *gsosdp, Word pcount) {
     if (createRequest.NameLength == 0xFFFF)
         return badPathSyntax;
 
-    result = SendRequestAndGetResponse(dib->session, SMB2_CREATE, dib->treeId,
+    result = SendRequestAndGetResponse(dib, SMB2_CREATE,
         sizeof(createRequest) + createRequest.NameLength);
     if (result != rsDone)
         return ConvertError(result);
@@ -67,7 +67,7 @@ Word Destroy(void *pblock, void *gsosdp, Word pcount) {
     info->DeletePending = 1;
 #undef info
 
-    result = SendRequestAndGetResponse(dib->session, SMB2_SET_INFO, dib->treeId,
+    result = SendRequestAndGetResponse(dib, SMB2_SET_INFO,
         sizeof(setInfoRequest) + sizeof(FILE_DISPOSITION_INFORMATION));
     if (result != rsDone)
         retval = ConvertError(result);
@@ -79,8 +79,7 @@ Word Destroy(void *pblock, void *gsosdp, Word pcount) {
     closeRequest.Reserved = 0;
     closeRequest.FileId = fileID;
 
-    result = SendRequestAndGetResponse(dib->session, SMB2_CLOSE, dib->treeId,
-        sizeof(closeRequest));
+    result = SendRequestAndGetResponse(dib, SMB2_CLOSE, sizeof(closeRequest));
     if (result != rsDone)
         return retval ? retval : ConvertError(result);
 

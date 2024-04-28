@@ -176,8 +176,7 @@ Word Create(void *pblock, void *gsosdp, Word pcount) {
             }
         }
     
-        result = SendRequestAndGetResponse(dib->session, SMB2_CREATE,
-            dib->treeId, msgLen);
+        result = SendRequestAndGetResponse(dib, SMB2_CREATE, msgLen);
         if (result != rsDone) {
             retval = ConvertError(result);
             if (retval == fileNotFound)
@@ -241,8 +240,7 @@ Word Create(void *pblock, void *gsosdp, Word pcount) {
             // ignore errors (allocation size isn't very important)
         }
 
-        result = SendRequestAndGetResponse(dib->session, SMB2_CREATE,
-            dib->treeId, msgLen);
+        result = SendRequestAndGetResponse(dib, SMB2_CREATE, msgLen);
         if (result != rsDone) {
             if (storageType == extendExistingFile
                 && result == rsFailed
@@ -258,8 +256,8 @@ Word Create(void *pblock, void *gsosdp, Word pcount) {
         closeRequest.Reserved = 0;
         closeRequest.FileId = createResponse.FileId;
     
-        result = SendRequestAndGetResponse(dib->session, SMB2_CLOSE,
-            dib->treeId, sizeof(closeRequest));
+        result = SendRequestAndGetResponse(dib, SMB2_CLOSE,
+            sizeof(closeRequest));
         if (result != rsDone) {
             retval = ConvertError(result);
             goto close_on_error;
@@ -304,8 +302,8 @@ Word Create(void *pblock, void *gsosdp, Word pcount) {
             afpInfoSuffix, sizeof(afpInfoSuffix));
         createRequest.NameLength += sizeof(afpInfoSuffix);
 
-        result = SendRequestAndGetResponse(dib->session, SMB2_CREATE,
-            dib->treeId, sizeof(createRequest) + createRequest.NameLength);
+        result = SendRequestAndGetResponse(dib, SMB2_CREATE,
+            sizeof(createRequest) + createRequest.NameLength);
         if (result != rsDone) {
             /*
              * If we get STATUS_OBJECT_NAME_INVALID for the AFP info (after
@@ -353,8 +351,8 @@ Word Create(void *pblock, void *gsosdp, Word pcount) {
                 FileTypeToTypeCreator(fileType, NULL);
 #undef afpInfo
 
-        result = SendRequestAndGetResponse(dib->session, SMB2_WRITE,
-            dib->treeId, sizeof(writeRequest) + sizeof(AFPInfo));
+        result = SendRequestAndGetResponse(dib, SMB2_WRITE,
+            sizeof(writeRequest) + sizeof(AFPInfo));
         if (result != rsDone)
             retval = ConvertError(result);
 
@@ -362,8 +360,8 @@ Word Create(void *pblock, void *gsosdp, Word pcount) {
         closeRequest.Reserved = 0;
         closeRequest.FileId = infoFileID;
     
-        result = SendRequestAndGetResponse(dib->session, SMB2_CLOSE,
-            dib->treeId, sizeof(closeRequest));
+        result = SendRequestAndGetResponse(dib, SMB2_CLOSE,
+            sizeof(closeRequest));
         if (result != rsDone)
             retval = retval ? retval : ConvertError(result);
         
@@ -392,8 +390,7 @@ set_attributes:
             info->Reserved = 0;
 #undef info
         
-            result = SendRequestAndGetResponse(
-                dib->session, SMB2_SET_INFO, dib->treeId, 
+            result = SendRequestAndGetResponse(dib, SMB2_SET_INFO, 
                 sizeof(setInfoRequest) + sizeof(FILE_BASIC_INFORMATION));
             if (result != rsDone) {
                 retval = ConvertError(result);
@@ -420,7 +417,7 @@ close_on_error:
             info->DeletePending = 1;
 #undef info
         
-            SendRequestAndGetResponse(dib->session, SMB2_SET_INFO, dib->treeId,
+            SendRequestAndGetResponse(dib, SMB2_SET_INFO,
                 sizeof(setInfoRequest) + sizeof(FILE_DISPOSITION_INFORMATION));
             // Ignore errors here (we already have an error to report)
         }
@@ -429,8 +426,7 @@ close_on_error:
         closeRequest.Reserved = 0;
         closeRequest.FileId = fileID;
     
-        SendRequestAndGetResponse(dib->session, SMB2_CLOSE,
-            dib->treeId, sizeof(closeRequest));
+        SendRequestAndGetResponse(dib, SMB2_CLOSE, sizeof(closeRequest));
         // Ignore errors here (file is already created, or already have error)
     }
 

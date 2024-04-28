@@ -118,8 +118,7 @@ Word GetDirEntry(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
              */
             ((char16_t*)queryDirectoryRequest.Buffer)[0] = '*';
 
-            result = SendRequestAndGetResponse(dibs[i].session,
-                SMB2_QUERY_DIRECTORY, dibs[i].treeId,
+            result = SendRequestAndGetResponse(&dibs[i], SMB2_QUERY_DIRECTORY,
                 sizeof(queryDirectoryRequest)
                 + queryDirectoryRequest.FileNameLength);
             if (result == rsFailed
@@ -228,8 +227,7 @@ Word GetDirEntry(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
          */
         ((char16_t*)queryDirectoryRequest.Buffer)[0] = '*';
     
-        result = SendRequestAndGetResponse(dibs[i].session, 
-            SMB2_QUERY_DIRECTORY, dibs[i].treeId,
+        result = SendRequestAndGetResponse(&dibs[i], SMB2_QUERY_DIRECTORY,
             sizeof(queryDirectoryRequest)
             + queryDirectoryRequest.FileNameLength);
         if (result != rsDone)
@@ -386,8 +384,7 @@ Word GetDirEntry(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
         
             createRequest.NameLength = namePtr - createRequest.Buffer;
             
-            result = SendRequestAndGetResponse(dibs[i].session, SMB2_CREATE,
-                dibs[i].treeId,
+            result = SendRequestAndGetResponse(&dibs[i], SMB2_CREATE,
                 sizeof(createRequest) + createRequest.NameLength);
             if (result == rsFailed) {
                 /*
@@ -432,8 +429,8 @@ Word GetDirEntry(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
                 readRequest.ReadChannelInfoOffset = 0;
                 readRequest.ReadChannelInfoLength = 0;
             
-                result = SendRequestAndGetResponse(dibs[i].session, SMB2_READ,
-                    dibs[i].treeId, sizeof(readRequest));
+                result = SendRequestAndGetResponse(&dibs[i], SMB2_READ,
+                    sizeof(readRequest));
                 if (result == rsFailed) {
                     // just ignore too-short AFP Info or other errors
                     goto get_stream_info;
@@ -479,8 +476,8 @@ get_stream_info:
             queryInfoRequest.Flags = 0;
             queryInfoRequest.FileId = fileID;
         
-            result = SendRequestAndGetResponse(dibs[i].session, SMB2_QUERY_INFO,
-                dibs[i].treeId, sizeof(queryInfoRequest));
+            result = SendRequestAndGetResponse(&dibs[i], SMB2_QUERY_INFO,
+                sizeof(queryInfoRequest));
             if (result == rsFailed) {
                 /*
                  * Do not report errors about getting the resource fork size.
@@ -552,8 +549,8 @@ close_stream:
             closeRequest.Reserved = 0;
             closeRequest.FileId = fileID;
         
-            result = SendRequestAndGetResponse(dibs[i].session, SMB2_CLOSE,
-                dibs[i].treeId, sizeof(closeRequest));
+            result = SendRequestAndGetResponse(&dibs[i], SMB2_CLOSE,
+                sizeof(closeRequest));
             if (result == rsFailed) {
                 // ignore errors
             } else if (result != rsDone) {

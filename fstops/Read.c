@@ -58,8 +58,8 @@ Word Read(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
         readRequest.ReadChannelInfoOffset = 0;
         readRequest.ReadChannelInfoLength = 0;
 
-        result = SendRequestAndGetResponse(dibs[i].session, SMB2_READ,
-            dibs[i].treeId, sizeof(readRequest));
+        result = SendRequestAndGetResponse(&dibs[i], SMB2_READ,
+            sizeof(readRequest));
         if (result != rsDone)
             break;
         

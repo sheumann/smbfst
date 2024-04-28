@@ -57,8 +57,8 @@ Word Write(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
         writeRequest.Flags = 0;
         memcpy(writeRequest.Buffer, buf, writeRequest.Length);
 
-        result = SendRequestAndGetResponse(dibs[i].session, SMB2_WRITE,
-            dibs[i].treeId, sizeof(writeRequest) + transferCount);
+        result = SendRequestAndGetResponse(&dibs[i], SMB2_WRITE,
+            sizeof(writeRequest) + transferCount);
         if (result != rsDone)
             break;
         

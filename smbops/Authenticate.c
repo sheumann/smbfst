@@ -53,7 +53,8 @@ Word SMB_Authenticate(SMBAuthenticateRec *pblock, void *gsosdp, Word pcount) {
         sessionSetupRequest.SecurityBufferLength = authSize;
         sessionSetupRequest.PreviousSessionId = 0;
 
-        result = SendRequestAndGetResponse(session, SMB2_SESSION_SETUP, 0,
+        fakeDIB.session = session;
+        result = SendRequestAndGetResponse(&fakeDIB, SMB2_SESSION_SETUP,
             sizeof(sessionSetupRequest) + authSize);
         
         if (result == rsDone) {

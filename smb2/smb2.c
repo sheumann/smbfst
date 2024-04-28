@@ -181,8 +181,9 @@ bool SendMessage(Session *session, uint16_t command, uint32_t treeId,
     return !(tcperr || toolerror());
 }
 
-ReadStatus SendRequestAndGetResponse(Session *session, uint16_t command,
-                                     uint32_t treeId, uint16_t bodyLength) {
+ReadStatus SendRequestAndGetResponse(DIB *dib, uint16_t command,
+                                     uint16_t bodyLength) {
+    Session *session = dib->session;
     Connection *connection = session->connection;
     uint64_t messageId = connection->nextMessageId;
     
@@ -192,7 +193,7 @@ ReadStatus SendRequestAndGetResponse(Session *session, uint16_t command,
     if (bodyLength < msgBodyHeader.StructureSize)
         msg.body[bodyLength++] = 0;
     
-    if (SendMessage(session, command, treeId, bodyLength) == false)
+    if (SendMessage(session, command, dib->treeId, bodyLength) == false)
         return rsError;
 
     do {

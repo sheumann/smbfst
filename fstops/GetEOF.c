@@ -35,8 +35,8 @@ Word GetEOF(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     queryInfoRequest.Flags = 0;
     queryInfoRequest.FileId = fcr->fileID;
     
-    result = SendRequestAndGetResponse(dibs[i].session, SMB2_QUERY_INFO,
-        dibs[i].treeId, sizeof(queryInfoRequest));
+    result = SendRequestAndGetResponse(&dibs[i], SMB2_QUERY_INFO,
+        sizeof(queryInfoRequest));
     if (result != rsDone)
         return ConvertError(result);
     

@@ -55,7 +55,7 @@ Word GetAFPInfo(DIB *dib, struct GSOSDP *gsosdp) {
         afpInfoSuffix, sizeof(afpInfoSuffix));
     createRequest.NameLength += sizeof(afpInfoSuffix);
     
-    result = SendRequestAndGetResponse(dib->session, SMB2_CREATE, dib->treeId,
+    result = SendRequestAndGetResponse(dib, SMB2_CREATE,
         sizeof(createRequest) + createRequest.NameLength);
     if (result != rsDone) {
         // TODO maybe give no error for "no Finder Info found"
@@ -79,8 +79,7 @@ Word GetAFPInfo(DIB *dib, struct GSOSDP *gsosdp) {
     readRequest.ReadChannelInfoOffset = 0;
     readRequest.ReadChannelInfoLength = 0;
 
-    result = SendRequestAndGetResponse(dib->session, SMB2_READ,
-        dib->treeId, sizeof(readRequest));
+    result = SendRequestAndGetResponse(dib, SMB2_READ, sizeof(readRequest));
     if (result != rsDone) {
         retval = ConvertError(result);
         goto close;
@@ -112,8 +111,7 @@ close:
     closeRequest.Reserved = 0;
     closeRequest.FileId = fileID;
 
-    result = SendRequestAndGetResponse(dib->session, SMB2_CLOSE, dib->treeId,
-        sizeof(closeRequest));
+    result = SendRequestAndGetResponse(dib, SMB2_CLOSE, sizeof(closeRequest));
     if (result != rsDone) {
         // TODO give appropriate error code
         return retval ? retval : ConvertError(result);

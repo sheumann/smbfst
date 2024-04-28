@@ -29,8 +29,8 @@ Word Close(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     closeRequest.Reserved = 0;
     closeRequest.FileId = fcr->fileID;
 
-    result = SendRequestAndGetResponse(dibs[i].session, SMB2_CLOSE,
-        dibs[i].treeId, sizeof(closeRequest));
+    result = SendRequestAndGetResponse(&dibs[i], SMB2_CLOSE,
+        sizeof(closeRequest));
     if (result != rsDone)
         return networkError;
     

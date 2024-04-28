@@ -27,5 +27,6 @@ typedef struct {
 
 void Session_Retain(Session *sess);
 void Session_Release(Session *sess);
+Word SessionSetup(Session *session);
 
 #endif

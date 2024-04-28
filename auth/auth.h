@@ -8,6 +8,14 @@
 #define MAX_MECHLIST_SIZE 100
 
 typedef struct {
+    char16_t *userName;
+    Word userNameSize;
+    char16_t *userDomain;
+    Word userDomainSize;
+    unsigned char ntlmv2Hash[16];
+} AuthInfo;
+
+typedef struct {
     unsigned step;
     unsigned char *negotiateMessage;
     unsigned char *challengeMessage;
@@ -18,10 +26,10 @@ typedef struct {
     
     uint8_t signKey[16];
     
-    SMBAuthenticateRec *authRec;
+    AuthInfo *authInfo;
 } AuthState;
 
-void InitAuth(AuthState *state, SMBAuthenticateRec *authRec);
+void InitAuth(AuthState *state, AuthInfo *authInfo);
 
 size_t DoAuthStep(AuthState *state, const unsigned char *previousMsg,
                   uint16_t previousSize, unsigned char *msgBuf);

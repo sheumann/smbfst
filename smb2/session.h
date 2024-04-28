@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <types.h>
 #include "smb2/connection.h"
+#include "auth/auth.h"
 
 struct hmac_sha256_context;
 
@@ -20,6 +21,8 @@ typedef struct {
     };
     
     Word refCount;
+    
+    AuthInfo authInfo;
 } Session;
 
 void Session_Retain(Session *sess);

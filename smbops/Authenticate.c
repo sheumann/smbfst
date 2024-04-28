@@ -9,6 +9,7 @@
 #include "fst/fstspecific.h"
 #include "smb2/smb2.h"
 #include "auth/auth.h"
+#include "auth/ntlm.h"
 #include "utils/alloc.h"
 #include "smb2/connection.h"
 #include "crypto/sha256.h"
@@ -31,7 +32,32 @@ Word SMB_Authenticate(SMBAuthenticateRec *pblock, void *gsosdp, Word pcount) {
     memset(session, 0, sizeof(Session));
     session->connection = connection;
 
-    InitAuth(&authState, pblock);
+    // Set up auth info for session, including NTLMv2 hash
+    if (!GetNTLMv2Hash(pblock->passwordSize, pblock->password,
+        pblock->userNameSize, pblock->userName,
+        pblock->userDomainSize, pblock->userDomain,
+        session->authInfo.ntlmv2Hash))
+        goto oom;
+
+    session->authInfo.userNameSize = pblock->userNameSize;
+    if (pblock->userNameSize != 0) {
+        session->authInfo.userName = smb_malloc(pblock->userNameSize);
+        if (session->authInfo.userName == NULL)
+            goto oom;
+        memcpy(session->authInfo.userName, pblock->userName,
+            pblock->userNameSize);
+    }
+    
+    session->authInfo.userDomainSize = pblock->userDomainSize;
+    if (pblock->userDomainSize != 0) {
+        session->authInfo.userDomain = smb_malloc(pblock->userDomainSize);
+        if (session->authInfo.userDomain == NULL)
+            goto oom;
+        memcpy(session->authInfo.userDomain, pblock->userDomain,
+            pblock->userDomainSize);
+    }
+
+    InitAuth(&authState, &session->authInfo);
     previousAuthMsg = NULL;
     previousAuthSize = 0;
 
@@ -67,8 +93,7 @@ Word SMB_Authenticate(SMBAuthenticateRec *pblock, void *gsosdp, Word pcount) {
                         sizeof(struct hmac_sha256_context), userid(), 0x8015, 0);
                     if (toolerror()) {
                         // TODO clean up on errors?
-                        smb_free(session);
-                        return outOfMem;
+                        goto oom;
                     }
                 
                     session->signingRequired = true;
@@ -82,8 +107,7 @@ Word SMB_Authenticate(SMBAuthenticateRec *pblock, void *gsosdp, Word pcount) {
                         sizeof(struct aes_cmac_context), userid(), 0x8015, 0);
                     if (toolerror()) {
                         // TODO clean up on errors?
-                        smb_free(session);
-                        return outOfMem;
+                        goto oom;
                     }
                 
                     session->signingRequired = true;
@@ -128,4 +152,10 @@ Word SMB_Authenticate(SMBAuthenticateRec *pblock, void *gsosdp, Word pcount) {
             sessionSetupResponse.SecurityBufferOffset;
         previousAuthSize = sessionSetupResponse.SecurityBufferLength;
     };
+
+oom:
+    smb_free(session->authInfo.userName);
+    smb_free(session->authInfo.userDomain);
+    smb_free(session);
+    return outOfMem;
 }

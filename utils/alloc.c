@@ -1,4 +1,5 @@
 #include "defs.h"
+#include <stddef.h>
 #include <memory.h>
 #include <orca.h>
 #include "utils/alloc.h"
@@ -31,5 +32,8 @@ void *smb_malloc(size_t size) {
 
 
 void smb_free(void *ptr) {
+    if (ptr == NULL)
+        return;
+
     DisposeHandle(FindHandle(ptr));
 }

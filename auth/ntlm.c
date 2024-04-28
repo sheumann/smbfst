@@ -69,6 +69,33 @@ void NTOWFv2(uint16_t passwordSize, char16_t password[],
     memcpy(result, c.hmac_md5_context.u[0].ctx.hash, 16);
 }
 
+bool GetNTLMv2Hash(uint16_t passwordSize, char16_t password[],
+                   uint16_t userNameSize, char16_t userName[],
+                   uint16_t userDomainSize, char16_t userDomain[],
+                   unsigned  char result[16]) {
+    char16_t *userNameUpperCase;
+    unsigned i;
+
+    userNameUpperCase = smb_malloc(userNameSize);
+    if (!userNameUpperCase)
+        return false;
+
+    for (i = 0; i < userNameSize; i++) {
+        // TODO properly uppercase non-ASCII characters
+        userNameUpperCase[i] = toupper(userName[i]);
+    }
+
+    /* Compute NT one-way function v2 */
+    NTOWFv2(passwordSize, password,
+        userNameSize, userNameUpperCase,
+        userDomainSize, userDomain,
+        result);
+
+    smb_free(userNameUpperCase);
+
+    return true;
+}
+
 void NTLM_GetNegotiateMessage(NTLM_Context *ctx, unsigned char *buf) {
 
     memcpy(buf, &negotiateMessage, sizeof(negotiateMessage));
@@ -136,8 +163,7 @@ static void GetSealKey(const uint8_t exportedSessionKey[16],
     memcpy(sealKey, c.md5_context.hash, 16);
 }
 
-unsigned char *NTLM_HandleChallenge(NTLM_Context *ctx,
-    SMBAuthenticateRec *authRec,
+unsigned char *NTLM_HandleChallenge(NTLM_Context *ctx, AuthInfo *authInfo,
     const NTLM_CHALLENGE_MESSAGE *challengeMsg, uint16_t challengeSize,
     size_t *resultSize, uint8_t sessionKey[16]) {
 
@@ -150,8 +176,6 @@ unsigned char *NTLM_HandleChallenge(NTLM_Context *ctx,
     static unsigned char sessionBaseKey[16];
     static unsigned char encryptedRandomSessionKey[16];
     unsigned char *payloadPtr;
-    char16_t *userNameUpperCase;
-    unsigned i;
     unsigned char *randPtr;
     
     // Nonce used for session key generation
@@ -168,27 +192,12 @@ unsigned char *NTLM_HandleChallenge(NTLM_Context *ctx,
         return 0;
     // TODO verify flags
 
-    userNameUpperCase = smb_malloc(authRec->userNameSize);
-    if (!userNameUpperCase)
-        return 0;
-
-    for (i = 0; i < authRec->userNameSize; i++) {
-        // TODO properly uppercase non-ASCII characters
-        userNameUpperCase[i] = toupper(authRec->userName[i]);
-    }
-
     /* Generate random values for use in NTLM */
     randPtr = GetRandom();
     memcpy(exportedSessionKey, randPtr, 16);
     clientChallenge = *(uint64_t*)(randPtr + 20);
 
-    /* Compute NT one-way function v2 */
-    NTOWFv2(authRec->passwordSize, authRec->password,
-        authRec->userNameSize, userNameUpperCase,
-        authRec->userDomainSize, authRec->userDomain,
-        responseKeyNT);
-
-    smb_free(userNameUpperCase);
+    memcpy(responseKeyNT, authInfo->ntlmv2Hash, 16);
 
     // TODO special case for anonymous logins
 
@@ -276,18 +285,18 @@ unsigned char *NTLM_HandleChallenge(NTLM_Context *ctx,
     payloadPtr += tempBufSize;
 
     authMsg.DomainNameFields.Len =
-        authMsg.DomainNameFields.MaxLen = authRec->userDomainSize;
+        authMsg.DomainNameFields.MaxLen = authInfo->userDomainSize;
     authMsg.DomainNameFields.BufferOffset =
         payloadPtr - (unsigned char*)&authMsg;
-    memcpy(payloadPtr, authRec->userDomain, authRec->userDomainSize);
-    payloadPtr += authRec->userDomainSize;
+    memcpy(payloadPtr, authInfo->userDomain, authInfo->userDomainSize);
+    payloadPtr += authInfo->userDomainSize;
     
     authMsg.UserNameFields.Len =
-        authMsg.UserNameFields.MaxLen = authRec->userNameSize;
+        authMsg.UserNameFields.MaxLen = authInfo->userNameSize;
     authMsg.UserNameFields.BufferOffset =
         payloadPtr - (unsigned char*)&authMsg;
-    memcpy(payloadPtr, authRec->userName, authRec->userNameSize);
-    payloadPtr += authRec->userNameSize;
+    memcpy(payloadPtr, authInfo->userName, authInfo->userNameSize);
+    payloadPtr += authInfo->userNameSize;
     
     // workstation name = "IIGS"
     // TODO generate a more unique one, or allow it to be configured

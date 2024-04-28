@@ -25,9 +25,9 @@ enum {
 
 
 
-void InitAuth(AuthState *state, SMBAuthenticateRec *authRec) {
+void InitAuth(AuthState *state, AuthInfo *authInfo) {
     memset(state, 0, sizeof(*state));
-    state->authRec = authRec;
+    state->authInfo = authInfo;
 }
 
 /*
@@ -186,7 +186,7 @@ size_t DoAuthStep(AuthState *state, const unsigned char *previousMsg,
             return (size_t)-1; //invalid size
 
         /* Get NTLM AUTHENTICATE_MESSAGE */
-        authMsgPtr = NTLM_HandleChallenge(&ntlmContext, state->authRec,
+        authMsgPtr = NTLM_HandleChallenge(&ntlmContext, state->authInfo,
             (NTLM_CHALLENGE_MESSAGE *)prevMsgPtr, itemSize, &itemSize,
             state->signKey);
         if (authMsgPtr == NULL)

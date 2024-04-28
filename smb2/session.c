@@ -22,6 +22,9 @@ void Session_Release(Session *sess) {
             DisposeHandle(FindHandle((Pointer)sess->hmacSigningContext));
 
         Connection_Release(sess->connection);
+        
+        smb_free(sess->authInfo.userName);
+        smb_free(sess->authInfo.userDomain);
         smb_free(sess);
     }
 }

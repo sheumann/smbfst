@@ -96,7 +96,7 @@ ReadStatus ReadMessage(Connection *connection) {
     ReadStatus result;
     uint32_t msgSize;
     
-    result = ReadTCP(connection->ipid, 4, &msg.directTCPHeader);
+    result = ReadTCP(connection, 4, &msg.directTCPHeader);
     if (result != rsDone)
         return result;
     
@@ -105,7 +105,7 @@ ReadStatus ReadMessage(Connection *connection) {
         return rsBadMsg;
     }
     
-    result = ReadTCP(connection->ipid, msgSize, &msg.smb2Header);
+    result = ReadTCP(connection, msgSize, &msg.smb2Header);
     if (result != rsDone)
         return rsBadMsg;
 

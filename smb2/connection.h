@@ -25,6 +25,7 @@ typedef struct {
     LongWord serverPort;
     
     LongWord reconnectTime;
+    LongWord lastActivityTime;
 } Connection;
 
 extern DIB fakeDIB;

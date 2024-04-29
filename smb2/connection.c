@@ -62,6 +62,8 @@ Word Connect(Connection *connection) {
         return networkError;
     }
 
+    connection->lastActivityTime = GetTick();
+
     // assume lowest version until we have negotiated
     connection->dialect = SMB_202;
 

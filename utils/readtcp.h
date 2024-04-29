@@ -13,6 +13,6 @@ typedef enum {
     rsBadMsg,   // msg was at least partially read, but is invalid
 } ReadStatus;
 
-ReadStatus ReadTCP(Word ipid, uint16_t size, void *buf);
+ReadStatus ReadTCP(Connection *connection, uint16_t size, void *buf);
 
 #endif

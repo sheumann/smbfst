@@ -5,6 +5,7 @@
 #include <list.h>
 #include <memory.h>
 #include <quickdraw.h>
+#include <qdaux.h>
 #include <window.h>
 #include <resources.h>
 #include <control.h>
@@ -96,12 +97,12 @@ static bool DoSharesWindow(ListEntry *list, unsigned listSize) {
         ShowWindow(windPtr);
     }
     
+    InitCursor();
+    
     do {
-        controlID = DoModalWindow(&eventRec, NULL, NULL, NULL, mwIBeam);
+        controlID = DoModalWindow(&eventRec, NULL, NULL, NULL, 0);
         TCPIPPoll();
     } while (controlID != cancelMountBtn && controlID != mountBtn);
-
-    InitCursor();
 
     return (controlID == mountBtn);
 }
@@ -314,6 +315,10 @@ unsigned MountSMBVolumes(AddressParts *address, LongWord sessionID) {
         }
         
         doMount = DoSharesWindow(list, listSize);
+
+        if (doMount)
+            WaitCursor();
+        
         CloseSharesWindow();
 
         if (doMount)

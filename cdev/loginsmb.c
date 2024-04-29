@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <quickdraw.h>
+#include <qdaux.h>
 #include <window.h>
 #include <resources.h>
 #include <control.h>
@@ -75,6 +76,8 @@ static bool DoLoginWindow(AddressParts *address) {
         ShowWindow(windPtr);
     }
     
+    InitCursor();
+    
     do {
         controlID = DoModalWindow(&eventRec, NULL, NULL, NULL, mwIBeam);
         TCPIPPoll();
@@ -107,6 +110,8 @@ static unsigned TryLogin(LongWord connectionID, LongWord *sessionID) {
     UTF16String *user = NULL;
     UTF16String *pass = NULL;
     UTF16String *dom = NULL;
+    
+    WaitCursor();
 
     user = MacRomanToUTF16(username+1);
     pass = MacRomanToUTF16(password+1);

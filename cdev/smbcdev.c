@@ -9,6 +9,7 @@
 #include <gsos.h>
 #include <orca.h>
 #include <quickdraw.h>
+#include <qdaux.h>
 #include <window.h>
 #include <control.h>
 #include <resources.h>
@@ -56,6 +57,7 @@ Word modifiers = 0;
 
 void DisplayError(unsigned errorCode) {
     if (errorCode != canceled) {
+        InitCursor();
         AlertWindow(awResource+awButtonLayout, NULL, errorCode);
     }
 }
@@ -111,6 +113,8 @@ void DoConnect(void)
     unsigned errorCode;
     LongWord connectionID;
     LongWord sessionID;
+    
+    WaitCursor();
 
     GetLETextByID(wPtr, addressLine, (StringPtr)&addressBuf);
     if (addressBuf[0] == 0) {
@@ -159,6 +163,7 @@ fixcaret:
     if (FindTargetCtl() == ctl) {
         LEActivate((LERecHndl) GetCtlTitle(ctl));
     }
+    InitCursor();
 }
 
 void DoHit(long ctlID, CtlRecHndl ctlHandle)

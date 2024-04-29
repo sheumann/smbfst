@@ -7,6 +7,7 @@
 #include <orca.h>
 #include "smb2/smb2.h"
 #include "smb2/connection.h"
+#include "smb2/session.h"
 #include "utils/alloc.h"
 #include "driver/driver.h"
 #include "helpers/datetime.h"
@@ -63,6 +64,8 @@ Word Connect(Connection *connection) {
 
     // assume lowest version until we have negotiated
     connection->dialect = SMB_202;
+
+    connection->nextMessageId = 0;
 
     negotiateRequest.SecurityMode = 0;
     negotiateRequest.Reserved = 0;
@@ -122,4 +125,29 @@ Word Connect(Connection *connection) {
     // Security buffer is currently ignored
     
     return 0;
+}
+
+Word Connection_Reconnect(Connection *connection) {
+    Word result, result2;
+    Word oldIpid;
+    unsigned i;
+    
+    oldIpid = connection->ipid;
+    result = Connect(connection);
+    
+    if (result != 0) {
+        connection->ipid = oldIpid;
+    } else {
+        TCPIPLogout(oldIpid);
+        
+        for (i = 0; i < ARRAY_LENGTH(sessions); i++) {
+            if (sessions[i].connection == connection) {
+                result2 = Session_Reconnect(&sessions[i]);
+                if (result2 != 0 && result == 0)
+                    result = result2;
+            }
+        }
+    }
+    
+    return result;
 }

@@ -4,6 +4,7 @@
 #include <tcpip.h>
 #include <orca.h>
 #include <string.h>
+#include <misctool.h>
 #include "fst/fstspecific.h"
 #include "smb2/smb2.h"
 #include "utils/alloc.h"
@@ -28,6 +29,8 @@ Word SMB_Connect(SMBConnectRec *pblock, void *gsosdp, Word pcount) {
     memset(connection, 0, sizeof(Connection));
     connection->serverIP = pblock->serverIP;
     connection->serverPort = pblock->serverPort ? pblock->serverPort : SMB_PORT;
+    
+    connection->reconnectTime = GetTick();
     
     result = Connect(connection);
     if (result) {

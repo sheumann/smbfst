@@ -23,6 +23,8 @@ typedef struct {
 
     LongWord serverIP;
     LongWord serverPort;
+    
+    LongWord reconnectTime;
 } Connection;
 
 extern DIB fakeDIB;
@@ -30,5 +32,6 @@ extern DIB fakeDIB;
 void Connection_Retain(Connection *conn);
 void Connection_Release(Connection *conn);
 Word Connect(Connection *connection);
+Word Connection_Reconnect(Connection *connection);
 
 #endif

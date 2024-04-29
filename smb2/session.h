@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <types.h>
 #include "smb2/connection.h"
+#include "driver/dib.h"
 #include "auth/auth.h"
 
 struct hmac_sha256_context;
@@ -25,8 +26,12 @@ typedef struct {
     AuthInfo authInfo;
 } Session;
 
+extern Session sessions[NDIBS];
+
 void Session_Retain(Session *sess);
 void Session_Release(Session *sess);
+Session *Session_Alloc(void);
 Word SessionSetup(Session *session);
+Word Session_Reconnect(Session *session);
 
 #endif

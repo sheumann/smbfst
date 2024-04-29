@@ -18,7 +18,7 @@ Word SMB_Authenticate(SMBAuthenticateRec *pblock, void *gsosdp, Word pcount) {
     Session *session;
     Word result;
     
-    session = smb_malloc(sizeof(Session));
+    session = Session_Alloc();
     if (session == NULL)
         return outOfMem;
 
@@ -67,7 +67,7 @@ finish:
     } else {
         smb_free(session->authInfo.userName);
         smb_free(session->authInfo.userDomain);
-        smb_free(session);
+        session->connection = NULL;
     }
     return result;
 }

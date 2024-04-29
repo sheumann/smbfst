@@ -5,5 +5,6 @@
 #include "driver/driver.h"
 
 Word TreeConnect(DIB *dib);
+Word TreeConnect_Reconnect(DIB *dib);
 
 #endif

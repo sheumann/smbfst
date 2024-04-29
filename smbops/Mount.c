@@ -77,7 +77,6 @@ Word SMB_Mount(SMBMountRec *pblock, void *gsosdp, Word pcount) {
         return outOfMem;
     }
 
-    dibs[dibIndex].treeId = msg.smb2Header.TreeId;
     dibs[dibIndex].switched = true;
     dibs[dibIndex].extendedDIBPtr = &dibs[dibIndex].treeId;
     dibs[dibIndex].vcrVP = vcrVP;

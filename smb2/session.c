@@ -6,11 +6,15 @@
 #include <orca.h>
 #include "smb2/session.h"
 #include "smb2/connection.h"
+#include "smb2/treeconnect.h"
 #include "utils/alloc.h"
 #include "smb2/smb2.h"
 #include "auth/auth.h"
 #include "crypto/sha256.h"
 #include "crypto/aes.h"
+#include "driver/driver.h"
+
+Session sessions[NDIBS];
 
 void Session_Retain(Session *sess) {
     ++sess->refCount;
@@ -30,8 +34,19 @@ void Session_Release(Session *sess) {
         
         smb_free(sess->authInfo.userName);
         smb_free(sess->authInfo.userDomain);
-        smb_free(sess);
+        sess->connection = NULL;
     }
+}
+
+Session *Session_Alloc(void) {
+    unsigned i;
+    
+    for (i = 0; i < ARRAY_LENGTH(sessions); i++) {
+        if (sessions[i].refCount == 0 && sessions[i].connection == NULL)
+            return &sessions[i];
+    }
+    
+    return NULL;
 }
 
 /*
@@ -46,6 +61,10 @@ Word SessionSetup(Session *session) {
     static unsigned char *previousAuthMsg;
     static size_t previousAuthSize;
     static unsigned char cmac_key[16];
+    static uint64_t previousSessionId;
+    
+    previousSessionId = session->sessionId;
+    session->sessionId = 0;
 
     InitAuth(&authState, &session->authInfo);
     previousAuthMsg = NULL;
@@ -61,6 +80,7 @@ Word SessionSetup(Session *session) {
             previousAuthSize, sessionSetupRequest.Buffer);
         if (authSize == (size_t)-1) {
             // TODO handle errors
+            session->sessionId = previousSessionId;
             return networkError;
         }
 
@@ -71,7 +91,7 @@ Word SessionSetup(Session *session) {
         sessionSetupRequest.SecurityBufferOffset = 
             sizeof(SMB2Header) + sizeof(SMB2_SESSION_SETUP_Request);
         sessionSetupRequest.SecurityBufferLength = authSize;
-        sessionSetupRequest.PreviousSessionId = 0;
+        sessionSetupRequest.PreviousSessionId = previousSessionId;
 
         fakeDIB.session = session;
         result = SendRequestAndGetResponse(&fakeDIB, SMB2_SESSION_SETUP,
@@ -87,6 +107,7 @@ Word SessionSetup(Session *session) {
                         sizeof(struct hmac_sha256_context), userid(), 0x8015, 0);
                     if (toolerror()) {
                         // TODO clean up on errors?
+                        session->sessionId = previousSessionId;
                         return outOfMem;
                     }
                 
@@ -101,6 +122,7 @@ Word SessionSetup(Session *session) {
                         sizeof(struct aes_cmac_context), userid(), 0x8015, 0);
                     if (toolerror()) {
                         // TODO clean up on errors?
+                        session->sessionId = previousSessionId;
                         return outOfMem;
                     }
                 
@@ -129,6 +151,7 @@ Word SessionSetup(Session *session) {
                 sessionSetupResponse.SecurityBufferOffset,
                 sessionSetupResponse.SecurityBufferLength)) {
                 // TODO clean up on errors?
+                session->sessionId = previousSessionId;
                 return networkError;
             }
             
@@ -139,7 +162,30 @@ Word SessionSetup(Session *session) {
             previousAuthSize = sessionSetupResponse.SecurityBufferLength;
         } else {
             // TODO clean up on errors?
+            session->sessionId = previousSessionId;
             return invalidAccess;
         }
     };
 }
+
+Word Session_Reconnect(Session *session) {
+    Word result, result2;
+    unsigned i;
+
+    session->signingRequired = false;
+    
+    result = SessionSetup(session);
+    if (result != 0)
+        return result;
+
+    for (i = 0; i < NDIBS; i++) {
+        if (dibs[i].extendedDIBPtr != NULL && dibs[i].session == session) {
+            result2 = TreeConnect_Reconnect(&dibs[i]);
+            if (result2 != 0 && result == 0)
+                result = result2;
+        }
+    }
+    
+    return result;
+}
+

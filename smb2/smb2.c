@@ -4,19 +4,18 @@
 #include <uchar.h>
 #include <tcpip.h>
 #include <memory.h>
-#include <orca.h>
-
-/* for debugging only */
 #include <misctool.h>
-#include <stdio.h>
+#include <orca.h>
 
 #include "defs.h"
 #include "smb2/connection.h"
 #include "smb2/session.h"
+#include "smb2/treeconnect.h"
 #include "utils/endian.h"
 #include "smb2/smb2proto.h"
 #include "smb2/smb2.h"
 #include "utils/readtcp.h"
+#include "utils/alloc.h"
 #include "auth/auth.h"
 #include "crypto/sha256.h"
 #include "crypto/aes.h"
@@ -83,6 +82,9 @@ static const uint16_t responseStructureSizes[] = {
 
 #define SMB2_ERROR_RESPONSE_STRUCTURE_SIZE 9u
 
+#define MIN_RECONNECT_TIME 5 /* seconds */
+
+static bool Reconnect(DIB *dib, uint16_t bodyLength);
 
 static const smb_u128 u128_zero = {0,0};
 
@@ -100,21 +102,21 @@ ReadStatus ReadMessage(Connection *connection) {
     
     msgSize = ntoh32(msg.directTCPHeader.StreamProtocolLength);
     if (msgSize > sizeof(SMB2Header) + sizeof(msg.body)) {
-        return rsError;
+        return rsBadMsg;
     }
     
     result = ReadTCP(connection->ipid, msgSize, &msg.smb2Header);
     if (result != rsDone)
-        return result;
+        return rsBadMsg;
 
     // Check that it looks like an SMB2/3 message
     
     if (msgSize < sizeof(SMB2Header))
-        return rsError;
+        return rsBadMsg;
     if (msg.smb2Header.ProtocolId != 0x424D53FE)
-        return rsError;
+        return rsBadMsg;
     if (msg.smb2Header.StructureSize != 64)
-        return rsError;
+        return rsBadMsg;
     
     bodySize = msgSize - sizeof(SMB2Header);
     
@@ -185,20 +187,38 @@ ReadStatus SendRequestAndGetResponse(DIB *dib, uint16_t command,
                                      uint16_t bodyLength) {
     Session *session = dib->session;
     Connection *connection = session->connection;
-    uint64_t messageId = connection->nextMessageId;
-    
+    uint64_t messageId;
+    bool blockRetry = false;
+    ReadStatus status;
+
+retry:
+    messageId = connection->nextMessageId;
     msgBodyHeader.StructureSize = requestStructureSizes[command];
     
     // Pad body to at least equal structure size (required by Windows).
     if (bodyLength < msgBodyHeader.StructureSize)
         msg.body[bodyLength++] = 0;
     
-    if (SendMessage(session, command, dib->treeId, bodyLength) == false)
-        return rsError;
+    if (SendMessage(session, command, dib->treeId, bodyLength) == false) {
+        if (!blockRetry && Reconnect(dib, bodyLength)) {
+            blockRetry = true;
+            goto retry;
+        } else {
+            return rsError;
+        }
+    }
 
     do {
-        if (ReadMessage(connection) != rsDone)
-            return rsError;
+        status = ReadMessage(connection);
+        if (status != rsDone) {
+            if (status != rsBadMsg && !blockRetry
+                && Reconnect(dib, bodyLength)) {
+                blockRetry = true;
+                goto retry;
+            } else {
+                return rsError;
+            }
+        }
         
         // Check that the message received is a response to the one sent.
         if (!(msg.smb2Header.Flags & SMB2_FLAGS_SERVER_TO_REDIR))
@@ -208,10 +228,11 @@ ReadStatus SendRequestAndGetResponse(DIB *dib, uint16_t command,
         if (msg.smb2Header.Command != command)
             return rsError;
         
-        if (bodySize < (responseStructureSizes[command] & 0xFFFE))
+        if (bodySize < (responseStructureSizes[command] & 0xFFFE)
+            || msgBodyHeader.StructureSize != responseStructureSizes[command]) {
+            blockRetry = true;
             continue;
-        if (msgBodyHeader.StructureSize != responseStructureSizes[command])
-            continue;
+        }
     
         if (msg.smb2Header.Status == STATUS_SUCCESS) {
             return rsDone;
@@ -227,6 +248,8 @@ ReadStatus SendRequestAndGetResponse(DIB *dib, uint16_t command,
         } else if (msg.smb2Header.Status == STATUS_MORE_PROCESSING_REQUIRED) {
             return rsMoreProcessingRequired;
         }
+        
+        blockRetry = true; // because msg has been overwritten
     } while (msg.smb2Header.Status == STATUS_PENDING &&
         (msg.smb2Header.Flags & SMB2_FLAGS_ASYNC_COMMAND));
 
@@ -237,4 +260,28 @@ ReadStatus SendRequestAndGetResponse(DIB *dib, uint16_t command,
     } else {
         return rsError;
     }
+}
+
+static bool Reconnect(DIB *dib, uint16_t bodyLength) {
+    Connection *connection = dib->session->connection;
+    bool result;
+    void *savedBody;
+    
+    if (GetTick() - connection->reconnectTime
+        < MIN_RECONNECT_TIME * 60)
+        return false;
+    
+    connection->reconnectTime = GetTick();
+
+    savedBody = smb_malloc(bodyLength);
+    if (savedBody == NULL)
+        return false;
+    memcpy(savedBody, msg.body, bodyLength);
+
+    result = Connection_Reconnect(connection) == 0;
+
+    memcpy(msg.body, savedBody, bodyLength);
+    smb_free(savedBody);
+
+    return result;
 }

@@ -20,5 +20,12 @@ Word TreeConnect(DIB *dib) {
         return networkError;
     }
     
+    dib->treeId = msg.smb2Header.TreeId;
     return 0;
+}
+
+Word TreeConnect_Reconnect(DIB *dib) {
+    // TODO handle reconnecting files, or block reconnect if there are open files
+
+    return TreeConnect(dib);
 }

@@ -9,8 +9,6 @@
 
 #define DEVICE_FILE_SERVER 0x0010
 
-#define NDIBS 16
-
 /* device information block */
 struct DIB {
     void *linkPtr;

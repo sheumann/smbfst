@@ -57,7 +57,7 @@ resource rControlTemplate (sharesWindow+sharesLst) {
     {20, 10, 122, 287},                 /* control rect */
     ListControl {{
         $0000,                          /* flags */
-        $1400,                          /* more flags */
+        $3400,                          /* more flags */
         0,                              /* refcon */
         0,                              /* list size */
         10,                              /* List View */

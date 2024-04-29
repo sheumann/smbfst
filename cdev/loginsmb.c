@@ -7,6 +7,7 @@
 #include <window.h>
 #include <resources.h>
 #include <control.h>
+#include <event.h>
 #include <lineedit.h>
 #include <tcpip.h>
 #include <gsos.h>
@@ -16,6 +17,9 @@
 #include "cdev/charset.h"
 #include "cdev/errorcodes.h"
 #include "fst/fstspecific.h"
+
+// Bit setting in DoModalWindow eventHook value
+#define MAP_OA_PERIOD_TO_ESC 0x80000000
 
 #define loginWindow     3000
 
@@ -46,6 +50,45 @@ static bool setParamPtr = false;
 static char username[257];
 static char password[257];
 static char domain[257];
+
+#define TAB 0x09
+
+#pragma databank 1
+static void EventHook(EventRecord *event) {
+    Word key;
+    LongWord target;
+    CtlRecHndl ctl;
+
+    if ((event->modifiers & (shiftKey | appleKey))
+        && (event->what == keyDownEvt || event->what == autoKeyEvt)) {
+        key = event->message & 0xFF;
+        if (key == TAB) {
+            // shift-tab (or OA-tab) -> tab through fields in reverse
+            switch (GetCtlID(FindTargetCtl())) {
+            case nameLine:      target = domainLine;    break;
+            default:
+            case passwordLine:  target = nameLine;      break;
+            case domainLine:    target = passwordLine;  break;
+            }
+            ctl = GetCtlHandleFromID(windPtr, target);
+            MakeThisCtlTarget(ctl);
+            LESetSelect(0, 256, (LERecHndl)GetCtlTitle(ctl));
+            event->what = nullEvt;
+        } else if ((key == 'a' || key == 'A')
+            && (event->modifiers & appleKey)) {
+            // OA-A -> select all
+            ctl = FindTargetCtl();
+            target = GetCtlID(ctl);
+            if (toolerror() || (target != nameLine 
+                && target != passwordLine && target != domainLine))
+                return;
+            LESetSelect(0, 256, (LERecHndl)GetCtlTitle(ctl));
+            event->what = nullEvt;
+        }
+    
+    }
+}
+#pragma databank 0
 
 static bool DoLoginWindow(AddressParts *address) {
     LongWord controlID;
@@ -79,7 +122,9 @@ static bool DoLoginWindow(AddressParts *address) {
     InitCursor();
     
     do {
-        controlID = DoModalWindow(&eventRec, NULL, NULL, NULL, mwIBeam);
+        controlID = DoModalWindow(&eventRec, NULL,
+            (VoidProcPtr)((uintptr_t)&EventHook | MAP_OA_PERIOD_TO_ESC),
+            NULL, mwIBeam);
         TCPIPPoll();
     } while (controlID != cancelBtn && controlID != loginBtn);
 

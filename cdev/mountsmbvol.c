@@ -9,6 +9,7 @@
 #include <window.h>
 #include <resources.h>
 #include <control.h>
+#include <event.h>
 #include <tcpip.h>
 #include <gsos.h>
 #include <orca.h>
@@ -18,6 +19,11 @@
 #include "fst/fstspecific.h"
 #include "rpc/srvsvc.h"
 
+// Bit setting in DoModalWindow eventHook value
+#define MAP_OA_PERIOD_TO_ESC 0x80000000
+
+// SortList/SortList2 compareProc value
+#define SORT_CASE_INSENSITIVE ((void*)0x00000001)
 
 #define sharesWindow    5000
 
@@ -30,7 +36,7 @@
 #define MAX_LIST_SIZE 0x3fff
 
 // Maximum number of list entries to select automatically
-#define AUTO_SELECT_LIMIT 16
+#define AUTO_SELECT_LIMIT 14
 
 // The type of entries in out List Manager list
 typedef struct {
@@ -73,6 +79,32 @@ static GrafPortPtr oldPort;
 static WindowPtr windPtr = NULL;
 static EventRecord eventRec;
 
+static struct {
+    ListEntry *list;
+    unsigned listSize;
+    Handle listCtlHandle;
+} listInfo;
+
+#pragma databank 1
+static void EventHook(EventRecord *event) {
+    Word key;
+    unsigned long i;
+
+    if ((event->modifiers & appleKey)
+        && (event->what == keyDownEvt || event->what == autoKeyEvt)) {
+        key = event->message & 0xFF;
+        if (key == 'a' || key == 'A') {
+            // OA-A -> select all
+            for (i = 0; i < listInfo.listSize; i++) {
+                listInfo.list[i].memFlag |= memSelected;
+            }
+            DrawMember2(0, listInfo.listCtlHandle);
+            event->what = nullEvt;
+        }
+    }
+}
+#pragma databank 0
+
 static bool DoSharesWindow(ListEntry *list, unsigned listSize) {
     Handle listCtlHandle;
     LongWord controlID;
@@ -92,15 +124,21 @@ static bool DoSharesWindow(ListEntry *list, unsigned listSize) {
 
         listCtlHandle = (Handle)GetCtlHandleFromID(windPtr, sharesLst);
         NewList2(NULL, 1, (Ref)list, refIsPointer, listSize, listCtlHandle);
-        SortList2((Pointer)0x00000001, listCtlHandle);
+        SortList2(SORT_CASE_INSENSITIVE, listCtlHandle);
 
         ShowWindow(windPtr);
+
+        listInfo.list = list;
+        listInfo.listSize = listSize;
+        listInfo.listCtlHandle = listCtlHandle;
     }
     
     InitCursor();
     
     do {
-        controlID = DoModalWindow(&eventRec, NULL, NULL, NULL, 0);
+        controlID = DoModalWindow(&eventRec, NULL,
+            (VoidProcPtr)((uintptr_t)&EventHook | MAP_OA_PERIOD_TO_ESC),
+            NULL, 0);
         TCPIPPoll();
     } while (controlID != cancelMountBtn && controlID != mountBtn);
 

@@ -53,8 +53,6 @@ char addressBuf[257];
 
 WindowPtr wPtr = NULL;
 
-Word modifiers = 0;
-
 void DisplayError(unsigned errorCode) {
     if (errorCode != canceled) {
         InitCursor();
@@ -238,6 +236,25 @@ void DoCreate(WindowPtr windPtr)
     NewControl2(wPtr, resourceToResource, cdevWindow);
 }
 
+void DoEvent(EventRecord *event)
+{
+    Word key;
+    CtlRecHndl ctl;
+
+    if ((event->modifiers & appleKey)
+        && (event->what == keyDownEvt || event->what == autoKeyEvt)) {
+        key = event->message & 0xFF;
+        if (key == 'a' || key == 'A') {
+            // OA-A -> select all
+            ctl = FindTargetCtl();
+            if (toolerror() || GetCtlID(ctl) != addressLine)
+                return;
+            LESetSelect(0, 256, (LERecHndl)GetCtlTitle(ctl));
+            event->what = nullEvt;
+        }
+    }
+}
+
 LongWord CDEVMain (LongWord data2, LongWord data1, Word message)
 {
     long result = 0;
@@ -248,8 +265,7 @@ LongWord CDEVMain (LongWord data2, LongWord data1, Word message)
     case EditCDEV:      DoEdit(data1 & 0xFFFF);             break;
     case CreateCDEV:    DoCreate((WindowPtr)data1);         break;
     case CloseCDEV:     wPtr = NULL;                        break;
-    case EventsCDEV:    modifiers = ((EventRecordPtr)data1)->modifiers;
-                        break;
+    case EventsCDEV:    DoEvent((EventRecord*)data1);       break;
     }
 
     return result;

@@ -122,6 +122,11 @@ typedef struct FCR {
     
     uint16_t smbFlags;
     uint64_t createTime;
+    
+    // Our local cached copy of the EOF.  This is only used to avoid
+    // going to the server to check if a SetMark call would go past EOF,
+    // and is otherwise not treated as authoritative.
+    uint64_t eof;
 } FCR;
 
 /* access bits (in addition to standard access flags in low bits) */

@@ -45,12 +45,21 @@ Word SetMark(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
         #undef pblock
     }
     
-    retval = CalcPosition(fcr, &dibs[i], base, displacement, &pos, &eof);
+    retval = CalcPosition(fcr, &dibs[i], base, displacement, &pos);
     if (retval != 0)
         return retval;
 
-    if (pos > eof)
-        return outOfRange;
+    /*
+     * Check for position past our cached copy of EOF.  If it appears to be
+     * past EOF, confirm EOF with server before reporting an error.
+     */
+    if (pos > fcr->eof) {
+        retval = GetEndOfFile(fcr, &dibs[i], &eof);
+        if (retval != 0)
+            return retval;
+        if (pos > eof)
+            return outOfRange;
+    }
 
     fcr->mark = pos;
 

@@ -6,13 +6,13 @@
 #include "driver/driver.h"
 #include "smb2/fileinfo.h"
 #include "helpers/errors.h"
+#include "helpers/position.h"
 
 Word GetEOF(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
-    Word result;
     VirtualPointer vp;
     FCR *fcr;
     unsigned i;
-    uint32_t eof;
+    uint64_t eof;
     Word retval = 0;
     
     vp = gsosdp->fcrPtr;
@@ -25,38 +25,13 @@ Word GetEOF(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     if (i == NDIBS)
         return volNotFound;
 
-    queryInfoRequest.InfoType = SMB2_0_INFO_FILE;
-    queryInfoRequest.FileInfoClass = FileStandardInformation;
-    queryInfoRequest.OutputBufferLength = sizeof(FILE_STANDARD_INFORMATION);
-    queryInfoRequest.InputBufferOffset = 0;
-    queryInfoRequest.Reserved = 0;
-    queryInfoRequest.InputBufferLength = 0;
-    queryInfoRequest.AdditionalInformation = 0;
-    queryInfoRequest.Flags = 0;
-    queryInfoRequest.FileId = fcr->fileID;
-    
-    result = SendRequestAndGetResponse(&dibs[i], SMB2_QUERY_INFO,
-        sizeof(queryInfoRequest));
-    if (result != rsDone)
-        return ConvertError(result);
-    
-    if (queryInfoResponse.OutputBufferLength
-        != sizeof(FILE_STANDARD_INFORMATION))
-        return networkError;
+    retval = GetEndOfFile(fcr, &dibs[i], &eof);
+    if (retval != 0)
+        return retval;
 
-    if (!VerifyBuffer(
-        queryInfoResponse.OutputBufferOffset,
-        queryInfoResponse.OutputBufferLength))
-        return networkError;
-
-    FILE_STANDARD_INFORMATION *info = (void*)((unsigned char *)&msg.smb2Header
-        + queryInfoResponse.OutputBufferOffset);
-
-    if (info->EndOfFile > 0xFFFFFFFF) {
+    if (eof > 0xFFFFFFFF) {
         eof = 0xFFFFFFFF;
         retval = outOfRange;
-    } else {
-        eof = info->EndOfFile;
     }
 
     if (pcount == 0) {

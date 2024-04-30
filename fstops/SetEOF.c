@@ -46,7 +46,7 @@ Word SetEOF(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
         #undef pblock
     }
     
-    retval = CalcPosition(fcr, &dibs[i], base, displacement, &eof, NULL);
+    retval = CalcPosition(fcr, &dibs[i], base, displacement, &eof);
     if (retval != 0)
         return retval;
 
@@ -68,6 +68,8 @@ Word SetEOF(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
         sizeof(setInfoRequest) + setInfoRequest.BufferLength);
     if (result != rsDone)
         return ConvertError(result);
+
+    fcr->eof = eof;
 
     return retval;
 }

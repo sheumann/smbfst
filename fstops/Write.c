@@ -71,6 +71,9 @@ Word Write(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
         fcr->mark += writeResponse.Count;
     } while (remainingCount != 0);
     
+    if (fcr->mark > fcr->eof)
+        fcr->eof = fcr->mark;
+    
     if (remainingCount == 0) {
         return 0;
     } else {

@@ -261,7 +261,20 @@ open_done:
     fcr->nextServerEntryNum = -1;
     fcr->smbFlags = pcount == 0 ? SMB_FLAG_P16SHARING : 0;
     fcr->createTime = createResponse.CreationTime;
-    
+
+    /*
+     * Cache EOF to use in checking whether SetMark goes past EOF.
+     * Our copy of the EOF should remain valid if the server fully enforces
+     * the sharing rules, but we do not consider it fully authoritative and
+     * therefore do not rely on it for anything else.
+     *
+     * Note: [MS-SMB2] up to v20240423 says that EndofFile is always the EOF
+     * of the main stream, but Microsoft has confirmed to me that it is
+     * actually the EOF of the stream being opened.  In testing, macOS and
+     * Samba behave this way too.
+     */
+    fcr->eof = createResponse.EndofFile;
+
     if (pcount == 0) {
         #define pblock ((OpenRec*)pblock)
         

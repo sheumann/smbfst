@@ -1,4 +1,5 @@
 #include "defs.h"
+#include <stddef.h>
 #include <string.h>
 #include <gsos.h>
 #include "smb2/smb2.h"
@@ -6,6 +7,10 @@
 #include "smb2/treeconnect.h"
 #include "helpers/createcontext.h"
 #include "driver/driver.h"
+#include "gsos/gsosutils.h"
+#include "helpers/path.h"
+#include "helpers/afpinfo.h"
+#include "fstops/Open.h"
 
 Word TreeConnect(DIB *dib) {
     ReadStatus result;
@@ -121,8 +126,126 @@ finish:
     return 0;
 }
 
-Word TreeConnect_Reconnect(DIB *dib) {
-    // TODO handle reconnecting files, or block reconnect if there are open files
+static void ReconnectFile(DIB *dib, FCR *fcr) {
+    VirtualPointer vp;
+    GSString *path;
 
-    return TreeConnect(dib);
+    /*
+     * Re-open file
+     */
+    createRequest.SecurityFlags = 0;
+    createRequest.RequestedOplockLevel = SMB2_OPLOCK_LEVEL_NONE;
+    createRequest.ImpersonationLevel = Impersonation;
+    createRequest.SmbCreateFlags = 0;
+    createRequest.Reserved = 0;
+    createRequest.FileAttributes = 0;
+    createRequest.CreateOptions = 0; // TODO maybe FILE_NO_EA_KNOWLEDGE
+    createRequest.NameOffset =
+        sizeof(SMB2Header) + offsetof(SMB2_CREATE_Request, Buffer);
+    createRequest.CreateContextsOffset = 0;
+    createRequest.CreateContextsLength = 0;
+    
+    if (fcr->access & ACCESS_FLAG_RFORK) {
+        createRequest.CreateDisposition = FILE_OPEN_IF;
+    } else {
+        createRequest.CreateDisposition = FILE_OPEN;
+    }
+
+    // translate filename to SMB format
+    vp = fcr->pathName;
+    DerefVP(path, vp);
+    createRequest.NameLength = GSPathToSMB(path, createRequest.Buffer,
+        sizeof(msg.body) - offsetof(SMB2_CREATE_Request, Buffer));
+    if (createRequest.NameLength == 0xFFFF)
+        return;
+
+    if (fcr->access & ACCESS_FLAG_RFORK) {
+        if (createRequest.NameLength >
+            sizeof(msg.body) - offsetof(SMB2_CREATE_Request, Buffer)
+            - sizeof(resourceForkSuffix))
+            return;
+        memcpy(createRequest.Buffer + createRequest.NameLength,
+            resourceForkSuffix, sizeof(resourceForkSuffix));
+        createRequest.NameLength += sizeof(resourceForkSuffix);
+    }
+
+    SetOpenAccess(fcr->access & (readEnable | writeEnable),
+        (bool)(fcr->smbFlags & SMB_FLAG_P16SHARING));
+    
+    if (SendRequestAndGetResponse(dib, SMB2_CREATE,
+        sizeof(createRequest) + createRequest.NameLength) != rsDone)
+        return;
+
+    /*
+     * Check if the creation time matches as a heuristic to determine if this
+     * is the same file that was open previously.  This heuristic can have
+     * false positives and false negatives, but it should work in most cases.
+     */
+    if (createResponse.CreationTime != fcr->createTime) {
+        /*
+         * Close file if it seems to be a different file
+         */
+        closeRequest.Flags = 0;
+        closeRequest.Reserved = 0;
+        closeRequest.FileId = createResponse.FileId;
+    
+        SendRequestAndGetResponse(dib, SMB2_CLOSE, sizeof(closeRequest));
+        
+        return;
+    }
+
+    /*
+     * Update file ID in message that will be retried, if applicable.
+     */
+    if (dib == reconnectInfo.dib && reconnectInfo.fileId != NULL
+        && memcmp(reconnectInfo.fileId, &fcr->fileID, sizeof(SMB2_FILEID)) == 0)
+    {
+        *reconnectInfo.fileId = createResponse.FileId;
+        reconnectInfo.fileId = NULL;
+    }
+    
+    fcr->fileID = createResponse.FileId;
+}
+
+Word TreeConnect_Reconnect(DIB *dib) {
+    VirtualPointer vp;
+    VCR *vcr;
+    FCR *fcr;
+    Word result;
+    unsigned i;
+    bool done;
+    
+    result = TreeConnect(dib);
+    if (result != 0)
+        return result;
+    
+    vp = dib->vcrVP;
+    DerefVP(vcr, vp);
+
+    if (vcr->openCount != 0) {
+        for (i = 1, done = false; ; i++) {
+            asm {
+                ldx i
+                phd
+                lda gsosDP
+                tcd
+                txa
+                jsl GET_FCR
+                pld
+                rol done
+                stx vp
+                sty vp+2
+            }
+            
+            if (done)
+                break;
+            
+            DerefVP(fcr, vp);
+            if (fcr->volID == vcr->id && fcr->fstID == smbFSID) {
+                ReconnectFile(dib, fcr);
+            }
+        }
+    }
+
+    return result;
 }

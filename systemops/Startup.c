@@ -8,6 +8,7 @@
 #include "driver/driver.h"
 #include "systemops/Startup.h"
 #include "utils/random.h"
+#include "smb2/smb2.h"
 
 extern pascal void SystemUserID (unsigned, char *);
 
@@ -116,6 +117,8 @@ static void LoadTCPTool(void) {
         marinettiStatus = tcpipLoaded;
         
         SeedEntropy();
+        
+        InitSMB();
     }
 }
 #pragma databank 0

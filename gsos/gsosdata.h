@@ -24,6 +24,7 @@ typedef GSString255Ptr GSStringPtr;
 #define FIND_VCR    0x01fc48
 #define ALLOC_FCR   0x01fc2c
 #define RELEASE_FCR 0x01fc30
+#define GET_FCR     0x01fc64
 
 typedef LongWord VirtualPointer;
 
@@ -118,11 +119,16 @@ typedef struct FCR {
     // number of next dir entry that would be fetched from server
     // (. and .. are considered entries -1 and 0; GDE returns entries 1 onward)
     int32_t nextServerEntryNum; 
+    
+    uint16_t smbFlags;
+    uint64_t createTime;
 } FCR;
 
 /* access bits (in addition to standard access flags in low bits) */
 #define ACCESS_FLAG_CLEAN 0x8000
 #define ACCESS_FLAG_RFORK 0x4000
+
+#define SMB_FLAG_P16SHARING 0x0001
 
 extern unsigned char *gbuf;
 extern struct GSOSDP *gsosDP;  /* GS/OS direct page ptr */

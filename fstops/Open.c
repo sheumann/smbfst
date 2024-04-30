@@ -12,8 +12,49 @@
 #include "fstops/GetFileInfo.h"
 #include "helpers/errors.h"
 #include "helpers/afpinfo.h"
+#include "fstops/open.h"
 
 #define ACCESS_TYPE_COUNT 3
+
+/*
+ * Set createRequest.DesiredAccess and createRequest.ShareAccess to reflect
+ * a GS/OS access word and corresponding sharing modes (using either GS/OS
+ * or P16 sharing rules).
+ */
+void SetOpenAccess(Word access, bool p16Sharing) {
+    // See GS/OS Ref p. 67 & 397 for GS/OS-style and P16-style sharing modes
+    switch (access) {
+    case readEnable:
+        createRequest.DesiredAccess = FILE_READ_DATA | FILE_READ_ATTRIBUTES;
+        if (p16Sharing) {
+            createRequest.ShareAccess = FILE_SHARE_READ | FILE_SHARE_WRITE;
+        } else {
+            createRequest.ShareAccess = FILE_SHARE_READ;
+        }
+        break;
+
+    case writeEnable:
+        // TODO check if FILE_READ_ATTRIBUTES is needed for write-only mode
+        createRequest.DesiredAccess = FILE_WRITE_DATA | FILE_APPEND_DATA |
+            FILE_WRITE_ATTRIBUTES;
+        if (p16Sharing) {
+            createRequest.ShareAccess = FILE_SHARE_READ;
+        } else {
+            createRequest.ShareAccess = 0;
+        }
+        break;
+
+    case readWriteEnable:    
+        createRequest.DesiredAccess = FILE_READ_DATA | FILE_WRITE_DATA | 
+            FILE_APPEND_DATA | FILE_READ_ATTRIBUTES | FILE_WRITE_ATTRIBUTES;
+        if (p16Sharing) {
+            createRequest.ShareAccess = FILE_SHARE_READ;
+        } else {
+            createRequest.ShareAccess = 0;
+        }
+        break;
+    }
+}
 
 Word Open(void *pblock, void *gsosdp, Word pcount) {
     static Word requestAccess[ACCESS_TYPE_COUNT];
@@ -90,37 +131,12 @@ retry:
         createRequest.NameLength += sizeof(resourceForkSuffix);
     }
 
-    // See GS/OS Ref p. 67 & 397 for GS/OS-style and P16-style sharing modes
     for (i = 0; i < ACCESS_TYPE_COUNT; i++) {
         switch (requestAccess[i]) {
         case readEnable:
-            createRequest.DesiredAccess = FILE_READ_DATA | FILE_READ_ATTRIBUTES;
-            if (pcount != 0) {
-                createRequest.ShareAccess = FILE_SHARE_READ;
-            } else {
-                createRequest.ShareAccess = FILE_SHARE_READ | FILE_SHARE_WRITE;
-            }
-            break;
-    
         case writeEnable:
-            // TODO check if FILE_READ_ATTRIBUTES is needed for write-only mode
-            createRequest.DesiredAccess = FILE_WRITE_DATA | FILE_APPEND_DATA |
-                FILE_WRITE_ATTRIBUTES;
-            if (pcount != 0) {
-                createRequest.ShareAccess = 0;
-            } else {
-                createRequest.ShareAccess = FILE_SHARE_READ;
-            }
-            break;
-    
         case readWriteEnable:    
-            createRequest.DesiredAccess = FILE_READ_DATA | FILE_WRITE_DATA | 
-                FILE_APPEND_DATA | FILE_READ_ATTRIBUTES | FILE_WRITE_ATTRIBUTES;
-            if (pcount != 0) {
-                createRequest.ShareAccess = 0;
-            } else {
-                createRequest.ShareAccess = FILE_SHARE_READ;
-            }
+            SetOpenAccess(requestAccess[i], pcount == 0);
             break;
     
         case 0:
@@ -243,6 +259,8 @@ open_done:
     fcr->fileID = fileID;
     fcr->dirEntryNum = 0;
     fcr->nextServerEntryNum = -1;
+    fcr->smbFlags = pcount == 0 ? SMB_FLAG_P16SHARING : 0;
+    fcr->createTime = createResponse.CreationTime;
     
     if (pcount == 0) {
         #define pblock ((OpenRec*)pblock)

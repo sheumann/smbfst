@@ -181,7 +181,7 @@ Word Session_Reconnect(Session *session) {
     for (i = 0; i < NDIBS; i++) {
         if (dibs[i].extendedDIBPtr != NULL && dibs[i].session == session) {
             result2 = TreeConnect_Reconnect(&dibs[i]);
-            if (result2 != 0 && result == 0)
+            if (&dibs[i] == reconnectInfo.dib)
                 result = result2;
         }
     }

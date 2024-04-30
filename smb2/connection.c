@@ -145,7 +145,7 @@ Word Connection_Reconnect(Connection *connection) {
         for (i = 0; i < ARRAY_LENGTH(sessions); i++) {
             if (sessions[i].connection == connection) {
                 result2 = Session_Reconnect(&sessions[i]);
-                if (result2 != 0 && result == 0)
+                if (&sessions[i] == reconnectInfo.dib->session)
                     result = result2;
             }
         }

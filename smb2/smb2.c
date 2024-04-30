@@ -80,6 +80,12 @@ static const uint16_t responseStructureSizes[] = {
     [SMB2_OPLOCK_BREAK] = 24,
 };
 
+/*
+ * This will contain the offset of the FileId field in each request
+ * structure (or 0 if it is not present).
+ */
+static uint8_t fileIdOffsets[SMB2_OPLOCK_BREAK + 1];
+
 #define SMB2_ERROR_RESPONSE_STRUCTURE_SIZE 9u
 
 #define MIN_RECONNECT_TIME 5 /* seconds */
@@ -91,6 +97,8 @@ static const smb_u128 u128_zero = {0,0};
 MsgRec msg;
 
 uint16_t bodySize;   // size of last message received
+
+ReconnectInfo reconnectInfo;
 
 ReadStatus ReadMessage(Connection *connection) {
     ReadStatus result;
@@ -265,7 +273,7 @@ retry:
 static bool Reconnect(DIB *dib, uint16_t bodyLength) {
     Connection *connection = dib->session->connection;
     bool result;
-    void *savedBody;
+    unsigned char *savedBody;
     
     if (GetTick() - connection->reconnectTime
         < MIN_RECONNECT_TIME * 60)
@@ -277,11 +285,48 @@ static bool Reconnect(DIB *dib, uint16_t bodyLength) {
     if (savedBody == NULL)
         return false;
     memcpy(savedBody, msg.body, bodyLength);
+    
+    /*
+     * Save info about the file being accessed (if any), so that the fileId
+     * can be updated as part of the reconnect process.
+     */
+    reconnectInfo.dib = dib;
+    if (fileIdOffsets[msg.smb2Header.Command] != 0) {
+        reconnectInfo.fileId =
+            (SMB2_FILEID*)(savedBody + fileIdOffsets[msg.smb2Header.Command]);
+    } else {
+        reconnectInfo.fileId = NULL;
+    }
 
     result = Connection_Reconnect(connection) == 0;
 
     memcpy(msg.body, savedBody, bodyLength);
     smb_free(savedBody);
 
+    if (reconnectInfo.fileId != NULL)
+        return result;
+
     return result;
+}
+
+void InitSMB(void) {
+    fileIdOffsets[SMB2_NEGOTIATE] = 0;
+    fileIdOffsets[SMB2_SESSION_SETUP] = 0;
+    fileIdOffsets[SMB2_LOGOFF] = 0;
+    fileIdOffsets[SMB2_TREE_CONNECT] = 0;
+    fileIdOffsets[SMB2_TREE_DISCONNECT] = 0;
+    fileIdOffsets[SMB2_CREATE] = 0;
+    fileIdOffsets[SMB2_CLOSE] = offsetof(SMB2_CLOSE_Request, FileId);
+    fileIdOffsets[SMB2_FLUSH] = offsetof(SMB2_FLUSH_Request, FileId);
+    fileIdOffsets[SMB2_READ] = offsetof(SMB2_READ_Request, FileId);
+    fileIdOffsets[SMB2_WRITE] = offsetof(SMB2_WRITE_Request, FileId);
+    //fileIdOffsets[SMB2_LOCK] = offsetof(SMB2_LOCK_Request, FileId);
+    //fileIdOffsets[SMB2_IOCTL] = offsetof(SMB2_IOCTL_Request, FileId);
+    fileIdOffsets[SMB2_CANCEL] = 0;
+    fileIdOffsets[SMB2_ECHO] = 0;
+    fileIdOffsets[SMB2_QUERY_DIRECTORY] = offsetof(SMB2_QUERY_DIRECTORY_Request, FileId);
+    //fileIdOffsets[SMB2_CHANGE_NOTIFY] = offsetof(SMB2_CHANGE_NOTIFY_Request, FileId);
+    fileIdOffsets[SMB2_QUERY_INFO] = offsetof(SMB2_QUERY_INFO_Request, FileId);
+    fileIdOffsets[SMB2_SET_INFO] = offsetof(SMB2_SET_INFO_Request, FileId);
+    //fileIdOffsets[SMB2_OPLOCK_BREAK] = offsetof(SMB2_OPLOCK_BREAK_Request, FileId);
 }

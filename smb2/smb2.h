@@ -66,7 +66,15 @@ extern MsgRec msg;
 
 extern uint16_t bodySize;   // size of last message received
 
+typedef struct {
+    DIB *dib;
+    SMB2_FILEID *fileId;
+} ReconnectInfo;
+
+extern ReconnectInfo reconnectInfo;
+
 ReadStatus SendRequestAndGetResponse(DIB *dib, uint16_t command,
                                      uint16_t bodyLength);
+void InitSMB(void);
 
 #endif

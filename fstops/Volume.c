@@ -22,7 +22,7 @@ Word Volume(void *pblock, struct GSOSDP *gsosDP, Word pcount) {
     Word result = 0;
 
     for (i = 0; i < NDIBS; i++) {
-        if (dibs[i].DIBDevNum == gsosDP->dev1Num /* TODO && active */)
+        if (dibs[i].DIBDevNum == gsosDP->dev1Num && dibs[i].extendedDIBPtr != 0)
             break;
     }
     if (i == NDIBS)

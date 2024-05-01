@@ -29,7 +29,7 @@ Word Flush(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     DerefVP(fcr, vp);
     
     for (i = 0; i < NDIBS; i++) {
-        if (dibs[i].DIBDevNum == gsosDP->dev1Num /* TODO && active */)
+        if (dibs[i].DIBDevNum == gsosDP->dev1Num && dibs[i].extendedDIBPtr != 0)
             break;
     }
     if (i == NDIBS)

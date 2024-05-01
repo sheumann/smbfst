@@ -104,7 +104,7 @@ useDevNum:
     }
     
     for (i = 0; i < NDIBS; i++) {
-        if (dibs[i].DIBDevNum == devNum /* TODO && active ? */)
+        if (dibs[i].DIBDevNum == devNum  && dibs[i].extendedDIBPtr != 0)
             return &dibs[i];
     }
     return NULL;

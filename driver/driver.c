@@ -6,6 +6,7 @@
 #include <intmath.h>
 #include "driver/driver.h"
 #include "smb2/smb2.h"
+#include "utils/alloc.h"
 
 #define DRIVER_VERSION 0x001E             /* GS/OS driver version format */
 
@@ -246,6 +247,11 @@ void UnmountSMBVolume(DIB *dib) {
         dib->vcrVP = 0;
         dib->flags = 0;
         dib->extendedDIBPtr = NULL;
+        smb_free(dib->shareName);
+        dib->shareName = NULL;
+        dib->shareNameSize = 0;
+        smb_free(dib->volName);
+        dib->volName = NULL;
     }
 }
 

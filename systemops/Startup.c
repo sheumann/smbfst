@@ -4,6 +4,7 @@
 #include <orca.h>
 #include <stddef.h>
 #include <locator.h>
+#include <gsos.h>
 #include "gsos/gsosdata.h"
 #include "driver/driver.h"
 #include "systemops/Startup.h"
@@ -45,11 +46,25 @@ enum MarinettiStatus marinettiStatus = tcpipUnloaded;
 static asm void PriorityHandler(void);
 static asm void P8SwitchHandler(void);
 
-static void LoadTCPTool(void);
-static void HandleOSSwitch(int a);
+static void Startup2(void);
+static void HandleOSP8Switch(int a);
+static void NotificationProc(void);
+static asm unsigned InstallDIBs(void);
+
+static struct {
+    Long reserved1;
+    Word reserved2;
+    Word Signature;
+    Long Event_flags;
+    Long Event_code;
+    Byte jml;
+    void (*proc)(void);
+} notificationProcRec;
+
+#define NOTIFY_GSOS_SWITCH 0x04
 
 /*
- * Called when GS/OS starts up, either on boot or when switching back from P8.
+ * Called when GS/OS starts up on boot (not when switching back from P8).
  */
 int Startup(void) {
     int result;
@@ -57,23 +72,7 @@ int Startup(void) {
     SystemUserID(GetNewID(0x3300), NULL);
 
     InitDIBs();
-
-    asm {
-        phd
-        lda gsosDP
-        tcd
-
-        jsl GET_SYS_GBUF
-        stx gbuf
-        sty gbuf+2
-
-        ldx #dibList
-        ldy #^dibList
-        jsl INSTALL_DRIVER
-
-        pld
-        sta result
-    }
+    result = InstallDIBs();
     
     if (result == 0) {
         oldPriorityVector = priorityVector;
@@ -88,13 +87,39 @@ int Startup(void) {
     return result;
 }
 
+/*
+ * Install out DIBs.  Returns error code from INSTALL_DRIVER, if any.
+ */
+static asm unsigned InstallDIBs(void) {
+    phd
+    lda gsosDP
+    tcd
+
+    jsl GET_SYS_GBUF
+    stx gbuf
+    sty gbuf+2
+
+    ldx #dibList
+    ldy #^dibList
+    jsl INSTALL_DRIVER
+
+    pld
+    rtl
+}
+
 static asm void PriorityHandler(void) {
-    jsl >LoadTCPTool
+    jsl >Startup2
     jml >oldPriorityVector
 }
 
+/*
+ * This is the second-phase startup code, which is run from the priority vector.
+ * It runs after tool patches and inits are loaded, but before desk accessories.
+ */
 #pragma databank 1
-static void LoadTCPTool(void) {
+static void Startup2(void) {
+    NotifyProcRecGS addNotifyProcRec;
+
     if (marinettiStatus == tcpipUnloaded) {
         /*
          * Load Marinetti tool stub.
@@ -119,6 +144,14 @@ static void LoadTCPTool(void) {
         SeedEntropy();
         
         InitSMB();
+
+        notificationProcRec.Signature = 0xA55A;
+        notificationProcRec.Event_flags = NOTIFY_GSOS_SWITCH;
+        notificationProcRec.jml = JML;
+        notificationProcRec.proc = NotificationProc;
+        addNotifyProcRec.pCount = 1;
+        addNotifyProcRec.procPointer = (ProcPtr)&notificationProcRec;
+        AddNotifyProcGS(&addNotifyProcRec);
     }
 }
 #pragma databank 0
@@ -126,7 +159,7 @@ static void LoadTCPTool(void) {
 static asm void P8SwitchHandler(void) {
     pha
     pha
-    jsl >HandleOSSwitch
+    jsl >HandleOSP8Switch
     pla
     jml >oldP8SwitchVector
 }
@@ -137,7 +170,7 @@ static asm void P8SwitchHandler(void) {
  * A=1 indicates quitting GS/OS, either to shut down or switch to P8.
  */
 #pragma databank 1
-static void HandleOSSwitch(int a) {
+static void HandleOSP8Switch(int a) {
     unsigned i;
 
     /*
@@ -146,6 +179,59 @@ static void HandleOSSwitch(int a) {
     if (a == 1 && warm_cold_flag == 0) {
         for (i = 0; i < NDIBS; i++) {
             UnmountSMBVolume(&dibs[i]);
+        }
+    }
+}
+#pragma databank 0
+
+/*
+ * Notification procedure called when switching to GS/OS.
+ */
+#pragma databank 1
+static void NotificationProc(void) {
+    bool oom;
+    VirtualPointer vcrVP;
+    VCR *vcr;
+    GSString *volName;
+    unsigned i;
+
+    /*
+     * Re-install DIBs and VCRs for SMB volumes on switch from P8 to GS/OS.
+     */
+    if (notificationProcRec.Event_code & NOTIFY_GSOS_SWITCH) {
+        if (InstallDIBs() == 0) {
+            for (i = 0; i < NDIBS; i++) {
+                if (dibs[i].extendedDIBPtr != NULL) {
+                    volName = dibs[i].volName;
+                    asm {
+                        stz oom
+                        ldx volName
+                        ldy volName+2
+                        phd
+                        lda gsosDP
+                        tcd
+                        lda #sizeof(VCR)
+                        jsl ALLOC_VCR
+                        pld
+                        stx vcrVP
+                        sty vcrVP+2
+                        rol oom
+                    }
+                    
+                    if (!oom) {
+                        dibs[i].vcrVP = vcrVP;
+        
+                        DerefVP(vcr, vcrVP);
+            
+                        vcr->status = 0;
+                        vcr->openCount = 0;
+                        vcr->fstID = smbFSID;
+                        vcr->devNum = dibs[i].DIBDevNum;
+                    } else {
+                        UnmountSMBVolume(&dibs[i]);
+                    }
+                }
+            }
         }
     }
 }

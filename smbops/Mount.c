@@ -34,6 +34,15 @@ Word SMB_Mount(SMBMountRec *pblock, void *gsosdp, Word pcount) {
     if (dibs[dibIndex].shareName == NULL)
         return outOfMem;
     memcpy(dibs[dibIndex].shareName, pblock->shareName, pblock->shareNameSize);
+
+    dibs[dibIndex].volName = smb_malloc(pblock->volName->length + 2UL);
+    if (dibs[dibIndex].volName == NULL) {
+        smb_free(dibs[dibIndex].shareName);
+        return outOfMem;
+    }
+    memcpy(dibs[dibIndex].volName, pblock->volName,
+        pblock->volName->length + 2UL);
+
     dibs[dibIndex].shareNameSize = pblock->shareNameSize;
     dibs[dibIndex].session = session;
     dibs[dibIndex].treeId = 0;
@@ -41,6 +50,7 @@ Word SMB_Mount(SMBMountRec *pblock, void *gsosdp, Word pcount) {
     errCode = TreeConnect(&dibs[dibIndex]);
     if (errCode) {
         smb_free(dibs[dibIndex].shareName);
+        smb_free(dibs[dibIndex].volName);
         return errCode;
     }
 
@@ -68,6 +78,7 @@ Word SMB_Mount(SMBMountRec *pblock, void *gsosdp, Word pcount) {
          * work right if it cannot allocate memory.
          */
         smb_free(dibs[dibIndex].shareName);
+        smb_free(dibs[dibIndex].volName);
         return outOfMem;
     }
 

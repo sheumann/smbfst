@@ -33,6 +33,7 @@ struct DIB {
     Word flags;
     char16_t *shareName;
     uint16_t shareNameSize;
+    GSString *volName;
 };
 
 /* flags bits */

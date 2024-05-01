@@ -169,9 +169,8 @@ unsigned char *NTLM_HandleChallenge(NTLM_Context *ctx, AuthInfo *authInfo,
 
     uint16_t infoSize;
     const void *infoPtr;
-    static uint8_t tempBuf[8+8+8+4+1000]; // TODO size this as needed
+    uint8_t *tempBuf;
     static size_t tempBufSize;
-    static unsigned char responseKeyNT[16];
     static unsigned char ntProofStr[16];
     static unsigned char sessionBaseKey[16];
     static unsigned char encryptedRandomSessionKey[16];
@@ -185,11 +184,14 @@ unsigned char *NTLM_HandleChallenge(NTLM_Context *ctx, AuthInfo *authInfo,
     
     // Check that this is a valid challenge message
     if (challengeSize < sizeof(NTLM_CHALLENGE_MESSAGE))
-        return 0;
+        return NULL;
     if (memcmp(challengeMsg->Signature, "NTLMSSP", 8) != 0)
-        return 0;
+        return NULL;
     if (challengeMsg->MessageType != NtLmChallenge)
-        return 0;
+        return NULL;
+    if ((uint64_t)challengeMsg->TargetInfoFields.BufferOffset
+        + challengeMsg->TargetInfoFields.Len > challengeSize)
+        return NULL;
     // TODO verify flags
 
     /* Generate random values for use in NTLM */
@@ -197,17 +199,22 @@ unsigned char *NTLM_HandleChallenge(NTLM_Context *ctx, AuthInfo *authInfo,
     memcpy(exportedSessionKey, randPtr, 16);
     clientChallenge = *(uint64_t*)(randPtr + 20);
 
-    memcpy(responseKeyNT, authInfo->ntlmv2Hash, 16);
-
     // TODO special case for anonymous logins
 
-    /* Construct temp buffer used to compute NTProofStr */
-    memset(tempBuf, 0, sizeof(tempBuf));
+    /* Construct temp buffer used to compute NTProofStr (see [MS-NLMP] 3.3.2) */
+    tempBufSize = 1UL + 1 + 6 + 8 + 8 + 4
+        + 8 /* for possible added MsvAvFlags */
+        + challengeMsg->TargetInfoFields.Len + 4;
+    tempBuf = smb_malloc(tempBufSize);
+    if (tempBuf == NULL)
+        return NULL;
+
+    memset(tempBuf, 0, tempBufSize);
     tempBuf[0] = 1; // Responseversion
     tempBuf[1] = 1; // HiResponseversion
     
     // timestamp (taken from challenge message)
-    // TODO handle case where it's not provided in challenge?
+    // TODO handle case where timestamp is not provided in challenge?
     infoPtr = NTLM_GetTargetInfo(challengeMsg, challengeSize, MsvAvTimestamp,
         &infoSize);
     if (infoPtr && infoSize == 8)
@@ -231,8 +238,6 @@ unsigned char *NTLM_HandleChallenge(NTLM_Context *ctx, AuthInfo *authInfo,
         }
     }
 
-    // TODO Validate that locations specified are within input buffer
-    //      and do not overflow output buffer
     // TODO Adjust target info as specified in [MS-NLMP] (end of sec. 3.1.5.1.2)
     memcpy(payloadPtr, (const unsigned char *)challengeMsg
         + challengeMsg->TargetInfoFields.BufferOffset,
@@ -241,6 +246,7 @@ unsigned char *NTLM_HandleChallenge(NTLM_Context *ctx, AuthInfo *authInfo,
 
     tempBufSize = payloadPtr - tempBuf + 4;
 
+#define responseKeyNT (authInfo->ntlmv2Hash)
     /* Compute NTProofStr */
     hmac_md5_init(&c.hmac_md5_context, responseKeyNT, sizeof(responseKeyNT));
     hmac_md5_update(&c.hmac_md5_context, (void*)&challengeMsg->ServerChallenge,
@@ -253,6 +259,7 @@ unsigned char *NTLM_HandleChallenge(NTLM_Context *ctx, AuthInfo *authInfo,
     hmac_md5_init(&c.hmac_md5_context, responseKeyNT, sizeof(responseKeyNT));
     hmac_md5_compute(&c.hmac_md5_context, ntProofStr, sizeof(ntProofStr));
     memcpy(sessionBaseKey, c.hmac_md5_context.u[0].ctx.hash, 16);
+#undef responseKeyNT
 
     /* Compute EncryptedRandomSessionKey */
     rc4_init(&c.rc4_context, sessionBaseKey, sizeof(sessionBaseKey));
@@ -283,6 +290,8 @@ unsigned char *NTLM_HandleChallenge(NTLM_Context *ctx, AuthInfo *authInfo,
     payloadPtr += sizeof(ntProofStr);
     memcpy(payloadPtr, tempBuf, tempBufSize);
     payloadPtr += tempBufSize;
+    
+    smb_free(tempBuf);
 
     authMsg.DomainNameFields.Len =
         authMsg.DomainNameFields.MaxLen = authInfo->userDomainSize;
@@ -324,7 +333,7 @@ unsigned char *NTLM_HandleChallenge(NTLM_Context *ctx, AuthInfo *authInfo,
             NTLMSSP_NEGOTIATE_NTLM +
             NTLMSSP_NEGOTIATE_SIGN +
             NTLMSSP_REQUEST_TARGET +
-            NTLMSSP_NEGOTIATE_UNICODE,
+            NTLMSSP_NEGOTIATE_UNICODE;
     // TODO adjust flags?
     
     // TODO choose what version to send, if any

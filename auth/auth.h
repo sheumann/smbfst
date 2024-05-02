@@ -2,6 +2,7 @@
 #define AUTH_H
 
 #include <stdint.h>
+#include <stdbool.h>
 #include "fst/fstspecific.h"
 
 /* This size must be sufficient to hold any mechList we may produce. */
@@ -13,6 +14,7 @@ typedef struct {
     char16_t *userDomain;
     Word userDomainSize;
     unsigned char ntlmv2Hash[16];
+    bool anonymous;
 } AuthInfo;
 
 typedef struct {

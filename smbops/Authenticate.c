@@ -56,6 +56,9 @@ Word SMB_Authenticate(SMBAuthenticateRec *pblock, void *gsosdp, Word pcount) {
             pblock->userDomainSize);
     }
 
+    session->authInfo.anonymous =
+        pblock->userNameSize == 0 && pblock->passwordSize == 0;
+
     result = SessionSetup(session);
 
 finish:

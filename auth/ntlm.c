@@ -77,7 +77,7 @@ bool GetNTLMv2Hash(uint16_t passwordSize, char16_t password[],
     unsigned i;
 
     userNameUpperCase = smb_malloc(userNameSize);
-    if (!userNameUpperCase)
+    if (!userNameUpperCase && userNameSize != 0)
         return false;
 
     for (i = 0; i < userNameSize; i++) {
@@ -199,67 +199,69 @@ unsigned char *NTLM_HandleChallenge(NTLM_Context *ctx, AuthInfo *authInfo,
     memcpy(exportedSessionKey, randPtr, 16);
     clientChallenge = *(uint64_t*)(randPtr + 20);
 
-    // TODO special case for anonymous logins
-
-    /* Construct temp buffer used to compute NTProofStr (see [MS-NLMP] 3.3.2) */
-    tempBufSize = 1UL + 1 + 6 + 8 + 8 + 4
-        + 8 /* for possible added MsvAvFlags */
-        + challengeMsg->TargetInfoFields.Len + 4;
-    tempBuf = smb_malloc(tempBufSize);
-    if (tempBuf == NULL)
-        return NULL;
-
-    memset(tempBuf, 0, tempBufSize);
-    tempBuf[0] = 1; // Responseversion
-    tempBuf[1] = 1; // HiResponseversion
+    if (!authInfo->anonymous) {
+        /* Construct temp buffer used to compute NTProofStr (see [MS-NLMP] 3.3.2) */
+        tempBufSize = 1UL + 1 + 6 + 8 + 8 + 4
+            + 8 /* for possible added MsvAvFlags */
+            + challengeMsg->TargetInfoFields.Len + 4;
+        tempBuf = smb_malloc(tempBufSize);
+        if (tempBuf == NULL)
+            return NULL;
     
-    // timestamp (taken from challenge message)
-    // TODO handle case where timestamp is not provided in challenge?
-    infoPtr = NTLM_GetTargetInfo(challengeMsg, challengeSize, MsvAvTimestamp,
-        &infoSize);
-    if (infoPtr && infoSize == 8)
-        memcpy(tempBuf+8, infoPtr, 8);
+        memset(tempBuf, 0, tempBufSize);
+        tempBuf[0] = 1; // Responseversion
+        tempBuf[1] = 1; // HiResponseversion
+        
+        // timestamp (taken from challenge message)
+        // TODO handle case where timestamp is not provided in challenge?
+        infoPtr = NTLM_GetTargetInfo(challengeMsg, challengeSize, MsvAvTimestamp,
+            &infoSize);
+        if (infoPtr && infoSize == 8)
+            memcpy(tempBuf+8, infoPtr, 8);
+        
+        // client challenge
+        memcpy(tempBuf+16, &clientChallenge, 8);
     
-    // client challenge
-    memcpy(tempBuf+16, &clientChallenge, 8);
-
-    payloadPtr = tempBuf + 28;
-
-    if (infoPtr != NULL) {
-        if (NTLM_GetTargetInfo(challengeMsg, challengeSize, MsvAvFlags,
-            &infoSize) == NULL) {
-            ((AV_PAIR*)payloadPtr)->AvId = MsvAvFlags;
-            ((AV_PAIR*)payloadPtr)->AvLen = 4;
-            payloadPtr += 4;
-            *(uint32_t*)payloadPtr = 0x00000002; // auth message includes MIC
-            payloadPtr += 4;
-        } else {
-            // TODO should update existing flags.
+        payloadPtr = tempBuf + 28;
+    
+        if (infoPtr != NULL) {
+            if (NTLM_GetTargetInfo(challengeMsg, challengeSize, MsvAvFlags,
+                &infoSize) == NULL) {
+                ((AV_PAIR*)payloadPtr)->AvId = MsvAvFlags;
+                ((AV_PAIR*)payloadPtr)->AvLen = 4;
+                payloadPtr += 4;
+                *(uint32_t*)payloadPtr = 0x00000002; // auth message includes MIC
+                payloadPtr += 4;
+            } else {
+                // TODO should update existing flags.
+            }
         }
-    }
-
-    // TODO Adjust target info as specified in [MS-NLMP] (end of sec. 3.1.5.1.2)
-    memcpy(payloadPtr, (const unsigned char *)challengeMsg
-        + challengeMsg->TargetInfoFields.BufferOffset,
-        challengeMsg->TargetInfoFields.Len);
-    payloadPtr += challengeMsg->TargetInfoFields.Len;
-
-    tempBufSize = payloadPtr - tempBuf + 4;
+    
+        // TODO Adjust target info as specified in [MS-NLMP] (end of sec. 3.1.5.1.2)
+        memcpy(payloadPtr, (const unsigned char *)challengeMsg
+            + challengeMsg->TargetInfoFields.BufferOffset,
+            challengeMsg->TargetInfoFields.Len);
+        payloadPtr += challengeMsg->TargetInfoFields.Len;
+    
+        tempBufSize = payloadPtr - tempBuf + 4;
 
 #define responseKeyNT (authInfo->ntlmv2Hash)
-    /* Compute NTProofStr */
-    hmac_md5_init(&c.hmac_md5_context, responseKeyNT, sizeof(responseKeyNT));
-    hmac_md5_update(&c.hmac_md5_context, (void*)&challengeMsg->ServerChallenge,
-        sizeof(challengeMsg->ServerChallenge));
-    hmac_md5_update(&c.hmac_md5_context, tempBuf, tempBufSize);
-    hmac_md5_finalize(&c.hmac_md5_context);
-    memcpy(ntProofStr, c.hmac_md5_context.u[0].ctx.hash, 16);
-
-    /* Compute SessionBaseKey (which is used as KeyExchangeKey) */
-    hmac_md5_init(&c.hmac_md5_context, responseKeyNT, sizeof(responseKeyNT));
-    hmac_md5_compute(&c.hmac_md5_context, ntProofStr, sizeof(ntProofStr));
-    memcpy(sessionBaseKey, c.hmac_md5_context.u[0].ctx.hash, 16);
+        /* Compute NTProofStr */
+        hmac_md5_init(&c.hmac_md5_context, responseKeyNT, sizeof(responseKeyNT));
+        hmac_md5_update(&c.hmac_md5_context, (void*)&challengeMsg->ServerChallenge,
+            sizeof(challengeMsg->ServerChallenge));
+        hmac_md5_update(&c.hmac_md5_context, tempBuf, tempBufSize);
+        hmac_md5_finalize(&c.hmac_md5_context);
+        memcpy(ntProofStr, c.hmac_md5_context.u[0].ctx.hash, 16);
+    
+        /* Compute SessionBaseKey (which is used as KeyExchangeKey) */
+        hmac_md5_init(&c.hmac_md5_context, responseKeyNT, sizeof(responseKeyNT));
+        hmac_md5_compute(&c.hmac_md5_context, ntProofStr, sizeof(ntProofStr));
+        memcpy(sessionBaseKey, c.hmac_md5_context.u[0].ctx.hash, 16);
 #undef responseKeyNT
+    } else {
+        memset(sessionBaseKey, 0, 16);
+    }
 
     /* Compute EncryptedRandomSessionKey */
     rc4_init(&c.rc4_context, sessionBaseKey, sizeof(sessionBaseKey));
@@ -274,24 +276,45 @@ unsigned char *NTLM_HandleChallenge(NTLM_Context *ctx, AuthInfo *authInfo,
     
     payloadPtr = authMsg.Payload;
     
-    // Send 24 zero bytes as LmChallengeResponse
-    authMsg.LmChallengeResponseFields.Len =
-        authMsg.LmChallengeResponseFields.MaxLen = 24;
-    authMsg.LmChallengeResponseFields.BufferOffset =
-        payloadPtr - (unsigned char*)&authMsg;
-    payloadPtr += 24;
+    if (!authInfo->anonymous) {
+        // Send 24 zero bytes as LmChallengeResponse
+        authMsg.LmChallengeResponseFields.Len =
+            authMsg.LmChallengeResponseFields.MaxLen = 24;
+        authMsg.LmChallengeResponseFields.BufferOffset =
+            payloadPtr - (unsigned char*)&authMsg;
+        payloadPtr += 24;
+        
+        // Send ntProofStr plus tempBuf as NtChallengeResponse
+        authMsg.NtChallengeResponseFields.Len =
+            authMsg.NtChallengeResponseFields.MaxLen = 
+            sizeof(ntProofStr) + tempBufSize;
+        authMsg.NtChallengeResponseFields.BufferOffset =
+            payloadPtr - (unsigned char*)&authMsg;
 
-    authMsg.NtChallengeResponseFields.Len =
-        authMsg.NtChallengeResponseFields.MaxLen = 
-        sizeof(ntProofStr) + tempBufSize;
-    authMsg.NtChallengeResponseFields.BufferOffset =
-        payloadPtr - (unsigned char*)&authMsg;
-    memcpy(payloadPtr, ntProofStr, sizeof(ntProofStr));
-    payloadPtr += sizeof(ntProofStr);
-    memcpy(payloadPtr, tempBuf, tempBufSize);
-    payloadPtr += tempBufSize;
-    
-    smb_free(tempBuf);
+        memcpy(payloadPtr, ntProofStr, sizeof(ntProofStr));
+        payloadPtr += sizeof(ntProofStr);
+        memcpy(payloadPtr, tempBuf, tempBufSize);
+        payloadPtr += tempBufSize;
+
+        smb_free(tempBuf);
+    } else {
+        // Send one zero byte as LmChallengeResponse if anonymous
+        authMsg.LmChallengeResponseFields.Len =
+            authMsg.LmChallengeResponseFields.MaxLen = 1;
+        authMsg.LmChallengeResponseFields.BufferOffset =
+            payloadPtr - (unsigned char*)&authMsg;
+        /*
+         * Add an extra byte as padding to keep subsequent strings two-byte
+         * aligned.  Wireshark suggests this is required, although I don't
+         * see anything in [MS-NLMP] about it.
+         */
+        payloadPtr += 1 + 1;
+        
+        // Set NTChallengeResponse fields to 0 if anonymous
+        authMsg.NtChallengeResponseFields.Len =
+            authMsg.NtChallengeResponseFields.MaxLen = 0;
+        authMsg.NtChallengeResponseFields.BufferOffset = 0;
+    }
 
     authMsg.DomainNameFields.Len =
         authMsg.DomainNameFields.MaxLen = authInfo->userDomainSize;
@@ -322,8 +345,7 @@ unsigned char *NTLM_HandleChallenge(NTLM_Context *ctx, AuthInfo *authInfo,
         payloadPtr - (unsigned char*)&authMsg;
     memcpy(payloadPtr, encryptedRandomSessionKey, 16);
     payloadPtr += 16;
-    
-    //authMsg.NegotiateFlags = challengeMsg->NegotiateFlags;
+
     authMsg.NegotiateFlags =
             NTLMSSP_NEGOTIATE_KEY_EXCH +
             NTLMSSP_NEGOTIATE_128 +
@@ -334,6 +356,8 @@ unsigned char *NTLM_HandleChallenge(NTLM_Context *ctx, AuthInfo *authInfo,
             NTLMSSP_NEGOTIATE_SIGN +
             NTLMSSP_REQUEST_TARGET +
             NTLMSSP_NEGOTIATE_UNICODE;
+    if (authInfo->anonymous)
+        authMsg.NegotiateFlags |= NTLMSSP_ANONYMOUS;
     // TODO adjust flags?
     
     // TODO choose what version to send, if any

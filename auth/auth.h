@@ -33,7 +33,8 @@ typedef struct {
 
 void InitAuth(AuthState *state, AuthInfo *authInfo);
 
-size_t DoAuthStep(AuthState *state, const unsigned char *previousMsg,
-                  uint16_t previousSize, unsigned char *msgBuf);
+size_t DoAuthStep(AuthState *state,
+                  const unsigned char *previousMsg, uint16_t previousSize,
+                  unsigned char *msgBuf, uint16_t msgBufSize);
 
 #endif

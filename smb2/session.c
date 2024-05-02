@@ -77,7 +77,8 @@ Word SessionSetup(Session *session) {
 
     while (1) {
         authSize = DoAuthStep(&authState, previousAuthMsg,
-            previousAuthSize, sessionSetupRequest.Buffer);
+            previousAuthSize, sessionSetupRequest.Buffer,
+            sizeof(msg.body) - sizeof(sessionSetupRequest));
         if (authSize == (size_t)-1) {
             // TODO handle errors
             session->sessionId = previousSessionId;

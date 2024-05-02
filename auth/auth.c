@@ -78,8 +78,9 @@ void WriteX690Length(unsigned char **bufPtrPtr, uint16_t val) {
  *
  * Returns size of new message, or (size_t)-1 on error.
  */
-size_t DoAuthStep(AuthState *state, const unsigned char *previousMsg,
-                  uint16_t previousSize, unsigned char *msgBuf) {
+size_t DoAuthStep(AuthState *state,
+                  const unsigned char *previousMsg, uint16_t previousSize,
+                  unsigned char *msgBuf, uint16_t msgBufSize) {
     unsigned char *msgPtr = msgBuf;
     unsigned const char *prevMsgPtr;
     static size_t itemSize;
@@ -91,6 +92,12 @@ size_t DoAuthStep(AuthState *state, const unsigned char *previousMsg,
 
     switch (state->step++) {
     case 0:
+#define NEGOTIATE_TOKEN_SIZE (2 + sizeof(SPNEGO_OID) + 4 + 4 \
+    + sizeof(NTLMSSP_OID) + 4 + sizeof(NTLM_NEGOTIATE_MESSAGE))
+    
+        if (msgBufSize < NEGOTIATE_TOKEN_SIZE)
+            return (size_t)-1;
+
         /* GSS-API token; see RFC 2743 sec. 3.1 */
         /* note: this assumes total token length <= 129 */
         *msgPtr++ = 0x60;
@@ -133,7 +140,8 @@ size_t DoAuthStep(AuthState *state, const unsigned char *previousMsg,
         NTLM_GetNegotiateMessage(&ntlmContext, msgPtr);
         msgPtr += sizeof(NTLM_NEGOTIATE_MESSAGE);
         
-        return msgPtr - msgBuf;
+        return NEGOTIATE_TOKEN_SIZE;
+#undef NEGOTIATE_TOKEN_SIZE
 
     case 1:
         prevMsgPtr = previousMsg;
@@ -195,13 +203,18 @@ size_t DoAuthStep(AuthState *state, const unsigned char *previousMsg,
 
         mechListMICPtr = NTLM_GetMechListMIC(&ntlmContext, state->mechList,
             state->mechListSize, &mechListMICSize);
-
-        // TODO Make sure that output does not overflow msgBuf
         
         // NOTE: Below sizes involving itemSize always take 3 bytes to
         // represent, since NTLM_HandleChallenge ensures the auth message is
         // at least 256 bytes.  This makes the below size calculations easier.
-        
+
+#define AUTHENTICATE_TOKEN_SIZE (16UL + itemSize + 4 + mechListMICSize)
+
+        if (msgBufSize < AUTHENTICATE_TOKEN_SIZE) {
+            smb_free(authMsgPtr);
+            return (size_t)-1;
+        }
+
         *msgPtr++ = 0xA1; // constructed [1] (negTokenResp)
         WriteX690Length(&msgPtr, 12+itemSize+4+mechListMICSize);
         *msgPtr++ = 0x30; // sequence
@@ -227,7 +240,8 @@ size_t DoAuthStep(AuthState *state, const unsigned char *previousMsg,
         memcpy(msgPtr, mechListMICPtr, mechListMICSize);
         msgPtr += mechListMICSize;
 
-        return msgPtr - msgBuf;
+        return AUTHENTICATE_TOKEN_SIZE;
+#undef AUTHENTICATE_TOKEN_SIZE
         
     default:
         return (size_t)-1;

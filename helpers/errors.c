@@ -24,6 +24,7 @@ Word ConvertError(ReadStatus rs) {
 
         case STATUS_ACCESS_DENIED:
         case STATUS_CANNOT_DELETE:
+        case STATUS_DIRECTORY_NOT_EMPTY:
         case STATUS_QUOTA_EXCEEDED:
             return invalidAccess;
 

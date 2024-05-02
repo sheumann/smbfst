@@ -34,6 +34,12 @@ static const NTLM_NEGOTIATE_MESSAGE negotiateMessage = {
     .Version = {0},
 };
 
+// workstation name = "IIGS"
+// TODO generate a more unique one, or allow it to be configured
+static const char16_t workstationName[4] = u"IIGS";
+
+#define LM_CHALLENGE_RESPONSE_SIZE 24
+
 typedef struct {
     union {
         struct md4_context md4_context;
@@ -101,12 +107,6 @@ void NTLM_GetNegotiateMessage(NTLM_Context *ctx, unsigned char *buf) {
     memcpy(buf, &negotiateMessage, sizeof(negotiateMessage));
 }
 
-// TODO set appropriate size (dynamically allocate?)
-static unsigned char ntlmResponseBuf[
-    sizeof(NTLM_AUTHENTICATE_MESSAGE)+sizeof(NTLMv2_CLIENT_CHALLENGE)+1000];
-#define authMsg (*(NTLM_AUTHENTICATE_MESSAGE*)ntlmResponseBuf)
-
-
 static const void *NTLM_GetTargetInfo(
     const NTLM_CHALLENGE_MESSAGE *challengeMsg, uint16_t challengeSize,
     uint16_t avId, uint16_t *size) {
@@ -163,6 +163,15 @@ static void GetSealKey(const uint8_t exportedSessionKey[16],
     memcpy(sealKey, c.md5_context.hash, 16);
 }
 
+/*
+ * This handles an NTLMv2 challenge message and returns a pointer to the
+ * authenticate message generated in response (or NULL in case of an error).
+ *
+ * The pointer is allocated with smb_malloc and must be freed by the caller.
+ * The authenticate message is always at least 256 bytes long; this is not
+ * required by the NTLM spec, but we pad the message if necessary to ensure
+ * this, because it is convenient for our SMB2 authentication implementation.
+ */
 unsigned char *NTLM_HandleChallenge(NTLM_Context *ctx, AuthInfo *authInfo,
     const NTLM_CHALLENGE_MESSAGE *challengeMsg, uint16_t challengeSize,
     size_t *resultSize, uint8_t sessionKey[16]) {
@@ -174,6 +183,7 @@ unsigned char *NTLM_HandleChallenge(NTLM_Context *ctx, AuthInfo *authInfo,
     static unsigned char ntProofStr[16];
     static unsigned char sessionBaseKey[16];
     static unsigned char encryptedRandomSessionKey[16];
+    unsigned char *ntlmResponseBuf;
     unsigned char *payloadPtr;
     unsigned char *randPtr;
     
@@ -260,6 +270,8 @@ unsigned char *NTLM_HandleChallenge(NTLM_Context *ctx, AuthInfo *authInfo,
         memcpy(sessionBaseKey, c.hmac_md5_context.u[0].ctx.hash, 16);
 #undef responseKeyNT
     } else {
+        tempBuf = NULL;
+        tempBufSize = 0;
         memset(sessionBaseKey, 0, 16);
     }
 
@@ -269,8 +281,37 @@ unsigned char *NTLM_HandleChallenge(NTLM_Context *ctx, AuthInfo *authInfo,
         16);
 
     /* Generate NTLM authenticate message */
+    
+    if (!authInfo->anonymous) {
+        *resultSize = sizeof(NTLM_AUTHENTICATE_MESSAGE)
+            + LM_CHALLENGE_RESPONSE_SIZE
+            + sizeof(ntProofStr) + tempBufSize
+            + authInfo->userDomainSize
+            + authInfo->userNameSize
+            + sizeof(workstationName)
+            + sizeof(encryptedRandomSessionKey);
+    } else {
+        *resultSize = sizeof(NTLM_AUTHENTICATE_MESSAGE)
+            + 2 /* for one-byte LmChallengeResponse and one-byte padding */
+            + authInfo->userDomainSize
+            + authInfo->userNameSize
+            + sizeof(workstationName)
+            + sizeof(encryptedRandomSessionKey);    
+    }
 
-    memset(&authMsg, 0, sizeof(NTLM_AUTHENTICATE_MESSAGE));
+    // Pad message to be at least 256 bytes.  This is not required by the
+    // NTLM spec, but it is convenient for our SMB auth implementation.
+    if (*resultSize < 256)
+        *resultSize = 256;
+    
+    ntlmResponseBuf = smb_malloc(*resultSize);
+    if (ntlmResponseBuf == NULL) {
+        smb_free(tempBuf);
+        return NULL;
+    }
+    memset(ntlmResponseBuf, 0, *resultSize);
+
+#define authMsg (*(NTLM_AUTHENTICATE_MESSAGE*)ntlmResponseBuf)
     memcpy(authMsg.Signature, "NTLMSSP", 8);
     authMsg.MessageType = NtLmAuthenticate;
     
@@ -279,10 +320,11 @@ unsigned char *NTLM_HandleChallenge(NTLM_Context *ctx, AuthInfo *authInfo,
     if (!authInfo->anonymous) {
         // Send 24 zero bytes as LmChallengeResponse
         authMsg.LmChallengeResponseFields.Len =
-            authMsg.LmChallengeResponseFields.MaxLen = 24;
+            authMsg.LmChallengeResponseFields.MaxLen =
+            LM_CHALLENGE_RESPONSE_SIZE;
         authMsg.LmChallengeResponseFields.BufferOffset =
             payloadPtr - (unsigned char*)&authMsg;
-        payloadPtr += 24;
+        payloadPtr += LM_CHALLENGE_RESPONSE_SIZE;
         
         // Send ntProofStr plus tempBuf as NtChallengeResponse
         authMsg.NtChallengeResponseFields.Len =
@@ -329,22 +371,22 @@ unsigned char *NTLM_HandleChallenge(NTLM_Context *ctx, AuthInfo *authInfo,
         payloadPtr - (unsigned char*)&authMsg;
     memcpy(payloadPtr, authInfo->userName, authInfo->userNameSize);
     payloadPtr += authInfo->userNameSize;
-    
-    // workstation name = "IIGS"
-    // TODO generate a more unique one, or allow it to be configured
+
     authMsg.WorkstationNameFields.Len =
-        authMsg.WorkstationNameFields.MaxLen = 8;
+        authMsg.WorkstationNameFields.MaxLen = sizeof(workstationName);
     authMsg.WorkstationNameFields.BufferOffset =
         payloadPtr - (unsigned char*)&authMsg;
-    memcpy(payloadPtr, u"IIGS", 8);
-    payloadPtr += 8;
+    memcpy(payloadPtr, workstationName, sizeof(workstationName));
+    payloadPtr += sizeof(workstationName);
     
     authMsg.EncryptedRandomSessionKeyFields.Len =
-        authMsg.EncryptedRandomSessionKeyFields.MaxLen = 16;
+        authMsg.EncryptedRandomSessionKeyFields.MaxLen =
+        sizeof(encryptedRandomSessionKey);
     authMsg.EncryptedRandomSessionKeyFields.BufferOffset =
         payloadPtr - (unsigned char*)&authMsg;
-    memcpy(payloadPtr, encryptedRandomSessionKey, 16);
-    payloadPtr += 16;
+    memcpy(payloadPtr, encryptedRandomSessionKey,
+        sizeof(encryptedRandomSessionKey));
+    payloadPtr += sizeof(encryptedRandomSessionKey);
 
     authMsg.NegotiateFlags =
             NTLMSSP_NEGOTIATE_KEY_EXCH +
@@ -365,8 +407,6 @@ unsigned char *NTLM_HandleChallenge(NTLM_Context *ctx, AuthInfo *authInfo,
     authMsg.Version.ProductBuild = 1;
     authMsg.Version.NTLMRevisionCurrent = NTLMSSP_REVISION_W2K3;
 
-    *resultSize = payloadPtr - (unsigned char*)&authMsg;
-
     // set authMsg.MIC
     hmac_md5_init(&c.hmac_md5_context, exportedSessionKey,
         sizeof(exportedSessionKey));
@@ -377,6 +417,7 @@ unsigned char *NTLM_HandleChallenge(NTLM_Context *ctx, AuthInfo *authInfo,
     hmac_md5_update(&c.hmac_md5_context, (const void *)&authMsg, *resultSize);
     hmac_md5_finalize(&c.hmac_md5_context);
     memcpy(authMsg.MIC, c.hmac_md5_context.u[0].ctx.hash, 16);
+#undef authMsg
 
     GetSignKey(exportedSessionKey, ctx->signkey);
     GetSealKey(exportedSessionKey, ctx->sealkey);
@@ -384,7 +425,7 @@ unsigned char *NTLM_HandleChallenge(NTLM_Context *ctx, AuthInfo *authInfo,
     // save session key for use by SMB
     memcpy(sessionKey, exportedSessionKey, 16);
 
-    return (unsigned char *)&authMsg;
+    return ntlmResponseBuf;
 }
 
 unsigned char *NTLM_GetMechListMIC(NTLM_Context *ctx,

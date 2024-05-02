@@ -4,6 +4,7 @@
 
 #include "auth/auth.h"
 #include "auth/ntlm.h"
+#include "utils/alloc.h"
 
 // Type we use for length of items in X.690 encoding
 typedef uint16_t length_t;
@@ -194,11 +195,12 @@ size_t DoAuthStep(AuthState *state, const unsigned char *previousMsg,
 
         mechListMICPtr = NTLM_GetMechListMIC(&ntlmContext, state->mechList,
             state->mechListSize, &mechListMICSize);
+
+        // TODO Make sure that output does not overflow msgBuf
         
-        // This ensures sizes are multi-byte
-        // TODO handle more elegantly, making sure not to read beyond buffer
-        if (itemSize < 256)
-            itemSize = 256;
+        // NOTE: Below sizes involving itemSize always take 3 bytes to
+        // represent, since NTLM_HandleChallenge ensures the auth message is
+        // at least 256 bytes.  This makes the below size calculations easier.
         
         *msgPtr++ = 0xA1; // constructed [1] (negTokenResp)
         WriteX690Length(&msgPtr, 12+itemSize+4+mechListMICSize);
@@ -213,6 +215,8 @@ size_t DoAuthStep(AuthState *state, const unsigned char *previousMsg,
 
         memcpy(msgPtr, authMsgPtr, itemSize);
         msgPtr += itemSize;
+
+        smb_free(authMsgPtr);
 
         /* mechListMIC */
         *msgPtr++ = 0xA3; // constructed [3]

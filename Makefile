@@ -100,7 +100,11 @@ LISTSHARES_OBJ = \
            rpc/ndr.a \
            rpc/srvsvc.a
 
-BINARIES = SMB.FST LongNamesPatch SMBMounter mountsmb listshares
+LISTSERVERS_OBJ = \
+           commands/listservers.a \
+           mdns/mdnssd.a
+
+BINARIES = SMB.FST LongNamesPatch SMBMounter mountsmb listshares listservers
 
 .PHONY: all
 all: $(BINARIES)
@@ -130,6 +134,9 @@ mountsmb: $(MOUNTSMB_OBJ)
 	$(CC) $^ -o $@
 
 listshares: $(LISTSHARES_OBJ)
+	$(CC) $^ -o $@
+
+listservers: $(LISTSERVERS_OBJ)
 	$(CC) $^ -o $@
 
 crypto/lib65816crypto crypto/lib65816hash &: $(CRYPTO_SRC)

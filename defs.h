@@ -4,7 +4,9 @@
 #ifdef __ORCAC__
 #pragma lint -1
 #pragma ignore 24
+#ifndef USE_BLANK_SEG
 segment "AUTOSEG~~~";
+#endif
 #ifndef GENERATE_ROOT
 #pragma noroot
 #endif

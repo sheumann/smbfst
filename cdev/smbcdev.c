@@ -1,3 +1,4 @@
+#define USE_BLANK_SEG
 #define GENERATE_ROOT
 #include "defs.h"
 #include <types.h>

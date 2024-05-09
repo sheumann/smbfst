@@ -1,3 +1,4 @@
+#define USE_BLANK_SEG
 #include "defs.h"
 #include <stdbool.h>
 #include <string.h>

@@ -1,3 +1,4 @@
+#define USE_BLANK_SEG
 #include "defs.h"
 #include <stddef.h>
 #include <ctype.h>

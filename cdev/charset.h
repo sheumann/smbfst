@@ -1,6 +1,7 @@
 #ifndef CHARSET_H
 #define CHARSET_H
 
+#include <stdbool.h>
 #include <stdint.h>
 #include <uchar.h>
 
@@ -11,5 +12,6 @@ typedef struct {
 
 UTF16String *MacRomanToUTF16(char *str);
 char *UTF16ToMacRoman(uint32_t len, char16_t utfStr[]);
+bool UTF8ToMacRoman(unsigned char *str);
 
 #endif

@@ -97,7 +97,7 @@ static bool DoLoginWindow(AddressParts *address) {
     if (windPtr == NULL) {
         oldPort = GetPort();
         oldParamPtr = GetCtlParamPtr();
-        SetCtlParamPtr((Pointer)&address->host);
+        SetCtlParamPtr((Pointer)&address->displayName);
         setParamPtr = true;
 
         windPtr = NewWindow2(NULL, 0, NULL, NULL, refIsResource, loginWindow,

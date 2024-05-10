@@ -12,6 +12,8 @@ typedef struct {
     char *share;
     char *path; /* Omits leading '/'. */
     
+    char *displayName;
+    
     bool errorFound;
 } AddressParts;
 

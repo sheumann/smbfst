@@ -83,7 +83,8 @@ CDEV_OBJ = cdev/smbcdev.a \
            utils/macromantable.a \
            rpc/rpc.a \
            rpc/ndr.a \
-           rpc/srvsvc.a
+           rpc/srvsvc.a \
+           mdns/mdnssd.a
 
 CDEV_RSRC = \
            cdev/smbcdev.rez \

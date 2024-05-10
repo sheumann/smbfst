@@ -4,6 +4,7 @@
 #include <types.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <stddef.h>
 #include <locator.h>
 #include <misctool.h>
@@ -19,6 +20,7 @@
 #include <memory.h>
 #include <desk.h>
 #include <menu.h>
+#include <list.h>
 #include <finder.h>
 #include <tcpip.h>
 #include "cdev/addressparser.h"
@@ -27,6 +29,9 @@
 #include "cdev/loginsmb.h"
 #include "cdev/mountsmbvol.h"
 #include "cdev/errorcodes.h"
+#include "cdev/charset.h"
+#include "mdns/mdnssd.h"
+#include "mdns/mdnsproto.h"
 
 #pragma cdev CDEVMain
 
@@ -42,17 +47,126 @@
 #define RunCDEV         11
 #define EditCDEV        12
 
+#define TAB 0x09
+
+// SortList/SortList2 compareProc value
+#define SORT_CASE_INSENSITIVE ((void*)0x00000001)
+
 #define cdevWindow          1000
 
 #define serverAddressTxt    2
 #define addressLine         3
 #define connectBtn          1
+#define serversLst          4
+
+#define INITIAL_INTERVAL (1 * 60)  /* ticks */
+#define MAX_INTERVAL     (16 * 60) /* ticks */
 
 FSTInfoRecGS fstInfoRec;
 
 char addressBuf[257];
 
 WindowPtr wPtr = NULL;
+
+bool mdnsActive;
+Word ipid;
+LongWord lastQueryTime;
+uint16_t interval;
+
+CtlRecHndl addressLineHndl;
+CtlRecHndl serversListHndl;
+
+#define SERVER_LIST_SIZE 64
+
+// The type of entries in out List Manager list
+typedef struct {
+    uint8_t *memPtr;
+    Byte memFlag;
+    ServerInfo *serverInfo;
+} ListEntry;
+
+ListEntry serverList[SERVER_LIST_SIZE];
+unsigned serverListEntries;
+
+void AddServerEntry(ServerInfo *serverInfo) {
+    unsigned i;
+
+    if (!UTF8ToMacRoman(serverInfo->name))
+        return;
+    
+    // If this matches an existing entry, just update that one.
+    for (i = 0; i < serverListEntries; i++) {
+        if (serverList[i].serverInfo->address == serverInfo->address
+            && serverList[i].serverInfo->port == serverInfo->port)
+            break;
+    }
+    
+    if (i == serverListEntries) {
+        // allocating a new entry
+        if (i == SERVER_LIST_SIZE)
+            return; // no more space in list
+        
+        serverList[i].serverInfo = malloc(sizeof(ServerInfo));
+        if (serverList[i].serverInfo == NULL)
+            return;
+        
+        serverListEntries++;
+        serverList[i].memFlag = 0;
+    } else {
+        // updating an existing entry
+        
+        // skip update if entry is unchanged
+        if (serverList[i].serverInfo->name[0] == serverInfo->name[0]
+            && memcmp(serverList[i].serverInfo->name + 1, serverInfo->name + 1,
+            serverInfo->name[0]) == 0)
+            return;
+    }
+
+    *serverList[i].serverInfo = *serverInfo;
+    serverList[i].serverInfo->hostName = NULL;
+    serverList[i].memPtr = serverList[i].serverInfo->name;
+
+    NewList2(NULL, 0xFFFF, (Ref)serverList, refIsPointer, serverListEntries,
+        (Handle)serversListHndl);
+    SortList2(SORT_CASE_INSENSITIVE, (Handle)serversListHndl);
+}
+
+void DoMDNS(void) {
+    Handle dgmHandle;
+
+    if (mdnsActive) {
+        if (GetTick() - lastQueryTime > interval) {
+            MDNSSendQuery(ipid);
+            lastQueryTime = GetTick();
+            if (interval < MAX_INTERVAL)
+                interval *= 2;
+        }
+    
+        TCPIPPoll();
+        dgmHandle = TCPIPGetNextDatagram(ipid, protocolUDP, 0xC000);
+        if (!toolerror() && dgmHandle != NULL) {
+            MDNSProcessPacket(dgmHandle, AddServerEntry);
+            DisposeHandle(dgmHandle);
+        }
+    }
+}
+
+void StartMDNS(void) {
+    static const uint8_t smbName[] = "\x04_smb\x04_tcp\x05local";
+
+    ipid = TCPIPLogin(userid(), MDNS_IP, MDNS_PORT, 0, 0x40);
+    if (toolerror())
+        return;
+    // TODO ensure local port is not MDNS_PORT
+    
+    MDNSInitQuery(smbName);
+
+    mdnsActive = true;
+    lastQueryTime = 0;
+    interval = INITIAL_INTERVAL / 2;
+    
+    DoMDNS();
+}
 
 void DisplayError(unsigned errorCode) {
     if (errorCode != canceled) {
@@ -105,26 +219,72 @@ Boolean CheckVersions(void)
     return TRUE;
 }
 
+void ClearListSelection(void) {
+    unsigned i;
+
+    for (i = 0; i < serverListEntries; i++) {
+        if (serverList[i].memFlag & memSelected) {
+            serverList[i].memFlag &= ~memSelected;
+            DrawMember2(i + 1, (Handle)serversListHndl);
+            break;
+        }
+    }
+}
+
+void ClearAddressLine(void) {
+    SetLETextByID(wPtr, addressLine, (StringPtr)"");
+}
+
 void DoConnect(void)
 {
-    AddressParts addressParts;
+    AddressParts addressParts = {0};
     CtlRecHndl ctl;
     unsigned errorCode;
     LongWord connectionID;
     LongWord sessionID;
+    unsigned i;
     
     WaitCursor();
 
-    GetLETextByID(wPtr, addressLine, (StringPtr)&addressBuf);
-    if (addressBuf[0] == 0) {
-        DisplayError(noServerNameError);
-        goto fixcaret;
-    }
-    
-    addressParts = ParseAddress(addressBuf+1);
-    if (addressParts.errorFound) {
-        DisplayError(invalidAddressError);
-        goto fixcaret;
+    if (FindTargetCtl() == GetCtlHandleFromID(wPtr, addressLine)) {
+        GetLETextByID(wPtr, addressLine, (StringPtr)&addressBuf);
+        if (addressBuf[0] == 0) {
+            DisplayError(noServerNameError);
+            goto fixcaret;
+        }
+        
+        addressParts = ParseAddress(addressBuf+1);
+        if (addressParts.errorFound) {
+            DisplayError(invalidAddressError);
+            goto fixcaret;
+        }
+        
+        addressParts.displayName = addressParts.host;
+    } else {
+        static char host[16];
+        static char port[6];
+
+        for (i = 0; i < serverListEntries; i++) {
+            if (serverList[i].memFlag & memSelected) {
+                sprintf(host, "%u.%u.%u.%u",
+                    ((uint8_t*)&serverList[i].serverInfo->address)[0],
+                    ((uint8_t*)&serverList[i].serverInfo->address)[1],
+                    ((uint8_t*)&serverList[i].serverInfo->address)[2],
+                    ((uint8_t*)&serverList[i].serverInfo->address)[3]);
+                sprintf(port, "%u", serverList[i].serverInfo->port);
+
+                addressParts.host = host;
+                addressParts.port = port;
+                addressParts.displayName =
+                    p2cstr((char*)serverList[i].serverInfo->name);
+                break;
+            }
+        }
+        
+        if (i == serverListEntries) {
+            DisplayError(noServerNameError);
+            goto fixcaret;
+        }
     }
 
     if (!CheckVersions()) {
@@ -165,16 +325,22 @@ fixcaret:
     InitCursor();
 }
 
-void DoHit(long ctlID, CtlRecHndl ctlHandle)
+void DoHit(Long ctlID, CtlRecHndl ctlHandle)
 {
     if (!wPtr)  /* shouldn't happen */
         return;
 
     if (ctlID == connectBtn) {
         DoConnect();
+    } else if (ctlHandle == addressLineHndl) {
+        ClearListSelection();
+    } else if (ctlHandle == serversListHndl) {
+        ClearAddressLine();
+    } else if (ctlID == 0xFFFFFFFF) {
+        // Scroll bar in list control
+        if (FindTargetCtl() == serversListHndl)
+            ClearAddressLine();
     }
-    
-    return;
 }
 
 long DoMachine(void)
@@ -208,7 +374,7 @@ void DoEdit(Word op)
     SetPort(wPtr);
     
     ctl = FindTargetCtl();
-    if (toolerror() || GetCtlID(ctl) != addressLine)
+    if (toolerror() || ctl != addressLineHndl)
         goto ret;
 
     switch (op) {
@@ -234,7 +400,19 @@ ret:
 void DoCreate(WindowPtr windPtr)
 {
     wPtr = windPtr;
-    NewControl2(wPtr, resourceToResource, cdevWindow);
+    
+    if (GetMasterSCB() & scbColorMode) {
+        NewControl2(wPtr, resourceToResource, cdevWindow);
+    } else {
+        NewControl2(wPtr, resourceToResource, cdevWindow+320);
+    }
+    
+    serversListHndl = GetCtlHandleFromID(wPtr, serversLst);
+    addressLineHndl = GetCtlHandleFromID(wPtr, addressLine);
+    
+    serverListEntries = 0;
+
+    StartMDNS();
 }
 
 void DoEvent(EventRecord *event)
@@ -242,18 +420,39 @@ void DoEvent(EventRecord *event)
     Word key;
     CtlRecHndl ctl;
 
-    if ((event->modifiers & appleKey)
-        && (event->what == keyDownEvt || event->what == autoKeyEvt)) {
+    if (event->what == keyDownEvt || event->what == autoKeyEvt) {
         key = event->message & 0xFF;
-        if (key == 'a' || key == 'A') {
+        if ((event->modifiers & appleKey) && (key == 'a' || key == 'A')) {
             // OA-A -> select all
             ctl = FindTargetCtl();
             if (toolerror() || GetCtlID(ctl) != addressLine)
                 return;
             LESetSelect(0, 256, (LERecHndl)GetCtlTitle(ctl));
             event->what = nullEvt;
+        } else if (key == TAB) {
+            ctl = FindTargetCtl();
+            if (toolerror())
+                return;
+            if (ctl == addressLineHndl) {
+                ClearAddressLine();
+            } else if (ctl == serversListHndl) {
+                ClearListSelection();
+            }
         }
     }
+}
+
+void DoClose(void) {
+    if (mdnsActive) {
+        TCPIPLogout(ipid);
+        mdnsActive = false;
+    }
+
+    wPtr = NULL;
+}
+
+void DoRun(void) {
+    DoMDNS();
 }
 
 LongWord CDEVMain (LongWord data2, LongWord data1, Word message)
@@ -265,8 +464,9 @@ LongWord CDEVMain (LongWord data2, LongWord data1, Word message)
     case HitCDEV:       DoHit(data2, (CtlRecHndl)data1);    break;
     case EditCDEV:      DoEdit(data1 & 0xFFFF);             break;
     case CreateCDEV:    DoCreate((WindowPtr)data1);         break;
-    case CloseCDEV:     wPtr = NULL;                        break;
+    case CloseCDEV:     DoClose();                          break;
     case EventsCDEV:    DoEvent((EventRecord*)data1);       break;
+    case RunCDEV:       DoRun();                            break;
     }
 
     return result;

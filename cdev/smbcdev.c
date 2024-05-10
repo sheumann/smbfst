@@ -90,6 +90,7 @@ typedef struct {
 
 ListEntry serverList[SERVER_LIST_SIZE];
 unsigned serverListEntries;
+bool needListUpdate;
 
 #pragma databank 1
 #pragma toolparms 1
@@ -148,19 +149,12 @@ void AddServerEntry(ServerInfo *serverInfo) {
     serverList[i].serverInfo->hostName = NULL;
     serverList[i].memPtr = serverList[i].serverInfo->name;
 
-    if (serverListEntries > SERVER_LIST_BLANKS) {
-        NewList2(NULL, 0xFFFF, (Ref)serverList, refIsPointer, serverListEntries,
-            (Handle)serversListHndl);
-        SortList2(SORT_CASE_INSENSITIVE, (Handle)serversListHndl);
-    } else {
-        SortList2((Pointer)((uintptr_t)Compare | 0x80000000),
-            (Handle)serversListHndl);
-        DrawMember2(0, (Handle)serversListHndl);
-    }
+    needListUpdate = true;
 }
 
 void DoMDNS(void) {
     Handle dgmHandle;
+    unsigned i;
 
     if (mdnsActive) {
         if (GetTick() - lastQueryTime > interval) {
@@ -169,12 +163,30 @@ void DoMDNS(void) {
             if (interval < MAX_INTERVAL)
                 interval *= 2;
         }
-    
-        TCPIPPoll();
-        dgmHandle = TCPIPGetNextDatagram(ipid, protocolUDP, 0xC000);
-        if (!toolerror() && dgmHandle != NULL) {
-            MDNSProcessPacket(dgmHandle, AddServerEntry);
-            DisposeHandle(dgmHandle);
+
+        needListUpdate = false;
+        i = 0;
+        do {
+            TCPIPPoll();
+            dgmHandle = TCPIPGetNextDatagram(ipid, protocolUDP, 0xC000);
+            if (toolerror())
+                break;
+            if (dgmHandle != NULL) {
+                MDNSProcessPacket(dgmHandle, AddServerEntry);
+                DisposeHandle(dgmHandle);
+            }
+        } while (dgmHandle != NULL && ++i < 10);
+        
+        if (needListUpdate) {
+            if (serverListEntries > SERVER_LIST_BLANKS) {
+                NewList2(NULL, 0xFFFF, (Ref)serverList, refIsPointer,
+                    serverListEntries, (Handle)serversListHndl);
+                SortList2(SORT_CASE_INSENSITIVE, (Handle)serversListHndl);
+            } else {
+                SortList2((Pointer)((uintptr_t)Compare | 0x80000000),
+                    (Handle)serversListHndl);
+                DrawMember2(0, (Handle)serversListHndl);
+            }
         }
     }
 }

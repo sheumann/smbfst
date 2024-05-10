@@ -52,6 +52,8 @@
 // SortList/SortList2 compareProc value
 #define SORT_CASE_INSENSITIVE ((void*)0x00000001)
 
+#define memNever 0x20
+
 #define cdevWindow          1000
 
 #define serverAddressTxt    2
@@ -76,7 +78,8 @@ uint16_t interval;
 CtlRecHndl addressLineHndl;
 CtlRecHndl serversListHndl;
 
-#define SERVER_LIST_SIZE 64
+#define SERVER_LIST_SIZE 254
+#define SERVER_LIST_BLANKS 10
 
 // The type of entries in out List Manager list
 typedef struct {
@@ -87,6 +90,25 @@ typedef struct {
 
 ListEntry serverList[SERVER_LIST_SIZE];
 unsigned serverListEntries;
+
+#pragma databank 1
+#pragma toolparms 1
+Word Compare(ListEntry *memberA, ListEntry *memberB) {
+    if (memberA->memFlag & memNever) {
+        return 1;
+    } else if (memberB->memFlag & memNever) {
+        return 0;
+    } else {
+        if (CompareStrings(0, (Ptr)memberA->memPtr, (Ptr)memberB->memPtr)
+            == 0xFFFF) {
+            return 0;
+        } else {
+            return 1;
+        }
+    }
+}
+#pragma toolparms 0
+#pragma databank 0
 
 void AddServerEntry(ServerInfo *serverInfo) {
     unsigned i;
@@ -126,9 +148,15 @@ void AddServerEntry(ServerInfo *serverInfo) {
     serverList[i].serverInfo->hostName = NULL;
     serverList[i].memPtr = serverList[i].serverInfo->name;
 
-    NewList2(NULL, 0xFFFF, (Ref)serverList, refIsPointer, serverListEntries,
-        (Handle)serversListHndl);
-    SortList2(SORT_CASE_INSENSITIVE, (Handle)serversListHndl);
+    if (serverListEntries > SERVER_LIST_BLANKS) {
+        NewList2(NULL, 0xFFFF, (Ref)serverList, refIsPointer, serverListEntries,
+            (Handle)serversListHndl);
+        SortList2(SORT_CASE_INSENSITIVE, (Handle)serversListHndl);
+    } else {
+        SortList2((Pointer)((uintptr_t)Compare | 0x80000000),
+            (Handle)serversListHndl);
+        DrawMember2(0, (Handle)serversListHndl);
+    }
 }
 
 void DoMDNS(void) {
@@ -399,6 +427,8 @@ ret:
 
 void DoCreate(WindowPtr windPtr)
 {
+    unsigned i;
+
     wPtr = windPtr;
     
     if (GetMasterSCB() & scbColorMode) {
@@ -409,6 +439,13 @@ void DoCreate(WindowPtr windPtr)
     
     serversListHndl = GetCtlHandleFromID(wPtr, serversLst);
     addressLineHndl = GetCtlHandleFromID(wPtr, addressLine);
+    
+    for (i = 0; i < SERVER_LIST_BLANKS; i++) {
+        serverList[i].memPtr = (uint8_t*)"";
+        serverList[i].memFlag = memDisabled | memNever;
+    }
+    NewList2(NULL, 1, (Ref)serverList, refIsPointer, SERVER_LIST_BLANKS,
+            (Handle)serversListHndl);
     
     serverListEntries = 0;
 

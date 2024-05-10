@@ -92,6 +92,12 @@ ListEntry serverList[SERVER_LIST_SIZE];
 unsigned serverListEntries;
 bool needListUpdate;
 
+Point lastClickPt;
+Long lastClickTime;
+Word lastSelection;
+ServerInfo *lastServerInfo;
+Point eventLoc;
+
 #pragma databank 1
 #pragma toolparms 1
 Word Compare(ListEntry *memberA, ListEntry *memberB) {
@@ -376,6 +382,24 @@ void DoHit(Long ctlID, CtlRecHndl ctlHandle)
         ClearListSelection();
     } else if (ctlHandle == serversListHndl) {
         ClearAddressLine();
+        SubPt(&eventLoc, &lastClickPt);
+        if (GetTick() - lastClickTime <= GetDblTime()
+            && lastClickPt.h >= -5 && lastClickPt.h <= 5
+            && lastClickPt.v >= -3 && lastClickPt.v <= 3
+            && NextMember2(0, (Handle)serversListHndl) == lastSelection
+            && lastSelection != 0
+            && (serverList[lastSelection - 1].memFlag & memNever) == 0
+            && serverList[lastSelection - 1].serverInfo == lastServerInfo) {
+            DoConnect();
+            lastClickTime = 0;
+            lastSelection = 0;
+        } else {
+            lastClickPt = eventLoc;
+            lastClickTime = GetTick();
+            lastSelection = NextMember2(0, (Handle)serversListHndl);
+            if (lastSelection != 0)
+                lastServerInfo = serverList[lastSelection - 1].serverInfo;
+        }
     } else if (ctlID == 0xFFFFFFFF) {
         // Scroll bar in list control
         if (FindTargetCtl() == serversListHndl)
@@ -452,6 +476,9 @@ void DoCreate(WindowPtr windPtr)
     serversListHndl = GetCtlHandleFromID(wPtr, serversLst);
     addressLineHndl = GetCtlHandleFromID(wPtr, addressLine);
     
+    lastClickTime = 0;
+    lastSelection = 0;
+    
     for (i = 0; i < SERVER_LIST_BLANKS; i++) {
         serverList[i].memPtr = (uint8_t*)"";
         serverList[i].memFlag = memDisabled | memNever;
@@ -488,6 +515,8 @@ void DoEvent(EventRecord *event)
                 ClearListSelection();
             }
         }
+    } else {
+        eventLoc = event->where;
     }
 }
 

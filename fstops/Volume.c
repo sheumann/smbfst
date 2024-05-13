@@ -16,7 +16,6 @@
 
 Word Volume(void *pblock, struct GSOSDP *gsosDP, Word pcount) {
     unsigned i;
-    VCR *vcr;
     GSString *volName;
     GSString *pathName;
     Word result = 0;
@@ -27,12 +26,11 @@ Word Volume(void *pblock, struct GSOSDP *gsosDP, Word pcount) {
     }
     if (i == NDIBS)
         return volNotFound;
-    
-    DerefVP(vcr, dibs[i].vcrVP);
-    DerefVP(volName, vcr->name);
 
-    // TODO check if pathName overflow is possible, and handle better if it is
+    volName = dibs[i].volName;
+
     if (volName->length > GBUF_SIZE - 3) {
+        // This should not happen in practice
         pathName = NULL;
     } else {
         pathName = (void*)gbuf;

@@ -2,6 +2,7 @@
 #include <gsos.h>
 #include <string.h>
 #include "gsos/gsosutils.h"
+#include "utils/memcasecmp.h"
 
 Word WriteGSOSString(Word length, char *str, ResultBufPtr buf) {
     char *outStr;
@@ -41,7 +42,6 @@ DIB *GetDIB(struct GSOSDP *gsosdp, int num) {
     Word devNum;
     GSString *path;
     size_t volNameLen;
-    VCR *vcr;
     unsigned i;
     char *sep;
 
@@ -64,36 +64,14 @@ DIB *GetDIB(struct GSOSDP *gsosdp, int num) {
         } else {
             volNameLen = path->length - 1;
         }
-        if (volNameLen > GBUF_SIZE-2)
-            return NULL;
 
-        *(Word *)gbuf = volNameLen;
-        memcpy(gbuf+2, path->text+1, volNameLen);
-        
-        i = 0;
-        asm {
-            ldx gbuf
-            ldy gbuf+2
-            phd
-            lda gsosdp
-            tcd
-            lda #0
-            jsl FIND_VCR
-            bcs no_vcr
-            jsl DEREF
-            pld
-            stx vcr
-            sty vcr+2
-            bra have_vcr
-no_vcr:     pld
-            inc i
-have_vcr:
+        for (i = 0; i < NDIBS; i++) {
+            if (dibs[i].extendedDIBPtr != 0
+                && dibs[i].volName->length == volNameLen
+                && memcasecmp(dibs[i].volName->text, path->text+1, volNameLen)
+                    == 0)
+                return &dibs[i];
         }
-        if (i != 0) {
-            return NULL;
-        }
-        
-        devNum = vcr->devNum;
     } else {
 useDevNum:
         if (num == 1) {
@@ -101,11 +79,12 @@ useDevNum:
         } else {
             devNum = gsosdp->dev2Num;
         }
-    }
     
-    for (i = 0; i < NDIBS; i++) {
-        if (dibs[i].DIBDevNum == devNum  && dibs[i].extendedDIBPtr != 0)
-            return &dibs[i];
+        for (i = 0; i < NDIBS; i++) {
+            if (dibs[i].DIBDevNum == devNum  && dibs[i].extendedDIBPtr != 0)
+                return &dibs[i];
+        }
     }
+
     return NULL;
 }

@@ -64,7 +64,11 @@ typedef struct {
 
 extern MsgRec msg;
 
+extern SMB2Message *nextMsg;
+
 extern uint16_t bodySize;   // size of last message received
+
+extern const SMB2_FILEID fileIDFromPrevious;
 
 typedef struct {
     DIB *dib;
@@ -73,6 +77,11 @@ typedef struct {
 
 extern ReconnectInfo reconnectInfo;
 
+bool SpaceAvailable(uint16_t bodyLength);
+unsigned EnqueueRequest(DIB *dib, uint16_t command, uint16_t bodyLength);
+bool SendMessages(DIB *dib);
+void ResetSendStatus(void);
+ReadStatus GetResponse(DIB *dib, uint16_t messageNum);
 ReadStatus SendRequestAndGetResponse(DIB *dib, uint16_t command,
                                      uint16_t bodyLength);
 void InitSMB(void);

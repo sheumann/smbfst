@@ -88,11 +88,37 @@ static uint8_t fileIdOffsets[SMB2_OPLOCK_BREAK + 1];
 
 #define SMB2_ERROR_RESPONSE_STRUCTURE_SIZE 9u
 
+// Position for next message to be enqueued
+SMB2Message *nextMsg = (SMB2Message *)&msg.smb2Header;
+
+// Pointer to last message enqueued, if any
+static SMB2Message *lastMsg = NULL;
+
+// Total length of data enqueued to send
+static uint16_t sendLength = 0;
+
+// Maximum number of messages that we allow to be compounded
+#define MAX_COMPOUND_SIZE 3
+
+// Message number to use for next message enqueued
+static uint16_t nextMessageNum = 0;
+
+// Message IDs and commands for last set of messages enqueued/sent
+static uint64_t msgIDs[MAX_COMPOUND_SIZE];
+static uint16_t msgCommands[MAX_COMPOUND_SIZE];
+
+// Block from retrying a send (because message has been overwritten)?
+bool blockRetry = false;
+
 #define MIN_RECONNECT_TIME 5 /* seconds */
 
-static bool Reconnect(DIB *dib, uint16_t bodyLength);
+static bool Reconnect(DIB *dib);
 
 static const smb_u128 u128_zero = {0,0};
+
+// File Id indicating the file created previously within a compounded request
+const SMB2_FILEID fileIDFromPrevious =
+    {0xffffffffffffffff, 0xffffffffffffffff};
 
 MsgRec msg;
 
@@ -100,23 +126,47 @@ uint16_t bodySize;   // size of last message received
 
 ReconnectInfo reconnectInfo;
 
-ReadStatus ReadMessage(Connection *connection) {
+/*
+ * Read an SMB2 protocol message from the connection.
+ * On success, the message is left in msg.smb2Header and msg.body.
+ */
+static ReadStatus ReadMessage(Connection *connection) {
     ReadStatus result;
     uint32_t msgSize;
     
-    result = ReadTCP(connection, 4, &msg.directTCPHeader);
-    if (result != rsDone)
-        return result;
-    
-    msgSize = ntoh32(msg.directTCPHeader.StreamProtocolLength);
-    if (msgSize > sizeof(SMB2Header) + sizeof(msg.body)) {
-        return rsBadMsg;
+    if (connection->remainingCompoundSize == 0) {
+        result =
+            ReadTCP(connection, 4 + sizeof(SMB2Header), &msg.directTCPHeader);
+        if (result != rsDone)
+            return result;
+        
+        connection->remainingCompoundSize =
+            ntoh32(msg.directTCPHeader.StreamProtocolLength);
+    } else {
+        result = ReadTCP(connection, sizeof(SMB2Header), &msg.smb2Header);
+        if (result != rsDone)
+            return result;
+    }
+
+    blockRetry = true;
+
+    if (msg.smb2Header.NextCommand != 0) {
+        if (msg.smb2Header.NextCommand >= connection->remainingCompoundSize)
+            return rsBadMsg;
+
+        connection->remainingCompoundSize -= msg.smb2Header.NextCommand;
+        msgSize = msg.smb2Header.NextCommand;
+        
+        if (connection->remainingCompoundSize != 0
+            && connection->remainingCompoundSize < sizeof(SMB2Header)) {
+            connection->remainingCompoundSize = 0;
+            return rsBadMsg;
+        }
+    } else {
+        msgSize = connection->remainingCompoundSize;
+        connection->remainingCompoundSize = 0;
     }
     
-    result = ReadTCP(connection, msgSize, &msg.smb2Header);
-    if (result != rsDone)
-        return rsBadMsg;
-
     // Check that it looks like an SMB2/3 message
     
     if (msgSize < sizeof(SMB2Header))
@@ -125,122 +175,192 @@ ReadStatus ReadMessage(Connection *connection) {
         return rsBadMsg;
     if (msg.smb2Header.StructureSize != 64)
         return rsBadMsg;
+
+    if (msgSize > sizeof(SMB2Header) + sizeof(msg.body))
+        return rsBadMsg;
+    
+    result = ReadTCP(connection, msgSize - sizeof(SMB2Header), &msg.body);
+    if (result != rsDone)
+        return rsBadMsg;
     
     bodySize = msgSize - sizeof(SMB2Header);
     
     return rsDone;
 }
 
-bool SendMessage(Session *session, uint16_t command, uint32_t treeId,
-                 uint16_t bodyLength) {
-    Connection *connection = session->connection;
-    Word tcperr;
+/*
+ * Check if there is space available in the buffer for another message with
+ * the specified body length.  If there is not, any already-buffered messages
+ * are cleared.
+ */
+bool SpaceAvailable(uint16_t bodyLength) {
+    if (msg.body + sizeof(msg.body) - (unsigned char *)nextMsg
+        < sizeof(SMB2Header) + bodyLength) {
+        ResetSendStatus();
+        return false;
+    }
+    return true;
+}
 
-    msg.smb2Header.ProtocolId = 0x424D53FE;
-    msg.smb2Header.StructureSize = 64;
+/*
+ * Enqueue a SMB2 request message to be sent later.
+ * If multiple messages are enqueued, they are compounded as related requests.
+ * Returns a message number that can be used to get the response.
+ */
+unsigned EnqueueRequest(DIB *dib, uint16_t command, uint16_t bodyLength) {
+    Session *session = dib->session;
+    Connection *connection = session->connection;
+    SMB2Header *header = &nextMsg->Header;
+
+    if (lastMsg != NULL) {
+        // Zero out padding
+        *(uint64_t*)((char*)&msg.smb2Header + sendLength) = 0;
+
+        header->Flags = SMB2_FLAGS_RELATED_OPERATIONS;
+        lastMsg->Header.NextCommand = (char*)nextMsg - (char*)lastMsg;
+    } else {
+        header->Flags = 0;
+    }
     
+    header->ProtocolId = 0x424D53FE;
+    header->StructureSize = 64;
+
     if (connection->dialect == SMB_202) {
-        msg.smb2Header.CreditCharge = 0;
+        header->CreditCharge = 0;
     } else {
         // Our messages are always < 64K, so CreditCharge is just 1.
-        msg.smb2Header.CreditCharge = 1;
+        header->CreditCharge = 1;
     }
     
-    if (connection->dialect <= SMB_21) {
-        msg.smb2Header.Status = 0;
+    // Note: In SMB 3.x, this is actually ChannelSequence + Reserved.
+    header->Status = 0;
+    
+    header->Command = command;
+    
+    if (command == SMB2_NEGOTIATE) {
+        header->CreditRequest = MAX_COMPOUND_SIZE;
     } else {
-        // TODO support reconnection with updated ChannelSequence
-        msg.smb2Header.ChannelSequence = 0;
-        msg.smb2Header.Reserved = 0;
+        header->CreditRequest = 1;
     }
 
-    msg.smb2Header.Command = command;
+    header->NextCommand = 0;
+    header->MessageId = connection->nextMessageId++;
+    header->Reserved2 = 0;
+    header->TreeId = dib->treeId;
+    header->SessionId = session->sessionId;
+    header->Signature = u128_zero;
     
-    msg.smb2Header.CreditRequest = 1;
+    ((SMB2_Common_Header*)nextMsg->Body)->StructureSize =
+        requestStructureSizes[command];
+
+    sendLength = ((sendLength + 7) & 0xfff8) + sizeof(SMB2Header) + bodyLength;
+    lastMsg = nextMsg;
     
-    msg.smb2Header.Flags = 0;
-    msg.smb2Header.NextCommand = 0;
-    msg.smb2Header.MessageId = connection->nextMessageId++;
-    msg.smb2Header.Reserved2 = 0;
-    msg.smb2Header.TreeId = treeId;
-    msg.smb2Header.SessionId = session->sessionId;
-    msg.smb2Header.Signature = u128_zero;
+    nextMsg = (void*)((char*)&msg.smb2Header + ((sendLength + 7) & 0xfff8));
+    
+    msgIDs[nextMessageNum] = header->MessageId;
+    msgCommands[nextMessageNum] = command;
+    return nextMessageNum++;
+}
+
+/*
+ * Send all currently-enqueued messages.
+ */
+bool SendMessages(DIB *dib) {
+    Session *session = dib->session;
+    Connection *connection = session->connection;
+    SMB2Message *message;
+    uint16_t msgLen;
+    uint16_t remainingLen;
+    Word tcperr;
 
     if (session->signingRequired) {
-        msg.smb2Header.Flags |= SMB2_FLAGS_SIGNED;
+        message = (SMB2Message *)&msg.smb2Header;
+        remainingLen = sendLength;
         
-        if (connection->dialect <= SMB_21) {
-            hmac_sha256_compute(session->hmacSigningContext,
-                (void*)&msg.smb2Header, sizeof(SMB2Header) + bodyLength);
-            memcpy(&msg.smb2Header.Signature,
-                session->hmacSigningContext->u[0].ctx.hash, 16);
-        } else {
-            aes_cmac_compute(session->cmacSigningContext,
-                (void*)&msg.smb2Header, sizeof(SMB2Header) + bodyLength);
-            memcpy(&msg.smb2Header.Signature,
-                session->cmacSigningContext->ctx.data, 16);
-        }
+        do {
+            if (message->Header.NextCommand != 0) {
+                msgLen = message->Header.NextCommand;
+            } else {
+                msgLen = remainingLen;
+            }
+
+            message->Header.Flags |= SMB2_FLAGS_SIGNED;
+            
+            if (connection->dialect <= SMB_21) {
+                hmac_sha256_compute(session->hmacSigningContext,
+                    (void*)message, msgLen);
+                memcpy(&message->Header.Signature,
+                    session->hmacSigningContext->u[0].ctx.hash, 16);
+            } else {
+                aes_cmac_compute(session->cmacSigningContext,
+                    (void*)message, msgLen);
+                memcpy(&message->Header.Signature,
+                    session->cmacSigningContext->ctx.data, 16);
+            }
+            
+            message = (SMB2Message *)((char*)message + msgLen);
+            remainingLen -= msgLen;
+        } while (remainingLen != 0);
     }
     
     msg.directTCPHeader.StreamProtocolLength =
-        hton32(sizeof(SMB2Header) + bodyLength);
+        hton32(sendLength);
 
-    tcperr =
-        TCPIPWriteTCP(connection->ipid, (void*)&msg,
-                      4 + sizeof(SMB2Header) + bodyLength, TRUE, FALSE);
+    blockRetry = false;
+
+    tcperr = TCPIPWriteTCP(connection->ipid, (void*)&msg, 4 + sendLength,
+        TRUE, FALSE);
     return !(tcperr || toolerror());
 }
 
-ReadStatus SendRequestAndGetResponse(DIB *dib, uint16_t command,
-                                     uint16_t bodyLength) {
-    Session *session = dib->session;
-    Connection *connection = session->connection;
-    uint64_t messageId;
-    bool blockRetry = false;
-    ReadStatus status;
+/*
+ * Clear the send buffer, discarding any enqueued messages.
+ */
+void ResetSendStatus(void) {
+    nextMsg = (SMB2Message *)&msg.smb2Header;
+    lastMsg = NULL;
+    sendLength = 0;
+    nextMessageNum = 0;
+}
 
-retry:
-    messageId = connection->nextMessageId;
-    msgBodyHeader.StructureSize = requestStructureSizes[command];
-    
-    // Pad body to at least equal structure size (required by Windows).
-    if (bodyLength < msgBodyHeader.StructureSize)
-        msg.body[bodyLength++] = 0;
-    
-    if (SendMessage(session, command, dib->treeId, bodyLength) == false) {
-        if (!blockRetry && Reconnect(dib, bodyLength)) {
-            blockRetry = true;
-            goto retry;
-        } else {
-            return rsError;
-        }
-    }
+/*
+ * Get a response to a message from the last batch sent.
+ * messageNum is the number returned from EnqueueRequest for it.
+ * Responses must be received in the order that the messages were enqueued.
+ */
+ReadStatus GetResponse(DIB *dib, uint16_t messageNum) {
+    ReadStatus status;
+    uint16_t command = msgCommands[messageNum];
 
     do {
-        status = ReadMessage(connection);
+retry:
+        status = ReadMessage(dib->session->connection);
         if (status != rsDone) {
             if (status != rsBadMsg && !blockRetry
-                && Reconnect(dib, bodyLength)) {
+                && Reconnect(dib)) {
+                SendMessages(dib);
                 blockRetry = true;
                 goto retry;
             } else {
+                ResetSendStatus();
                 return rsError;
             }
         }
         
+        ResetSendStatus();
+        
         // Check that the message received is a response to the one sent.
         if (!(msg.smb2Header.Flags & SMB2_FLAGS_SERVER_TO_REDIR))
             return rsError;
-        if (msg.smb2Header.MessageId != messageId)
+        if (msg.smb2Header.MessageId != msgIDs[messageNum])
             return rsError;
         if (msg.smb2Header.Command != command)
             return rsError;
         
         if (bodySize < (responseStructureSizes[command] & 0xFFFE)
-            || msgBodyHeader.StructureSize != responseStructureSizes[command]) {
-            blockRetry = true;
+            || msgBodyHeader.StructureSize != responseStructureSizes[command])
             continue;
-        }
     
         if (msg.smb2Header.Status == STATUS_SUCCESS) {
             return rsDone;
@@ -256,8 +376,6 @@ retry:
         } else if (msg.smb2Header.Status == STATUS_MORE_PROCESSING_REQUIRED) {
             return rsMoreProcessingRequired;
         }
-        
-        blockRetry = true; // because msg has been overwritten
     } while (msg.smb2Header.Status == STATUS_PENDING &&
         (msg.smb2Header.Flags & SMB2_FLAGS_ASYNC_COMMAND));
 
@@ -270,10 +388,34 @@ retry:
     }
 }
 
-static bool Reconnect(DIB *dib, uint16_t bodyLength) {
+/*
+ * Send a single message and get a response for it.
+ */
+ReadStatus SendRequestAndGetResponse(DIB *dib, uint16_t command,
+                                     uint16_t bodyLength) {
+    uint16_t messageNum;
+    
+    // Pad body to at least equal structure size (required by Windows).
+    if (bodyLength < requestStructureSizes[command])
+        msg.body[bodyLength++] = 0;
+    
+    messageNum = EnqueueRequest(dib, command, bodyLength);
+
+    SendMessages(dib);
+    return GetResponse(dib, messageNum);
+}
+
+/*
+ * Reconnect after the connection has been dropped.
+ * This tries to reconnect the connection and all its sessions, tree connects,
+ * and open files.  The previously sent group of messages are re-enqueued.
+ */
+static bool Reconnect(DIB *dib) {
     Connection *connection = dib->session->connection;
     bool result;
-    unsigned char *savedBody;
+    unsigned char *savedMsg;
+    uint16_t savedLength;
+    uint16_t msgLen;
     
     if (GetTick() - connection->reconnectTime
         < MIN_RECONNECT_TIME * 60)
@@ -281,34 +423,53 @@ static bool Reconnect(DIB *dib, uint16_t bodyLength) {
     
     connection->reconnectTime = GetTick();
 
-    savedBody = smb_malloc(bodyLength);
-    if (savedBody == NULL)
+    savedLength = sendLength;
+    savedMsg = smb_malloc(savedLength);
+    if (savedMsg == NULL)
         return false;
-    memcpy(savedBody, msg.body, bodyLength);
+    memcpy(savedMsg, &msg.smb2Header, savedLength);
     
     /*
      * Save info about the file being accessed (if any), so that the fileId
      * can be updated as part of the reconnect process.
+     * NOTE: This currently only works for the first message in a compound set.
      */
     reconnectInfo.dib = dib;
     if (fileIdOffsets[msg.smb2Header.Command] != 0) {
         reconnectInfo.fileId =
-            (SMB2_FILEID*)(savedBody + fileIdOffsets[msg.smb2Header.Command]);
+            (SMB2_FILEID*)(savedMsg + sizeof(SMB2Header)
+            + fileIdOffsets[msg.smb2Header.Command]);
     } else {
         reconnectInfo.fileId = NULL;
     }
 
+    ResetSendStatus();
     result = Connection_Reconnect(connection) == 0;
 
-    memcpy(msg.body, savedBody, bodyLength);
-    smb_free(savedBody);
+    memcpy(&msg.smb2Header, savedMsg, savedLength);
+    smb_free(savedMsg);
+    
+    // Re-enqueue messages to rebuild their headers as necessary
+    do {
+        if (nextMsg->Header.NextCommand != 0) {
+            msgLen = nextMsg->Header.NextCommand;
+        } else {
+            msgLen = savedLength;
+        }
+        EnqueueRequest(dib, nextMsg->Header.Command,
+            msgLen - sizeof(SMB2Header));
+        savedLength -= msgLen;
+    } while (savedLength != 0);
 
     if (reconnectInfo.fileId != NULL)
-        return result;
+        return false;
 
     return result;
 }
 
+/*
+ * Initialize data for SMB at start-up.
+ */
 void InitSMB(void) {
     fileIdOffsets[SMB2_NEGOTIATE] = 0;
     fileIdOffsets[SMB2_SESSION_SETUP] = 0;

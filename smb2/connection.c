@@ -68,6 +68,7 @@ Word Connect(Connection *connection) {
     connection->dialect = SMB_202;
 
     connection->nextMessageId = 0;
+    connection->remainingCompoundSize = 0;
 
     negotiateRequest.SecurityMode = 0;
     negotiateRequest.Reserved = 0;

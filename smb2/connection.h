@@ -26,6 +26,9 @@ typedef struct {
     
     LongWord reconnectTime;
     LongWord lastActivityTime;
+    
+    // size of not-yet processed portion of a compound message
+    uint32_t remainingCompoundSize;
 } Connection;
 
 extern DIB fakeDIB;

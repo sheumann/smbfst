@@ -83,6 +83,11 @@ SMB2_ASSERT_SIZE(SMB2Header,64)
 #define SMB2_FLAGS_DFS_OPERATIONS     0x10000000
 #define SMB2_FLAGS_REPLAY_OPERATION   0x20000000
 
+typedef struct {
+    SMB2Header Header;
+    uint8_t Body[];
+}  SMB2Message;
+
 /* Common header field for the body part of all SMB2 messages */
 typedef struct {
     uint16_t StructureSize;

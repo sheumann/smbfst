@@ -58,17 +58,6 @@ static SMBMountRec mountPB = {
 ResultBuf32 devName = {32};
 ResultBuf255 volName = {255};
 
-DInfoRec dInfoPB = {
-    .pCount = 2,
-    .devName = &devName,
-};
-
-VolumeRec volumePB = {
-    .pCount = 2,
-    .devName = &devName.bufString,
-    .volName = &volName,
-};
-
 DAccessRecGS dControlPB = {
     .pCount = 5,
     .code = eject,
@@ -154,7 +143,7 @@ static void CloseSharesWindow(void) {
     }
 }
 
-static unsigned MountVolume(char16_t *shareName, uint16_t shareNameSize,
+static Word MountVolume(char16_t *shareName, uint16_t shareNameSize,
     char *volName, AddressParts *address, LongWord sessionID) {
     UTF16String *hostName;
     uint32_t nameLen;
@@ -207,14 +196,6 @@ static unsigned MountVolume(char16_t *shareName, uint16_t shareNameSize,
     }
 
     free(nameBuffer);
-
-    dInfoPB.devNum = mountPB.devNum;
-    DInfo(&dInfoPB);
-    if (toolerror())
-        return mountError;
-
-    // This call ensures the share is recognized as an online volume.
-    VolumeGS(&volumePB);
 
     return 0;
 }
@@ -332,6 +313,8 @@ unsigned MountSMBVolumes(AddressParts *address, LongWord sessionID) {
         // Mount IPC$ share
         result = MountVolume(u"IPC$", 4*sizeof(char16_t), "IPC$", address,
             sessionID);
+        if (result != 0)
+            return result;
     
         // Get list of shares on server
         infoHandle = EnumerateShares(mountPB.devNum);

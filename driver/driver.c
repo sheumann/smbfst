@@ -213,13 +213,23 @@ static Word DoStatus(struct GSOSDP *dp) {
         dp->transferCount = 0;
         return drvrBadParm;
     }
-    //TODO disk-switched logic
     if (dp->dibPointer->extendedDIBPtr != NULL) {
         dsRec->statusWord = 0x0010;
         if (dp->dibPointer->flags & FLAG_READONLY)
             dsRec->statusWord |= 0x0004;
     } else {
         dsRec->statusWord = 0;
+    }
+    if (dp->dibPointer->switched) {
+        dp->dibPointer->switched = false;
+        dsRec->statusWord |= 0x0001;
+        asm {
+            phd
+            lda dp
+            tcd
+            jsl >SET_DISKSW
+            pld
+        }
     }
     if (dp->requestCount < 6) {
         dp->transferCount = 2;
@@ -256,6 +266,16 @@ void UnmountSMBVolume(DIB *dib) {
 
 static Word DoEject(struct GSOSDP *dp) {
     UnmountSMBVolume(dp->dibPointer);
+    
+    asm {
+        phd
+        lda dp
+        tcd
+        lda 0   /* deviceNum in GS/OS DP */
+        jsl >SWAP_OUT
+        pld
+    }
+    
     dp->transferCount = 0;
     return 0;
 }

@@ -27,6 +27,8 @@ typedef GSString255Ptr GSStringPtr;
 #define RELEASE_FCR 0x01fc30
 #define GET_FCR     0x01fc64
 #define RELEASE_VCR 0x01fc28
+#define SET_DISKSW  0x01fc90
+#define SWAP_OUT    0x01fc34
 
 typedef LongWord VirtualPointer;
 

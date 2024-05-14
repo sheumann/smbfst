@@ -120,6 +120,7 @@ retry:
         sizeof(msg.body) - offsetof(SMB2_CREATE_Request, Buffer));
     if (createRequest.NameLength == 0xFFFF)
         return badPathSyntax;
+    isRootDir = createRequest.NameLength == 0;
 
     if (forkOp >= openResourceFork) {
         if (createRequest.NameLength >

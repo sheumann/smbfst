@@ -18,6 +18,7 @@
 FILE_BASIC_INFORMATION basicInfo;
 bool haveDataForkSizes;
 uint64_t dataEOF, dataAlloc;
+bool isRootDir;
 
 /*
  * This contains the implementation of GetFileInfo, which is also used when
@@ -27,8 +28,9 @@ uint64_t dataEOF, dataAlloc;
  * pblock is adjusted to line up corresponding fields (access through 
  * resourceBlocks).  In addition, the CreationTime, LastWriteTime, and
  * FileAttributes fields of basicInfo must be pre-filled in this case,
- * and haveDataForkSizes must be set to indicate whether dataEOF and
- * dataAlloc have been filled in with the sizes for the data fork.
+ * haveDataForkSizes must be set to indicate whether dataEOF and dataAlloc
+ * have been filled in with the sizes for the data fork, and isRootDir must
+ * be set to indicate whether the file is the root directory of a share.
  */
 Word GetFileInfo_Impl(void *pblock, struct GSOSDP *gsosdp, Word pcount,
     bool alreadyOpen, SMB2_FILEID fileID) {
@@ -78,6 +80,7 @@ top:
             sizeof(msg.body) - offsetof(SMB2_CREATE_Request, Buffer));
         if (createRequest.NameLength == 0xFFFF)
             return badPathSyntax;
+        isRootDir = createRequest.NameLength == 0;
     
         result = SendRequestAndGetResponse(dib, SMB2_CREATE,
             sizeof(createRequest) + createRequest.NameLength);
@@ -244,6 +247,8 @@ close:
         #define pblock ((FileRec*)pblock)
         
         pblock->fAccess = GetAccess(basicInfo.FileAttributes);
+        if (isRootDir)
+            pblock->fAccess &= ~renameEnable;
         
         fileType = GetFileType(gsosdp->path1Ptr, &afpInfo,
             (bool)(basicInfo.FileAttributes & FILE_ATTRIBUTE_DIRECTORY));
@@ -273,6 +278,8 @@ close:
         #define pblock ((FileInfoRecGS*)pblock)
         
         pblock->access = GetAccess(basicInfo.FileAttributes);
+        if (isRootDir)
+            pblock->access &= ~renameEnable;
         
         if (pcount >= 3) {
             fileType = GetFileType(gsosdp->path1Ptr, &afpInfo,

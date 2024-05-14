@@ -8,6 +8,7 @@
 extern FILE_BASIC_INFORMATION basicInfo;
 extern bool haveDataForkSizes;
 extern uint64_t dataEOF, dataAlloc;
+extern bool isRootDir;
 
 Word GetFileInfo_Impl(void *pblock, struct GSOSDP *gsosdp, Word pcount,
     bool alreadyOpen, SMB2_FILEID fileID);

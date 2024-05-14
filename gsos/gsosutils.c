@@ -1,4 +1,5 @@
 #include "defs.h"
+#include <stdbool.h>
 #include <gsos.h>
 #include <string.h>
 #include "gsos/gsosutils.h"
@@ -87,4 +88,92 @@ useDevNum:
     }
 
     return NULL;
+}
+
+/*
+ * Get VCR for the SMB volume mounted on the specified device.
+ * Returns 0 on success, or a GS/OS error code.
+ * On success, if vcrPtrPtr is non-null, sets *vcrPtrPtr to point to the VCR.
+ */
+Word GetVCR(DIB *dib, VCR **vcrPtrPtr) {
+    bool err;
+    Word id;
+    VCR *vcr;
+    GSString *volName = dib->volName;
+
+    // Find existing VCR, if present.
+    asm {
+        stz err
+        ldx volName
+        ldy volName+2
+        phd
+        lda gsosDP
+        tcd
+        lda #0
+        jsl FIND_VCR
+        bcs done1
+        jsl DEREF
+        clc
+done1:  pld
+        rol err
+        stx vcr
+        sty vcr+2
+    }
+    
+    if (!err) {
+        if (vcr->fstID == smbFSID
+            && vcr->dib == dib
+            && vcr->treeConnectID == dib->treeConnectID) {
+            if (vcrPtrPtr != NULL)
+                *vcrPtrPtr = vcr;
+            return 0;
+        } else if (vcr->openCount == 0) {
+            // Release other VCR with same name, if it has no open files.
+            id = vcr->id;
+            asm {
+                ldx id
+                phd
+                lda gsosDP
+                tcd
+                txa
+                jsl RELEASE_VCR
+                pld
+            }
+        } else {
+            return dupVolume;
+        }
+    }
+    
+    // Allocate new VCR
+    asm {
+        stz err
+        ldx volName
+        ldy volName+2
+        phd
+        lda gsosDP
+        tcd
+        lda #sizeof(VCR)
+        jsl ALLOC_VCR
+        bcs done2
+        jsl DEREF
+        clc
+done2:  pld
+        rol err
+        stx vcr
+        sty vcr+2
+    }
+    
+    if (err)
+        return outOfMem;
+
+    vcr->status = 0;
+    vcr->openCount = 0;
+    vcr->fstID = smbFSID;
+    vcr->devNum = dib->DIBDevNum;
+    vcr->dib = dib;
+    vcr->treeConnectID = dib->treeConnectID;
+
+    if (vcrPtrPtr != NULL)
+        *vcrPtrPtr = vcr;
+    return 0;
 }

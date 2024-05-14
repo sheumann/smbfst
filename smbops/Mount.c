@@ -11,13 +11,11 @@
 #include "gsos/gsosutils.h"
 #include "utils/alloc.h"
 
+static uint32_t treeConnectCounter = 0;
+
 Word SMB_Mount(SMBMountRec *pblock, void *gsosdp, Word pcount) {
     unsigned dibIndex;
-    bool oom;
-    VirtualPointer vcrVP;
-    VCR *vcr;
     Session *session = (Session*)pblock->sessionID;
-    GSString *volName;
     Word errCode;
 
     if (pblock->pCount != 7)
@@ -53,45 +51,24 @@ Word SMB_Mount(SMBMountRec *pblock, void *gsosdp, Word pcount) {
         smb_free(dibs[dibIndex].volName);
         return errCode;
     }
-
-    volName = pblock->volName;
-    asm {
-        stz oom
-        ldx volName
-        ldy volName+2
-        phd
-        lda gsosdp
-        tcd
-        lda #sizeof(VCR)
-        jsl ALLOC_VCR
-        pld
-        stx vcrVP
-        sty vcrVP+2
-        rol oom
-    }
     
-    if (oom) {
+    dibs[dibIndex].treeConnectID = ++treeConnectCounter;
+
+    errCode = GetVCR(&dibs[dibIndex], NULL);
+    if (errCode) {
         /*
-         * If we're here, VCR allocation failed because we are out of memory.
+         * If we're here, VCR allocation failed, maybe due to lack of memory.
          * We should probably send a TREE_DISCONNECT message to the server,
          * but we currently don't.  There is a risk that Marinetti may not
          * work right if it cannot allocate memory.
          */
         smb_free(dibs[dibIndex].shareName);
         smb_free(dibs[dibIndex].volName);
-        return outOfMem;
+        return errCode;
     }
 
     dibs[dibIndex].switched = true;
     dibs[dibIndex].extendedDIBPtr = &dibs[dibIndex].treeId;
-    dibs[dibIndex].vcrVP = vcrVP;
-
-    DerefVP(vcr, vcrVP);
-
-    vcr->status = 0;
-    vcr->openCount = 0;
-    vcr->fstID = smbFSID;
-    vcr->devNum = dibs[dibIndex].DIBDevNum;
 
     pblock->devNum = dibs[dibIndex].DIBDevNum;
     

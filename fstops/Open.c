@@ -215,11 +215,11 @@ open_done:
     
     fileID = createResponse.FileId;
 
-    vp = dib->vcrVP;
-    DerefVP(vcr,vp);
-    vp = vcr->name;
-    DerefVP(volName,vp);
+    retval = GetVCR(dib, &vcr);
+    if (retval != 0)
+        goto close_on_error2;
     
+    volName = dib->volName;
     if (volName->length > GBUF_SIZE - 3) {
         retval = badPathSyntax;
         goto close_on_error2;
@@ -313,7 +313,7 @@ open_done:
 
 close_on_error1:
     /*
-     * Release VCR if we got an error after it was allocated
+     * Release FCR if we got an error after it was allocated
      */
     i = fcr->refNum;
     asm {

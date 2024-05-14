@@ -220,8 +220,9 @@ Word TreeConnect_Reconnect(DIB *dib) {
     if (result != 0)
         return result;
     
-    vp = dib->vcrVP;
-    DerefVP(vcr, vp);
+    result = GetVCR(dib, &vcr);
+    if (result != 0)
+        return result;
 
     if (vcr->openCount != 0) {
         for (i = 1, done = false; ; i++) {

@@ -244,7 +244,6 @@ void UnmountSMBVolume(DIB *dib) {
         dib->session = NULL;
         dib->treeId = 0;
         dib->switched = true;
-        dib->vcrVP = 0;
         dib->flags = 0;
         dib->extendedDIBPtr = NULL;
         smb_free(dib->shareName);

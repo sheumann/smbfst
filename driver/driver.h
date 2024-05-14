@@ -28,12 +28,15 @@ struct DIB {
     // SMB-specific part
     LongWord treeId;
     bool switched;
-    VirtualPointer vcrVP;
     Session *session;
     Word flags;
     char16_t *shareName;
     uint16_t shareNameSize;
     GSString *volName;
+    
+    // ID number that is unique for each "different" tree connect.
+    // (Reconnects do not get a new ID number.)
+    uint32_t treeConnectID;
 };
 
 /* flags bits */

@@ -6,6 +6,7 @@
 #include <locator.h>
 #include <gsos.h>
 #include "gsos/gsosdata.h"
+#include "gsos/gsosutils.h"
 #include "driver/driver.h"
 #include "systemops/Startup.h"
 #include "utils/random.h"
@@ -189,10 +190,6 @@ static void HandleOSP8Switch(int a) {
  */
 #pragma databank 1
 static void NotificationProc(void) {
-    bool oom;
-    VirtualPointer vcrVP;
-    VCR *vcr;
-    GSString *volName;
     unsigned i;
 
     /*
@@ -202,32 +199,7 @@ static void NotificationProc(void) {
         if (InstallDIBs() == 0) {
             for (i = 0; i < NDIBS; i++) {
                 if (dibs[i].extendedDIBPtr != NULL) {
-                    volName = dibs[i].volName;
-                    asm {
-                        stz oom
-                        ldx volName
-                        ldy volName+2
-                        phd
-                        lda gsosDP
-                        tcd
-                        lda #sizeof(VCR)
-                        jsl ALLOC_VCR
-                        pld
-                        stx vcrVP
-                        sty vcrVP+2
-                        rol oom
-                    }
-                    
-                    if (!oom) {
-                        dibs[i].vcrVP = vcrVP;
-        
-                        DerefVP(vcr, vcrVP);
-            
-                        vcr->status = 0;
-                        vcr->openCount = 0;
-                        vcr->fstID = smbFSID;
-                        vcr->devNum = dibs[i].DIBDevNum;
-                    } else {
+                    if (GetVCR(&dibs[i], NULL) != 0) {
                         UnmountSMBVolume(&dibs[i]);
                     }
                 }

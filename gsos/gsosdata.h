@@ -4,6 +4,7 @@
 #include <types.h>
 #include <stdint.h>
 #include "smb2/smb2proto.h"
+#include "driver/dib.h"
 
 /*
  * GS/OS string and result buf types.
@@ -25,6 +26,7 @@ typedef GSString255Ptr GSStringPtr;
 #define ALLOC_FCR   0x01fc2c
 #define RELEASE_FCR 0x01fc30
 #define GET_FCR     0x01fc64
+#define RELEASE_VCR 0x01fc28
 
 typedef LongWord VirtualPointer;
 
@@ -95,7 +97,9 @@ typedef struct VCR {
     Word devNum;
     void *fstPtr;
     
-    /* SMB-specific fields would go here */
+    /* SMB-specific fields go here */
+    DIB *dib;
+    uint32_t treeConnectID;
 } VCR;
 
 typedef struct FCR {

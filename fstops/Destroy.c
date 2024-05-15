@@ -14,8 +14,10 @@
 Word Destroy(void *pblock, void *gsosdp, Word pcount) {
     ReadStatus result;
     DIB *dib;
-    SMB2_FILEID fileID;
+    SMB2_SET_INFO_Request *setInfoReq;
+    SMB2_CLOSE_Request *closeReq;
     Word retval = 0;
+    uint16_t createMsgNum, setInfoMsgNum, closeMsgNum;
 
     dib = GetDIB(gsosdp, 1);
     if (dib == NULL)
@@ -45,43 +47,58 @@ Word Destroy(void *pblock, void *gsosdp, Word pcount) {
     if (createRequest.NameLength == 0xFFFF)
         return badPathSyntax;
 
-    result = SendRequestAndGetResponse(dib, SMB2_CREATE,
+    createMsgNum = EnqueueRequest(dib, SMB2_CREATE,
         sizeof(createRequest) + createRequest.NameLength);
-    if (result != rsDone)
-        return ConvertError(result);
-    
-    fileID = createResponse.FileId;
 
     /*
      * Put file in delete-pending state
      */
-    setInfoRequest.InfoType = SMB2_0_INFO_FILE;
-    setInfoRequest.FileInfoClass = FileDispositionInformation;
-    setInfoRequest.BufferLength = sizeof(FILE_DISPOSITION_INFORMATION);
-    setInfoRequest.BufferOffset =
+    setInfoReq = (SMB2_SET_INFO_Request*)nextMsg->Body;
+    if (!SpaceAvailable(
+        sizeof(*setInfoReq) + sizeof(FILE_DISPOSITION_INFORMATION)))
+        return fstError;
+
+    setInfoReq->InfoType = SMB2_0_INFO_FILE;
+    setInfoReq->FileInfoClass = FileDispositionInformation;
+    setInfoReq->BufferLength = sizeof(FILE_DISPOSITION_INFORMATION);
+    setInfoReq->BufferOffset =
         sizeof(SMB2Header) + offsetof(SMB2_SET_INFO_Request, Buffer);
-    setInfoRequest.Reserved = 0;
-    setInfoRequest.AdditionalInformation = 0;
-    setInfoRequest.FileId = fileID;
-#define info ((FILE_DISPOSITION_INFORMATION *)setInfoRequest.Buffer)
+    setInfoReq->Reserved = 0;
+    setInfoReq->AdditionalInformation = 0;
+    setInfoReq->FileId = fileIDFromPrevious;
+#define info ((FILE_DISPOSITION_INFORMATION *)setInfoReq->Buffer)
     info->DeletePending = 1;
 #undef info
 
-    result = SendRequestAndGetResponse(dib, SMB2_SET_INFO,
-        sizeof(setInfoRequest) + sizeof(FILE_DISPOSITION_INFORMATION));
-    if (result != rsDone)
-        retval = ConvertError(result);
+    setInfoMsgNum = EnqueueRequest(dib, SMB2_SET_INFO,
+        sizeof(*setInfoReq) + sizeof(FILE_DISPOSITION_INFORMATION));
 
     /*
      * Close file
      */
-    closeRequest.Flags = 0;
-    closeRequest.Reserved = 0;
-    closeRequest.FileId = fileID;
+    closeReq = (SMB2_CLOSE_Request*)nextMsg->Body;
+    if (!SpaceAvailable(sizeof(*closeReq)))
+        return fstError;
 
-    result = SendRequestAndGetResponse(dib, SMB2_CLOSE, sizeof(closeRequest));
+    closeReq->Flags = 0;
+    closeReq->Reserved = 0;
+    closeReq->FileId = fileIDFromPrevious;
+
+    closeMsgNum = EnqueueRequest(dib, SMB2_CLOSE, sizeof(*closeReq));
+    
+    SendMessages(dib);
+
+    result = GetResponse(dib, createMsgNum);
     if (result != rsDone)
-        return retval ? retval : ConvertError(result);
+        retval = ConvertError(result);
+    
+    result = GetResponse(dib, setInfoMsgNum);
+    if (result != rsDone && retval == 0)
+        retval = ConvertError(result);
+    
+    result = GetResponse(dib, closeMsgNum);
+    if (result != rsDone && retval == 0)
+        retval = ConvertError(result);
 
     return retval;
 }

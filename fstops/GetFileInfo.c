@@ -48,6 +48,10 @@ Word GetFileInfo_Impl(void *pblock, struct GSOSDP *gsosdp, Word pcount,
     
     static ProDOSTime pdosTime;
 
+    static uint16_t createMsgNum, queryInfoMsgNum, closeMsgNum;
+    SMB2_QUERY_INFO_Request *queryInfoReq;
+    SMB2_CLOSE_Request *closeReq;
+
     dib = GetDIB(gsosdp, 1);
     if (dib == NULL)
         return volNotFound;
@@ -82,153 +86,183 @@ top:
             return badPathSyntax;
         isRootDir = createRequest.NameLength == 0;
     
-        result = SendRequestAndGetResponse(dib, SMB2_CREATE,
+        createMsgNum = EnqueueRequest(dib, SMB2_CREATE,
             sizeof(createRequest) + createRequest.NameLength);
-        if (result != rsDone)
-            return ConvertError(result);
-        
-        fileID = createResponse.FileId;
-    
-        basicInfo.CreationTime = createResponse.CreationTime;
-        basicInfo.LastWriteTime = createResponse.LastWriteTime;
-        basicInfo.FileAttributes = createResponse.FileAttributes;
-        
-        dataEOF = createResponse.EndofFile;
-        dataAlloc = createResponse.AllocationSize;
-        haveDataForkSizes = true;
+
+        fileID = fileIDFromPrevious;
     }
-    
-    // Skip remaining queries if we only need access word
-    if (pcount == 2)
-        goto close;
 
-    /*
-     * Get stream information
-     */
-    queryInfoRequest.InfoType = SMB2_0_INFO_FILE;
-    queryInfoRequest.FileInfoClass = FileStreamInformation;
-    queryInfoRequest.OutputBufferLength =
-        sizeof(msg.body) - offsetof(SMB2_QUERY_INFO_Response, Buffer);
-    queryInfoRequest.InputBufferOffset = 0;
-    queryInfoRequest.Reserved = 0;
-    queryInfoRequest.InputBufferLength = 0;
-    queryInfoRequest.AdditionalInformation = 0;
-    queryInfoRequest.Flags = 0;
-    queryInfoRequest.FileId = fileID;
-
-    result = SendRequestAndGetResponse(dib, SMB2_QUERY_INFO,
-        sizeof(queryInfoRequest));
-    if (result != rsDone) {
+    if (pcount != 2) {  // Skip remaining queries if we only need access word
         /*
-         * macOS will not let us query FileStreamInformation on a resource
-         * fork.  To work around this, we will go back and open the data fork
-         * if we hit this error.
+         * Get stream information
          */
-        if (alreadyOpen
-            && !haveDataForkSizes
-            && result == rsFailed
-            && msg.smb2Header.Status == STATUS_ACCESS_DENIED) {
-            alreadyOpen = false;
-            goto top;
-        }
-        /*
-         * STATUS_INVALID_PARAMETER presumably means that we cannot get stream
-         * information because named streams are not supported (e.g. on Windows
-         * serving a FAT filesystem).  Just act like AFP Info & resource fork
-         * are not available, but don't treat this as an error.
-         */
-        if (result == rsFailed
-            && msg.smb2Header.Status == STATUS_INVALID_PARAMETER
-            && haveDataForkSizes) {
-            // do nothing
-        } else {
-            retval = ConvertError(result);
-        }
-        goto close;
-    }
+        queryInfoReq = (SMB2_QUERY_INFO_Request*)nextMsg->Body;
+        if (!SpaceAvailable(sizeof(*queryInfoReq)))
+            return fstError;
+        
+        queryInfoReq->InfoType = SMB2_0_INFO_FILE;
+        queryInfoReq->FileInfoClass = FileStreamInformation;
+        queryInfoReq->OutputBufferLength =
+            sizeof(msg.body) - offsetof(SMB2_QUERY_INFO_Response, Buffer);
+        queryInfoReq->InputBufferOffset = 0;
+        queryInfoReq->Reserved = 0;
+        queryInfoReq->InputBufferLength = 0;
+        queryInfoReq->AdditionalInformation = 0;
+        queryInfoReq->Flags = 0;
+        queryInfoReq->FileId = fileID;
     
-    if (queryInfoResponse.OutputBufferLength >
-        sizeof(msg.body) - offsetof(SMB2_QUERY_INFO_Response, Buffer)) {
-        retval = networkError;
-        goto close;
+        queryInfoMsgNum = EnqueueRequest(dib, SMB2_QUERY_INFO,
+            sizeof(*queryInfoReq));
     }
 
-    if (!VerifyBuffer(
-        queryInfoResponse.OutputBufferOffset,
-        queryInfoResponse.OutputBufferLength)) {
-        retval = networkError;
-        goto close;
-    }
-
-    streamInfoLen = queryInfoResponse.OutputBufferLength;
-    streamInfo = (FILE_STREAM_INFORMATION *)((unsigned char *)&msg.smb2Header +
-        queryInfoResponse.OutputBufferOffset);
-
-    while (streamInfoLen >= sizeof(FILE_STREAM_INFORMATION)) {
-        if (streamInfo->NextEntryOffset > streamInfoLen) {
-            retval = networkError;
-            goto close;
-        }
-        if (streamInfo->StreamNameLength >
-            streamInfoLen - offsetof(FILE_STREAM_INFORMATION, StreamName)) {
-            retval = networkError;
-            goto close;
-        }
-
-        if (streamInfo->StreamNameLength == 7*2 &&
-            memcmp(streamInfo->StreamName, u"::$DATA", 7*2) == 0)
-        {
-            /*
-             * We use the EOF/allocation size from the CREATE response if they
-             * are available and still valid, and if the server claims the
-             * data fork allocation size is equal to its EOF.  The reason
-             * is that macOS reports the true allocation size in the CREATE
-             * response, but not in FILE_STREAM_INFORMATION.
-             */
-            if (streamInfo->StreamSize != streamInfo->StreamAllocationSize
-                || !haveDataForkSizes
-                || streamInfo->StreamSize != dataEOF) {
-                dataEOF = streamInfo->StreamSize;
-                dataAlloc = streamInfo->StreamAllocationSize;
-                haveDataForkSizes = true;
-            }
-        }
-        else if (streamInfo->StreamNameLength == sizeof(resourceForkSuffix) &&
-            memcmp(streamInfo->StreamName, resourceForkSuffix,
-                sizeof(resourceForkSuffix)) == 0)
-        {
-            haveResourceFork = true;
-            resourceEOF = streamInfo->StreamSize;
-            resourceAlloc = streamInfo->StreamAllocationSize;
-        }
-        else if (streamInfo->StreamNameLength == sizeof(afpInfoSuffix) &&
-            memcmp(streamInfo->StreamName, afpInfoSuffix,
-                sizeof(afpInfoSuffix)) == 0 &&
-            streamInfo->StreamSize >= sizeof(AFPInfo))
-        {
-            haveAFPInfo = true;
-        }
-
-        if (streamInfo->NextEntryOffset == 0)
-            break;
-        streamInfoLen -= streamInfo->NextEntryOffset;
-        streamInfo = (void*)((char*)streamInfo + streamInfo->NextEntryOffset);
-    }
-    
-    if (!haveDataForkSizes)
-        dataEOF = dataAlloc = 0;
-
-close:
     if (!alreadyOpen) {
         /*
          * Close file
          */
-        closeRequest.Flags = 0;
-        closeRequest.Reserved = 0;
-        closeRequest.FileId = fileID;
+        closeReq = (SMB2_CLOSE_Request*)nextMsg->Body;
+        if (!SpaceAvailable(sizeof(*closeReq)))
+            return fstError;
+        
+        closeReq->Flags = 0;
+        closeReq->Reserved = 0;
+        closeReq->FileId = fileID;
     
-        result = SendRequestAndGetResponse(dib, SMB2_CLOSE,
-            sizeof(closeRequest));
+        closeMsgNum = EnqueueRequest(dib, SMB2_CLOSE, sizeof(*closeReq));
+    }
+
+    if (!alreadyOpen || pcount != 2)
+        SendMessages(dib);
+
+    if (!alreadyOpen) {
+        /* Handle CREATE response */
+        result = GetResponse(dib, createMsgNum);
+        if (result != rsDone) {
+            retval = ConvertError(result);
+        } else {
+            basicInfo.CreationTime = createResponse.CreationTime;
+            basicInfo.LastWriteTime = createResponse.LastWriteTime;
+            basicInfo.FileAttributes = createResponse.FileAttributes;
+            
+            dataEOF = createResponse.EndofFile;
+            dataAlloc = createResponse.AllocationSize;
+            haveDataForkSizes = true;
+        }
+    }
+
+    if (pcount != 2) {
+        /* Handle QUERY_INFO response */
+        result = GetResponse(dib, queryInfoMsgNum);
+        if (result != rsDone) {
+            /*
+             * macOS will not let us query FileStreamInformation on a resource
+             * fork.  To work around this, we will go back and open the data
+             * fork if we hit this error.
+             */
+            if (alreadyOpen
+                && !haveDataForkSizes
+                && result == rsFailed
+                && msg.smb2Header.Status == STATUS_ACCESS_DENIED) {
+                alreadyOpen = false;
+                goto top;
+            }
+            /*
+             * STATUS_INVALID_PARAMETER presumably means that we cannot get
+             * stream information because named streams are not supported (e.g.
+             * on Windows serving a FAT filesystem).  Just act like AFP Info &
+             * resource fork are not available, but don't treat this as an
+             * error.
+             */
+            if (result == rsFailed
+                && msg.smb2Header.Status == STATUS_INVALID_PARAMETER
+                && haveDataForkSizes) {
+                // do nothing
+            } else if (retval == 0) {
+                retval = ConvertError(result);
+            }
+            goto handle_close;
+        }
+        
+        if (queryInfoResponse.OutputBufferLength >
+            sizeof(msg.body) - offsetof(SMB2_QUERY_INFO_Response, Buffer)) {
+            if (retval == 0)
+                retval = networkError;
+            goto handle_close;
+        }
+    
+        if (!VerifyBuffer(
+            queryInfoResponse.OutputBufferOffset,
+            queryInfoResponse.OutputBufferLength)) {
+            if (retval == 0)
+                retval = networkError;
+            goto handle_close;
+        }
+    
+        streamInfoLen = queryInfoResponse.OutputBufferLength;
+        streamInfo = (FILE_STREAM_INFORMATION *)((char *)&msg.smb2Header +
+            queryInfoResponse.OutputBufferOffset);
+    
+        while (streamInfoLen >= sizeof(FILE_STREAM_INFORMATION)) {
+            if (streamInfo->NextEntryOffset > streamInfoLen) {
+                if (retval == 0)
+                    retval = networkError;
+                goto handle_close;
+            }
+            if (streamInfo->StreamNameLength >
+                streamInfoLen - offsetof(FILE_STREAM_INFORMATION, StreamName)) {
+                if (retval == 0)
+                    retval = networkError;
+                goto handle_close;
+            }
+    
+            if (streamInfo->StreamNameLength == 7*2 &&
+                memcmp(streamInfo->StreamName, u"::$DATA", 7*2) == 0)
+            {
+                /*
+                 * We use the EOF/allocation size from the CREATE response if
+                 * they are available and still valid, and if the server claims
+                 * the data fork allocation size is equal to its EOF.  The
+                 * reason is that macOS reports the true allocation size in the
+                 * CREATE response, but not in FILE_STREAM_INFORMATION.
+                 */
+                if (streamInfo->StreamSize != streamInfo->StreamAllocationSize
+                    || !haveDataForkSizes
+                    || streamInfo->StreamSize != dataEOF) {
+                    dataEOF = streamInfo->StreamSize;
+                    dataAlloc = streamInfo->StreamAllocationSize;
+                    haveDataForkSizes = true;
+                }
+            }
+            else if (streamInfo->StreamNameLength == sizeof(resourceForkSuffix)
+                && memcmp(streamInfo->StreamName, resourceForkSuffix,
+                    sizeof(resourceForkSuffix)) == 0)
+            {
+                haveResourceFork = true;
+                resourceEOF = streamInfo->StreamSize;
+                resourceAlloc = streamInfo->StreamAllocationSize;
+            }
+            else if (streamInfo->StreamNameLength == sizeof(afpInfoSuffix) &&
+                memcmp(streamInfo->StreamName, afpInfoSuffix,
+                    sizeof(afpInfoSuffix)) == 0 &&
+                streamInfo->StreamSize >= sizeof(AFPInfo))
+            {
+                haveAFPInfo = true;
+            }
+    
+            if (streamInfo->NextEntryOffset == 0)
+                break;
+            streamInfoLen -= streamInfo->NextEntryOffset;
+            streamInfo =
+                (void*)((char*)streamInfo + streamInfo->NextEntryOffset);
+        }
+        
+        if (!haveDataForkSizes)
+            dataEOF = dataAlloc = 0;
+    }
+
+handle_close:
+    if (!alreadyOpen) {
+        /* Handle CLOSE response */
+        result = GetResponse(dib, closeMsgNum);
         if (result != rsDone)
             return retval ? retval : ConvertError(result);
     }

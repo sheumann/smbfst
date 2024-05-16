@@ -4,12 +4,12 @@
 resource rVersion (1) {
     { 1,0,0,development,1 },
     verUS,
-    "SMB Mounter",
+    "SMB",
     "By Stephen Heumann"
 };
 
 resource rComment (1) {
-    "The SMB Mounter control panel allows you to connect to "
+    "The SMB control panel allows you to connect to "
     "file servers using the SMB protocol.\n"
     "\n"
     "Copyright 2024 Stephen Heumann\n"
@@ -25,12 +25,12 @@ resource rCDEVFlags (1) {
     1,                          /* min ROM version */
     0,                          /* reserved */
     {0, 0, 160, 320},           /* rectangle */
-    "SMB Mounter",              /* name */
+    "SMB",                      /* name */
     "Stephen Heumann",          /* author */
     "v1.0d1"                    /* version string */
 };
 
-read rCDevCode (0x1,convert,locked) "SMBMounter.obj";
+read rCDevCode (0x1,convert,locked) "SMBCDev.bin";
 
 resource rIcon (1) {
     0x8000,                     /* color icon */
@@ -211,7 +211,7 @@ resource rControlTemplate (helpWindow+helpTxt) {
 };
 
 resource rTextForLETextBox2 (helpWindow+helpTxt) {
-    "The SMB Mounter control panel allows you to connect to "
+    "The SMB control panel allows you to connect to "
     "file servers using the SMB protocol."
 };
 
@@ -225,7 +225,7 @@ resource rTextForLETextBox2 (helpWindow+helpTxt) {
 
 resource rAlertString (fstMissingError) {
     "72:"
-    "To use the SMB Mounter control panel, the SMB FST and "
+    "To use the SMB control panel, the SMB FST and "
     "the Marinetti TCP/IP stack must be installed and enabled."
     ":^#0\$00"
 };

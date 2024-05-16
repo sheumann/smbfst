@@ -92,7 +92,7 @@ CDEV_RSRC = \
            cdev/loginwindow.rez \
            cdev/shareswindow.rez
 
-CDEV_CODE_BINARY = cdev/SMBMounter.obj
+CDEV_CODE_BINARY = cdev/SMBCDev.bin
 
 MOUNTSMB_OBJ = commands/mountsmb.a
 
@@ -106,7 +106,7 @@ LISTSERVERS_OBJ = \
            commands/listservers.a \
            mdns/mdnssd.a
 
-BINARIES = SMB.FST LongNamesPatch SMBMounter mountsmb listshares listservers
+BINARIES = SMB.FST LongNamesPatch SMB mountsmb listshares listservers
 
 .PHONY: all
 all: $(BINARIES)
@@ -128,7 +128,7 @@ LongNamesPatch: $(FEXT_OBJ)
 $(CDEV_CODE_BINARY): $(CDEV_OBJ)
 	$(CC) -X $^ -o $@
 
-SMBMounter: $(CDEV_RSRC) $(CDEV_CODE_BINARY)
+SMB: $(CDEV_RSRC) $(CDEV_CODE_BINARY)
 	$(CC) -c $< -o $@
 	iix chtyp -tcdv $@
 

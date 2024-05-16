@@ -30,6 +30,8 @@ typedef struct {
     
     // size of not-yet processed portion of a compound message
     uint32_t remainingCompoundSize;
+    
+    bool requestedCredits;
 } Connection;
 
 extern DIB fakeDIB;

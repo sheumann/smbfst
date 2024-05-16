@@ -237,8 +237,9 @@ unsigned EnqueueRequest(DIB *dib, uint16_t command, uint16_t bodyLength) {
     
     header->Command = command;
     
-    if (command == SMB2_NEGOTIATE) {
+    if (command == SMB2_TREE_CONNECT && !connection->requestedCredits) {
         header->CreditRequest = MAX_COMPOUND_SIZE;
+        connection->requestedCredits = true;
     } else {
         header->CreditRequest = 1;
     }

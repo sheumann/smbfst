@@ -75,6 +75,7 @@ Word Connect(Connection *connection) {
 
     connection->nextMessageId = 0;
     connection->remainingCompoundSize = 0;
+    connection->requestedCredits = false;
 
     negotiateRequest.SecurityMode = 0;
     negotiateRequest.Reserved = 0;

@@ -254,6 +254,10 @@ unsigned EnqueueRequest(DIB *dib, uint16_t command, uint16_t bodyLength) {
     ((SMB2_Common_Header*)nextMsg->Body)->StructureSize =
         requestStructureSizes[command];
 
+    // Pad body to at least equal structure size (required by Windows).
+    if (bodyLength < requestStructureSizes[command])
+        nextMsg->Body[bodyLength++] = 0;
+
     sendLength = ((sendLength + 7) & 0xfff8) + sizeof(SMB2Header) + bodyLength;
     lastMsg = nextMsg;
     
@@ -395,10 +399,6 @@ retry:
 ReadStatus SendRequestAndGetResponse(DIB *dib, uint16_t command,
                                      uint16_t bodyLength) {
     uint16_t messageNum;
-    
-    // Pad body to at least equal structure size (required by Windows).
-    if (bodyLength < requestStructureSizes[command])
-        msg.body[bodyLength++] = 0;
     
     messageNum = EnqueueRequest(dib, command, bodyLength);
 

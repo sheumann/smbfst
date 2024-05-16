@@ -60,6 +60,7 @@ typedef struct {
     DirectTCPHeader directTCPHeader;
     SMB2Header smb2Header;
     unsigned char body[BODY_SIZE];
+    unsigned char extra;
 } MsgRec;
 
 extern MsgRec msg;

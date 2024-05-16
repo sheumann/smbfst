@@ -20,6 +20,7 @@ typedef struct {
     Word refCount;
     
     int64_t timeDiff; // difference of IIGS local time from server UTC time
+    int64_t connectTime; // UTC time the server reported when it connected
 
     LongWord serverIP;
     LongWord serverPort;

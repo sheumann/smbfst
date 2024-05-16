@@ -5,6 +5,7 @@
 #include <misctool.h>
 #include <time.h>
 #include <orca.h>
+#include <stdlib.h>
 #include "smb2/smb2.h"
 #include "smb2/connection.h"
 #include "smb2/session.h"
@@ -14,6 +15,9 @@
 
 // Timeout for TCP connection establishment
 #define TIMEOUT 15 /* seconds */
+
+// Max allowed offset between GS local time and UTC (in FILETIME units)
+#define MAX_TZ_OFFSET (18LL * 60 * 60 * 10000000)
 
 DIB fakeDIB = {0};
 
@@ -35,6 +39,8 @@ Word Connect(Connection *connection) {
     static srBuff status;
     static Long startTime;
     static Session dummySession = {0};
+    static uint64_t timeDiff;
+    unsigned i;
 
     connection->ipid = TCPIPLogin(userid(), connection->serverIP,
         connection->serverPort, 0, 64);
@@ -104,9 +110,36 @@ Word Connect(Connection *connection) {
      * time difference be slightly too large may give better results after
      * subsequent truncations.
      */
-    connection->timeDiff =
+    timeDiff =
         TIME_TO_FILETIME(time(NULL) + 1) - negotiateResponse.SystemTime;
-    
+
+    /*
+     * If GS local time and server UTC time differ by more than 18 hours,
+     * one or the other is wrong.  Guess that the GS is wrong (e.g. due to
+     * a dead battery), and just report times using server UTC.
+     */
+    if (llabs(timeDiff) > MAX_TZ_OFFSET)
+        timeDiff = 0;
+
+    /*
+     * If multiple connections are made to a macOS server, it may report the
+     * same time for subsequent connections as it did for the first one, even
+     * though that is no longer the current time.  If we encounter this
+     * situation, we copy the time difference from the earlier connection.
+     */
+    for (i = 0; i < NDIBS; i++) {
+        if (dibs[i].extendedDIBPtr != NULL
+            && dibs[i].session->connection->serverIP == connection->serverIP
+            && dibs[i].session->connection->connectTime
+                == negotiateResponse.SystemTime) {
+            timeDiff = dibs[i].session->connection->timeDiff;
+            break;
+        }
+    }
+
+    connection->connectTime = negotiateResponse.SystemTime;
+    connection->timeDiff = timeDiff;
+
     connection->wantSigning =
         negotiateResponse.SecurityMode & SMB2_NEGOTIATE_SIGNING_REQUIRED;
         
@@ -114,7 +147,6 @@ Word Connect(Connection *connection) {
         negotiateResponse.DialectRevision != SMB_21 &&
         negotiateResponse.DialectRevision != SMB_30 &&
         negotiateResponse.DialectRevision != SMB_302) {
-        // TODO handle 3.x dialects
         TCPIPAbortTCP(connection->ipid);
         TCPIPLogout(connection->ipid);
         return networkError;

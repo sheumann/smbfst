@@ -154,14 +154,15 @@ top:
         result = GetResponse(dib, queryInfoMsgNum);
         if (result != rsDone) {
             /*
-             * macOS will not let us query FileStreamInformation on a resource
-             * fork.  To work around this, we will go back and open the data
-             * fork if we hit this error.
+             * macOS and Samba will not let us query FileStreamInformation on
+             * a resource fork.  To work around this, we will go back and open
+             * the data fork if we hit this error.
              */
             if (alreadyOpen
                 && !haveDataForkSizes
                 && result == rsFailed
-                && msg.smb2Header.Status == STATUS_ACCESS_DENIED) {
+                && (msg.smb2Header.Status == STATUS_ACCESS_DENIED
+                    || msg.smb2Header.Status == STATUS_INVALID_PARAMETER)) {
                 alreadyOpen = false;
                 goto top;
             }

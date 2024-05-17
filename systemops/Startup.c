@@ -179,7 +179,10 @@ static void HandleOSP8Switch(int a) {
      */
     if (a == 1 && warm_cold_flag == 0) {
         for (i = 0; i < NDIBS; i++) {
-            UnmountSMBVolume(&dibs[i]);
+            if (dibs[i].extendedDIBPtr != NULL) {
+                dibs[i].session->connection->lastActivityTime = 0;
+                UnmountSMBVolume(&dibs[i]);
+            }
         }
     }
 }

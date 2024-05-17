@@ -417,6 +417,11 @@ static bool Reconnect(DIB *dib) {
     unsigned char *savedMsg;
     uint16_t savedLength;
     uint16_t msgLen;
+
+    // Don't reconnect just to disconnect
+    if (msg.smb2Header.Command == SMB2_LOGOFF
+        || msg.smb2Header.Command == SMB2_TREE_DISCONNECT)
+        return false;
     
     if (GetTick() - connection->reconnectTime
         < MIN_RECONNECT_TIME * 60)

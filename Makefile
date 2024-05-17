@@ -56,6 +56,7 @@ FST_OBJ =  fst/smbfst.A \
            helpers/afpinfo.a \
            helpers/attributes.a \
            helpers/blocks.a \
+           helpers/closerequest.a \
            helpers/createcontext.a \
            helpers/datetime.a \
            helpers/errors.a \

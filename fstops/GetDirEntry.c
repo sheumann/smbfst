@@ -15,6 +15,7 @@
 #include "helpers/datetime.h"
 #include "helpers/blocks.h"
 #include "helpers/attributes.h"
+#include "helpers/closerequest.h"
 
 #define NUMBER_OF_DOT_DIRS 2
 
@@ -545,12 +546,7 @@ get_stream_info:
              * Close AFP Info ADS (or main stream, for redo)
              */
 close_stream:
-            closeRequest.Flags = 0;
-            closeRequest.Reserved = 0;
-            closeRequest.FileId = fileID;
-        
-            result = SendRequestAndGetResponse(&dibs[i], SMB2_CLOSE,
-                sizeof(closeRequest));
+            result = SendCloseRequestAndGetResponse(&dibs[i], &fileID);
             if (result == rsFailed) {
                 // ignore errors
             } else if (result != rsDone) {

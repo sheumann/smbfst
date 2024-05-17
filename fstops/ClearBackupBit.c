@@ -10,6 +10,7 @@
 #include "gsos/gsosutils.h"
 #include "helpers/path.h"
 #include "helpers/errors.h"
+#include "helpers/closerequest.h"
 
 Word ClearBackupBit(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     ReadStatus result;
@@ -83,11 +84,7 @@ Word ClearBackupBit(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     /*
      * Close file
      */
-    closeRequest.Flags = 0;
-    closeRequest.Reserved = 0;
-    closeRequest.FileId = fileID;
-
-    result = SendRequestAndGetResponse(dib, SMB2_CLOSE, sizeof(closeRequest));
+    result = SendCloseRequestAndGetResponse(dib, &fileID);
     if (result != rsDone)
         return ConvertError(result);
 

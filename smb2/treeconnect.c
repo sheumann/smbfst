@@ -10,6 +10,7 @@
 #include "gsos/gsosutils.h"
 #include "helpers/path.h"
 #include "helpers/afpinfo.h"
+#include "helpers/closerequest.h"
 #include "fstops/Open.h"
 
 Word TreeConnect(DIB *dib) {
@@ -111,12 +112,7 @@ close:
         /*
          * Close file
          */
-        closeRequest.Flags = 0;
-        closeRequest.Reserved = 0;
-        closeRequest.FileId = fileID;
-    
-        result = SendRequestAndGetResponse(dib, SMB2_CLOSE,
-            sizeof(closeRequest));
+        result = SendCloseRequestAndGetResponse(dib, &fileID);
         // ignore any errors here
     } else if (treeConnectResponse.ShareType == SMB2_SHARE_TYPE_PIPE) {
         dib->flags |= FLAG_PIPE_SHARE;
@@ -185,11 +181,7 @@ static void ReconnectFile(DIB *dib, FCR *fcr) {
         /*
          * Close file if it seems to be a different file
          */
-        closeRequest.Flags = 0;
-        closeRequest.Reserved = 0;
-        closeRequest.FileId = createResponse.FileId;
-    
-        SendRequestAndGetResponse(dib, SMB2_CLOSE, sizeof(closeRequest));
+        SendCloseRequestAndGetResponse(dib, &createResponse.FileId);
         
         return;
     }

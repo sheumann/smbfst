@@ -4,6 +4,7 @@
 #include "smb2/smb2.h"
 #include "gsos/gsosdata.h"
 #include "driver/driver.h"
+#include "helpers/closerequest.h"
 
 Word Close(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     Word result;
@@ -25,12 +26,7 @@ Word Close(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     if (i == NDIBS)
         return volNotFound;
 
-    closeRequest.Flags = 0;
-    closeRequest.Reserved = 0;
-    closeRequest.FileId = fcr->fileID;
-
-    result = SendRequestAndGetResponse(&dibs[i], SMB2_CLOSE,
-        sizeof(closeRequest));
+    result = SendCloseRequestAndGetResponse(&dibs[i], &fcr->fileID);
     if (result != rsDone)
         return networkError;
     

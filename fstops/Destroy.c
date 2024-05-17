@@ -10,12 +10,12 @@
 #include "gsos/gsosutils.h"
 #include "helpers/path.h"
 #include "helpers/errors.h"
+#include "helpers/closerequest.h"
 
 Word Destroy(void *pblock, void *gsosdp, Word pcount) {
     ReadStatus result;
     DIB *dib;
     SMB2_SET_INFO_Request *setInfoReq;
-    SMB2_CLOSE_Request *closeReq;
     Word retval = 0;
     uint16_t createMsgNum, setInfoMsgNum, closeMsgNum;
 
@@ -76,15 +76,9 @@ Word Destroy(void *pblock, void *gsosdp, Word pcount) {
     /*
      * Close file
      */
-    closeReq = (SMB2_CLOSE_Request*)nextMsg->Body;
-    if (!SpaceAvailable(sizeof(*closeReq)))
+    closeMsgNum = EnqueueCloseRequest(dib, &fileIDFromPrevious);
+    if (closeMsgNum == 0xFFFF)
         return fstError;
-
-    closeReq->Flags = 0;
-    closeReq->Reserved = 0;
-    closeReq->FileId = fileIDFromPrevious;
-
-    closeMsgNum = EnqueueRequest(dib, SMB2_CLOSE, sizeof(*closeReq));
     
     SendMessages(dib);
 

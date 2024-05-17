@@ -12,6 +12,7 @@
 #include "fstops/GetFileInfo.h"
 #include "helpers/errors.h"
 #include "helpers/afpinfo.h"
+#include "helpers/closerequest.h"
 #include "fstops/open.h"
 
 #define ACCESS_TYPE_COUNT 3
@@ -197,12 +198,7 @@ open_done:
                 
                 fileID = createResponse.FileId;
                 
-                closeRequest.Flags = 0;
-                closeRequest.Reserved = 0;
-                closeRequest.FileId = fileID;
-
-                result = SendRequestAndGetResponse(dib, SMB2_CLOSE,
-                    sizeof(closeRequest));
+                result = SendCloseRequestAndGetResponse(dib, &fileID);
                 // ignore any errors on close
                 
                 forkOp = openOrCreateResourceFork;
@@ -333,11 +329,7 @@ close_on_error2:
     /*
      * Close file if we got an error
      */
-    closeRequest.Flags = 0;
-    closeRequest.Reserved = 0;
-    closeRequest.FileId = fileID;
-
-    result = SendRequestAndGetResponse(dib, SMB2_CLOSE, sizeof(closeRequest));
+    result = SendCloseRequestAndGetResponse(dib, &fileID);
     // Ignore error here, since we're already reporting some kind or error
     
     return retval;

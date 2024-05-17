@@ -13,6 +13,7 @@
 #include "helpers/filetype.h"
 #include "helpers/datetime.h"
 #include "helpers/errors.h"
+#include "helpers/closerequest.h"
 
 Word SetFileInfo(void *pblock, void *gsosdp, Word pcount) {
     ReadStatus result;
@@ -372,12 +373,7 @@ set_info:
         }
 
 close_afp_info:
-        closeRequest.Flags = 0;
-        closeRequest.Reserved = 0;
-        closeRequest.FileId = infoFileID;
-    
-        result = SendRequestAndGetResponse(dib, SMB2_CLOSE,
-            sizeof(closeRequest));
+        result = SendCloseRequestAndGetResponse(dib, &infoFileID);
         // ignore errors here
     }
 
@@ -424,11 +420,7 @@ finish:
     /*
      * Close file
      */
-    closeRequest.Flags = 0;
-    closeRequest.Reserved = 0;
-    closeRequest.FileId = fileID;
-
-    result = SendRequestAndGetResponse(dib, SMB2_CLOSE, sizeof(closeRequest));
+    result = SendCloseRequestAndGetResponse(dib, &fileID);
     // ignore errors here
 
     return retval;

@@ -12,6 +12,7 @@
 #include "helpers/datetime.h"
 #include "helpers/afpinfo.h"
 #include "helpers/filetype.h"
+#include "helpers/closerequest.h"
 #include "fstops/GetFileInfo.h"
 #include "helpers/errors.h"
 
@@ -50,7 +51,6 @@ Word GetFileInfo_Impl(void *pblock, struct GSOSDP *gsosdp, Word pcount,
 
     static uint16_t createMsgNum, queryInfoMsgNum, closeMsgNum;
     SMB2_QUERY_INFO_Request *queryInfoReq;
-    SMB2_CLOSE_Request *closeReq;
 
     dib = GetDIB(gsosdp, 1);
     if (dib == NULL)
@@ -118,16 +118,10 @@ top:
     if (!alreadyOpen) {
         /*
          * Close file
-         */
-        closeReq = (SMB2_CLOSE_Request*)nextMsg->Body;
-        if (!SpaceAvailable(sizeof(*closeReq)))
+         */    
+        closeMsgNum = EnqueueCloseRequest(dib, &fileID);
+        if (closeMsgNum == 0xFFFF)
             return fstError;
-        
-        closeReq->Flags = 0;
-        closeReq->Reserved = 0;
-        closeReq->FileId = fileID;
-    
-        closeMsgNum = EnqueueRequest(dib, SMB2_CLOSE, sizeof(*closeReq));
     }
 
     if (!alreadyOpen || pcount != 2)

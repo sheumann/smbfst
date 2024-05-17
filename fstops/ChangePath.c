@@ -10,6 +10,7 @@
 #include "gsos/gsosutils.h"
 #include "helpers/path.h"
 #include "helpers/errors.h"
+#include "helpers/closerequest.h"
 
 Word ChangePath(void *pblock, void *gsosdp, Word pcount) {
     ReadStatus result;
@@ -104,11 +105,7 @@ close:
     /*
      * Close file
      */
-    closeRequest.Flags = 0;
-    closeRequest.Reserved = 0;
-    closeRequest.FileId = fileID;
-
-    result = SendRequestAndGetResponse(dib1, SMB2_CLOSE, sizeof(closeRequest));
+    result = SendCloseRequestAndGetResponse(dib1, &fileID);
     if (result != rsDone)
         return retval ? retval : networkError;
 

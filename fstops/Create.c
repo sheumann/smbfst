@@ -16,6 +16,7 @@
 #include "helpers/attributes.h"
 #include "helpers/errors.h"
 #include "helpers/createcontext.h"
+#include "helpers/closerequest.h"
 
 #define extendExistingFile 0x8005
 
@@ -252,12 +253,7 @@ Word Create(void *pblock, void *gsosdp, Word pcount) {
             goto close_on_error;
         }
 
-        closeRequest.Flags = 0;
-        closeRequest.Reserved = 0;
-        closeRequest.FileId = createResponse.FileId;
-    
-        result = SendRequestAndGetResponse(dib, SMB2_CLOSE,
-            sizeof(closeRequest));
+        result = SendCloseRequestAndGetResponse(dib, &createResponse.FileId);
         if (result != rsDone) {
             retval = ConvertError(result);
             goto close_on_error;
@@ -356,12 +352,7 @@ Word Create(void *pblock, void *gsosdp, Word pcount) {
         if (result != rsDone)
             retval = ConvertError(result);
 
-        closeRequest.Flags = 0;
-        closeRequest.Reserved = 0;
-        closeRequest.FileId = infoFileID;
-    
-        result = SendRequestAndGetResponse(dib, SMB2_CLOSE,
-            sizeof(closeRequest));
+        result = SendCloseRequestAndGetResponse(dib, &infoFileID);
         if (result != rsDone)
             retval = retval ? retval : ConvertError(result);
         
@@ -422,11 +413,7 @@ close_on_error:
             // Ignore errors here (we already have an error to report)
         }
 
-        closeRequest.Flags = 0;
-        closeRequest.Reserved = 0;
-        closeRequest.FileId = fileID;
-    
-        SendRequestAndGetResponse(dib, SMB2_CLOSE, sizeof(closeRequest));
+        SendCloseRequestAndGetResponse(dib, &fileID);
         // Ignore errors here (file is already created, or already have error)
     }
 

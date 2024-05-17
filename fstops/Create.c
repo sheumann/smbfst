@@ -36,10 +36,12 @@
 Word Create(void *pblock, void *gsosdp, Word pcount) {
     Word result;
     DIB *dib;
-    static SMB2_FILEID fileID, infoFileID;
+    static SMB2_FILEID fileID;
     Word retval = 0;
     uint16_t msgLen;
-    uint16_t createMsgNum, closeMsgNum;
+    SMB2_WRITE_Request *writeReq;
+    uint16_t createMsgNum, writeMsgNum, closeMsgNum;
+    bool ignoreAFPInfoErrors;
 
     uint32_t attributes, initialAttributes;
     uint64_t creationTime = 0;
@@ -303,14 +305,63 @@ Word Create(void *pblock, void *gsosdp, Word pcount) {
         // add AFP Info suffix
         if (createRequest.NameLength >
             sizeof(msg.body) - offsetof(SMB2_CREATE_Request, Buffer)
-            - sizeof(afpInfoSuffix))
-            return badPathSyntax;
+            - sizeof(afpInfoSuffix)) {
+            retval = badPathSyntax;
+            goto close_on_error;
+        }
         memcpy(createRequest.Buffer + createRequest.NameLength,
             afpInfoSuffix, sizeof(afpInfoSuffix));
         createRequest.NameLength += sizeof(afpInfoSuffix);
 
-        result = SendRequestAndGetResponse(dib, SMB2_CREATE,
+        createMsgNum = EnqueueRequest(dib, SMB2_CREATE,
             sizeof(createRequest) + createRequest.NameLength);
+
+        /*
+         * Create and save AFP Info record (including Finder Info)
+         */
+        writeReq = (SMB2_WRITE_Request*)nextMsg->Body;
+        if (!SpaceAvailable(sizeof(*writeReq) + sizeof(AFPInfo))) {
+            retval = fstError;
+            goto close_on_error;
+        }
+
+        writeReq->DataOffset =
+            sizeof(SMB2Header) + offsetof(SMB2_WRITE_Request, Buffer);
+        writeReq->Length = sizeof(AFPInfo);
+        writeReq->Offset = 0;
+        writeReq->FileId = fileIDFromPrevious;
+        writeReq->Channel = 0;
+        writeReq->RemainingBytes = 0;
+        writeReq->WriteChannelInfoOffset = 0;
+        writeReq->WriteChannelInfoLength = 0;
+        writeReq->Flags = 0;
+
+#define afpInfo ((AFPInfo*)writeReq->Buffer)
+        memset(afpInfo, 0, sizeof(AFPInfo));
+        afpInfo->signature = AFPINFO_SIGNATURE;
+        afpInfo->version = AFPINFO_VERSION;
+        afpInfo->backupTime = 0x80000000; // indicating "never backed up"
+        afpInfo->prodosType = fileType.fileType;
+        afpInfo->prodosAuxType = fileType.auxType;
+        if (storageType != directoryFile)
+            afpInfo->finderInfo.typeCreator =
+                FileTypeToTypeCreator(fileType, NULL);
+#undef afpInfo
+
+        writeMsgNum = EnqueueRequest(dib, SMB2_WRITE,
+            sizeof(*writeReq) + sizeof(AFPInfo));
+
+        closeMsgNum = EnqueueCloseRequest(dib, &fileIDFromPrevious);
+        if (closeMsgNum == 0xFFFF) {
+            retval = fstError;
+            goto close_on_error;
+        }
+        
+        SendMessages(dib);
+
+        ignoreAFPInfoErrors = false;
+
+        result = GetResponse(dib, createMsgNum);
         if (result != rsDone) {
             /*
              * If we get STATUS_OBJECT_NAME_INVALID for the AFP info (after
@@ -323,54 +374,23 @@ Word Create(void *pblock, void *gsosdp, Word pcount) {
              */
             if (result == rsFailed
                 && msg.smb2Header.Status == STATUS_OBJECT_NAME_INVALID) {
-                goto set_attributes;
+                ignoreAFPInfoErrors = true;
             } else {
                 retval = ConvertError(result);
-                goto close_on_error;
             }
         }
 
-        infoFileID = createResponse.FileId;
-
-        /*
-         * Create and save AFP Info record (including Finder Info)
-         */
-        writeRequest.DataOffset =
-            sizeof(SMB2Header) + offsetof(SMB2_WRITE_Request, Buffer);
-        writeRequest.Length = sizeof(AFPInfo);
-        writeRequest.Offset = 0;
-        writeRequest.FileId = infoFileID;
-        writeRequest.Channel = 0;
-        writeRequest.RemainingBytes = 0;
-        writeRequest.WriteChannelInfoOffset = 0;
-        writeRequest.WriteChannelInfoLength = 0;
-        writeRequest.Flags = 0;
-
-#define afpInfo ((AFPInfo*)writeRequest.Buffer)
-        memset(afpInfo, 0, sizeof(AFPInfo));
-        afpInfo->signature = AFPINFO_SIGNATURE;
-        afpInfo->version = AFPINFO_VERSION;
-        afpInfo->backupTime = 0x80000000; // indicating "never backed up"
-        afpInfo->prodosType = fileType.fileType;
-        afpInfo->prodosAuxType = fileType.auxType;
-        if (storageType != directoryFile)
-            afpInfo->finderInfo.typeCreator =
-                FileTypeToTypeCreator(fileType, NULL);
-#undef afpInfo
-
-        result = SendRequestAndGetResponse(dib, SMB2_WRITE,
-            sizeof(writeRequest) + sizeof(AFPInfo));
-        if (result != rsDone)
+        result = GetResponse(dib, writeMsgNum);
+        if (result != rsDone && retval == 0 && !ignoreAFPInfoErrors)
             retval = ConvertError(result);
 
-        result = SendCloseRequestAndGetResponse(dib, &infoFileID);
-        if (result != rsDone)
-            retval = retval ? retval : ConvertError(result);
-        
+        result = GetResponse(dib, closeMsgNum);
+        if (result != rsDone && retval == 0 && !ignoreAFPInfoErrors)
+            retval = ConvertError(result);
+
         if (retval != 0)
             goto close_on_error;
 
-set_attributes:
         if (attributes != initialAttributes || creationTime != 0) {
             /*
              * Set final attributes and creation time

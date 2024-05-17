@@ -39,6 +39,7 @@ Word Create(void *pblock, void *gsosdp, Word pcount) {
     static SMB2_FILEID fileID, infoFileID;
     Word retval = 0;
     uint16_t msgLen;
+    uint16_t createMsgNum, closeMsgNum;
 
     uint32_t attributes, initialAttributes;
     uint64_t creationTime = 0;
@@ -241,7 +242,17 @@ Word Create(void *pblock, void *gsosdp, Word pcount) {
             // ignore errors (allocation size isn't very important)
         }
 
-        result = SendRequestAndGetResponse(dib, SMB2_CREATE, msgLen);
+        createMsgNum = EnqueueRequest(dib, SMB2_CREATE, msgLen);
+
+        closeMsgNum = EnqueueCloseRequest(dib, &fileIDFromPrevious);
+        if (closeMsgNum == 0xFFFF) {
+            retval = fstError;
+            goto close_on_error;
+        }
+        
+        SendMessages(dib);
+
+        result = GetResponse(dib, createMsgNum);
         if (result != rsDone) {
             if (storageType == extendExistingFile
                 && result == rsFailed
@@ -250,14 +261,14 @@ Word Create(void *pblock, void *gsosdp, Word pcount) {
             } else {
                 retval = ConvertError(result);
             }
-            goto close_on_error;
         }
 
-        result = SendCloseRequestAndGetResponse(dib, &createResponse.FileId);
-        if (result != rsDone) {
+        result = GetResponse(dib, closeMsgNum);
+        if (result != rsDone && retval == 0)
             retval = ConvertError(result);
+        
+        if (retval != 0)
             goto close_on_error;
-        }
     }
 
     if (storageType != extendExistingFile) {

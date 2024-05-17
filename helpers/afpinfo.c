@@ -5,6 +5,7 @@
 #include "helpers/path.h"
 #include "helpers/afpinfo.h"
 #include "helpers/errors.h"
+#include "helpers/closerequest.h"
 
 AFPInfo afpInfo;
 
@@ -17,8 +18,9 @@ const char16_t resourceForkSuffix[19] = u":AFP_Resource:$DATA";
  */
 Word GetAFPInfo(DIB *dib, struct GSOSDP *gsosdp) {
     ReadStatus result;
-    SMB2_FILEID fileID;
     Word retval = 0;
+    SMB2_READ_Request *readReq;
+    uint16_t createMsgNum, readMsgNum, closeMsgNum;
     
     memset(&afpInfo, 0, sizeof(AFPInfo));
 
@@ -55,46 +57,57 @@ Word GetAFPInfo(DIB *dib, struct GSOSDP *gsosdp) {
         afpInfoSuffix, sizeof(afpInfoSuffix));
     createRequest.NameLength += sizeof(afpInfoSuffix);
     
-    result = SendRequestAndGetResponse(dib, SMB2_CREATE,
+    createMsgNum = EnqueueRequest(dib, SMB2_CREATE,
         sizeof(createRequest) + createRequest.NameLength);
-    if (result != rsDone) {
-        // TODO maybe give no error for "no Finder Info found"
-        return ConvertError(result);
-    }
-    
-    fileID = createResponse.FileId;
 
     /*
      * Read AFP Info
      */
-    readRequest.Padding =
+    readReq = (SMB2_READ_Request*)nextMsg->Body;
+    if (!SpaceAvailable(sizeof(*readReq)))
+        return fstError;
+    
+    readReq->Padding =
         sizeof(SMB2Header) + offsetof(SMB2_READ_Response, Buffer);
-    readRequest.Flags = 0;
-    readRequest.Length = sizeof(AFPInfo);
-    readRequest.Offset = 0;
-    readRequest.FileId = fileID;
-    readRequest.MinimumCount = sizeof(AFPInfo);
-    readRequest.Channel = 0;
-    readRequest.RemainingBytes = 0;
-    readRequest.ReadChannelInfoOffset = 0;
-    readRequest.ReadChannelInfoLength = 0;
+    readReq->Flags = 0;
+    readReq->Length = sizeof(AFPInfo);
+    readReq->Offset = 0;
+    readReq->FileId = fileIDFromPrevious;
+    readReq->MinimumCount = sizeof(AFPInfo);
+    readReq->Channel = 0;
+    readReq->RemainingBytes = 0;
+    readReq->ReadChannelInfoOffset = 0;
+    readReq->ReadChannelInfoLength = 0;
 
-    result = SendRequestAndGetResponse(dib, SMB2_READ, sizeof(readRequest));
+    readMsgNum = EnqueueRequest(dib, SMB2_READ, sizeof(*readReq));
+
+    /*
+     * Close AFP Info ADS
+     */
+    closeMsgNum = EnqueueCloseRequest(dib, &fileIDFromPrevious);
+    if (closeMsgNum == 0xFFFF)
+        return fstError;
+
+    SendMessages(dib);
+
+    result = GetResponse(dib, createMsgNum);
     if (result != rsDone) {
+        // TODO maybe give no error for "no Finder Info found"
         retval = ConvertError(result);
-        goto close;
     }
 
-    if (readResponse.DataLength != sizeof(AFPInfo)) {
+    result = GetResponse(dib, readMsgNum);
+    if (result != rsDone && retval == 0)
+        retval = ConvertError(result);
+
+    if (readResponse.DataLength != sizeof(AFPInfo) && retval == 0) {
         // TODO maybe just ignore it with no error?
         retval = networkError;
-        goto close;
     }
 
-    if (!VerifyBuffer(readResponse.DataOffset, readResponse.DataLength)) {
+    if (!VerifyBuffer(readResponse.DataOffset, readResponse.DataLength)
+        && retval == 0)
         retval = networkError;
-        goto close;
-    }
 
     memcpy(&afpInfo, (uint8_t*)&msg.smb2Header + readResponse.DataOffset,
         sizeof(AFPInfo));
@@ -103,18 +116,10 @@ Word GetAFPInfo(DIB *dib, struct GSOSDP *gsosdp) {
     if (!AFPInfoValid(&afpInfo))
         InitAFPInfo();
 
-    /*
-     * Close AFP Info ADS
-     */
-close:
-    closeRequest.Flags = 0;
-    closeRequest.Reserved = 0;
-    closeRequest.FileId = fileID;
-
-    result = SendRequestAndGetResponse(dib, SMB2_CLOSE, sizeof(closeRequest));
-    if (result != rsDone) {
+    result = GetResponse(dib, closeMsgNum);
+    if (result != rsDone && retval == 0) {
         // TODO give appropriate error code
-        return retval ? retval : ConvertError(result);
+        retval = ConvertError(result);
     }
 
     return retval;

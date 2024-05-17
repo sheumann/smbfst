@@ -62,7 +62,6 @@ Word Open(void *pblock, void *gsosdp, Word pcount) {
     int i;
     Word result;
     DIB *dib;
-    //SMB2_FILEID fileID;
     VirtualPointer vp;
     VCR *vcr;
     GSString *volName;
@@ -71,6 +70,7 @@ Word Open(void *pblock, void *gsosdp, Word pcount) {
     Word retval = 0;
     static SMB2_FILEID fileID;
     enum {openDataFork, openResourceFork, openOrCreateResourceFork} forkOp;
+    uint16_t createMsgNum, closeMsgNum;
 
     dib = GetDIB(gsosdp, 1);
     if (dib == NULL)
@@ -190,16 +190,24 @@ open_done:
                     sizeof(msg.body) - offsetof(SMB2_CREATE_Request, Buffer));
                 if (createRequest.NameLength == 0xFFFF)
                     return badPathSyntax;
-
-                result = SendRequestAndGetResponse(dib, SMB2_CREATE,
+                
+                createMsgNum = EnqueueRequest(dib, SMB2_CREATE,
                     sizeof(createRequest) + createRequest.NameLength);
-                if (result != rsDone)
-                    return ConvertError(result);
+
+                closeMsgNum = EnqueueCloseRequest(dib, &fileIDFromPrevious);
+                if (closeMsgNum == 0xFFFF)
+                    return fstError;
+
+                SendMessages(dib);
+
+                result = GetResponse(dib, createMsgNum);
+                retval = ConvertError(result);
                 
-                fileID = createResponse.FileId;
-                
-                result = SendCloseRequestAndGetResponse(dib, &fileID);
+                result = GetResponse(dib, closeMsgNum);
                 // ignore any errors on close
+
+                if (retval != 0)
+                    return retval;
                 
                 forkOp = openOrCreateResourceFork;
                 goto retry;

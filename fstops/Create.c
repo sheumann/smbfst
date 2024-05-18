@@ -120,7 +120,7 @@ Word Create(void *pblock, void *gsosdp, Word pcount) {
     if (storageType == directoryFile)
         fileType.fileType = DIRECTORY_FILETYPE;
 
-    attributes = GetFileAttributes(access, storageType == directoryFile);
+    attributes = GetFileAttributes(access, storageType == directoryFile, dib);
 
     // Ensure we have write access initially, even if file will be read-only.
     // This is needed so we can set up the file.

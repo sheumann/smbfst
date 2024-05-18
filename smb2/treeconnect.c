@@ -74,7 +74,7 @@ Word TreeConnect(DIB *dib) {
             .CommandCode = kAAPL_SERVER_QUERY,
             .Reserved = 0,
             .RequestBitmap =
-                kAAPL_SERVER_CAPS | kAAPL_VOLUME_CAPS| kAAPL_MODEL_INFO,
+                kAAPL_SERVER_CAPS | kAAPL_VOLUME_CAPS | kAAPL_MODEL_INFO,
             .ClientCapabilities = kAAPL_SUPPORTS_READ_DIR_ATTR,
         };
     
@@ -104,9 +104,26 @@ Word TreeConnect(DIB *dib) {
             & (kAAPL_SERVER_CAPS | kAAPL_VOLUME_CAPS| kAAPL_MODEL_INFO)
             != (kAAPL_SERVER_CAPS | kAAPL_VOLUME_CAPS| kAAPL_MODEL_INFO))
             goto close;
-        
+        if (aaplResponse->ModelStringLength >
+            dataLen - sizeof(AAPL_SERVER_QUERY_RESPONSE))
+            goto close;
+
         if (aaplResponse->ServerCapabilities & kAAPL_SUPPORTS_READ_DIR_ATTR)
             dib->flags |= FLAG_AAPL_READDIR;
+
+        /*
+         * Try to detect if this is really a macOS server (as opposed to
+         * Samba with Mac extensions).  Macs should always pass these checks.
+         * Samba with vfs_fruit typically will not, although it's possible to
+         * set non-default configuration options that will make it pass them.
+         */
+        if ((aaplResponse->ServerCapabilities & kAAPL_SUPPORTS_READ_DIR_ATTR)
+            && (aaplResponse->ServerCapabilities & kAAPL_SUPPORTS_OSX_COPYFILE)
+            && (aaplResponse->ServerCapabilities & kAAPL_UNIX_BASED)
+            && (aaplResponse->ModelStringLength != 2*8
+                || memcmp(aaplResponse->ModelString, u"MacSamba", 2*8) != 0)) {
+            dib->flags |= FLAG_MACOS;
+        }            
     
 close:
         /*

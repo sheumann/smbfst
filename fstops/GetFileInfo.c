@@ -275,7 +275,7 @@ handle_close:
     if (pcount == 0) {
         #define pblock ((FileRec*)pblock)
         
-        pblock->fAccess = GetAccess(basicInfo.FileAttributes);
+        pblock->fAccess = GetAccess(basicInfo.FileAttributes, dib);
         if (isRootDir)
             pblock->fAccess &= ~renameEnable;
         
@@ -306,7 +306,7 @@ handle_close:
     } else {
         #define pblock ((FileInfoRecGS*)pblock)
         
-        pblock->access = GetAccess(basicInfo.FileAttributes);
+        pblock->access = GetAccess(basicInfo.FileAttributes, dib);
         if (isRootDir)
             pblock->access &= ~renameEnable;
         

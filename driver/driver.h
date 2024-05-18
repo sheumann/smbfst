@@ -43,6 +43,7 @@ struct DIB {
 #define FLAG_AAPL_READDIR 0x0001
 #define FLAG_READONLY     0x0002
 #define FLAG_PIPE_SHARE   0x0004
+#define FLAG_MACOS        0x0008
 
 /* list of DIBs (argument to INSTALL_DRIVER) */
 struct DIBList {

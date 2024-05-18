@@ -621,7 +621,7 @@ handle_close:
             GetGSTime(dirEntry.LastWriteTime, dibs[i].session);
 
     if (pcount >= 12) {
-        pblock->access = GetAccess(dirEntry.FileAttributes);
+        pblock->access = GetAccess(dirEntry.FileAttributes, &dibs[i]);
 
     if (pcount >= 13) {
         pblock->auxType = fileType.auxType;

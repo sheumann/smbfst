@@ -130,7 +130,7 @@ Word SetFileInfo(void *pblock, void *gsosdp, Word pcount) {
         FILE_ATTRIBUTE_ARCHIVE | FILE_ATTRIBUTE_HIDDEN | 
         FILE_ATTRIBUTE_READONLY | FILE_ATTRIBUTE_NORMAL);
     attributes |= 
-        GetFileAttributes(access, (bool)(attributes & FILE_ATTRIBUTE_DIRECTORY))
+        GetFileAttributes(access, attributes & FILE_ATTRIBUTE_DIRECTORY, dib)
         & ~(uint32_t)FILE_ATTRIBUTE_NORMAL;
     if (attributes == 0)
         attributes = FILE_ATTRIBUTE_NORMAL;

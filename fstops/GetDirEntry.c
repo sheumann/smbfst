@@ -48,6 +48,8 @@ Word GetDirEntry(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     unsigned i;
     static SMB2_FILEID fileID;
     Word retval = 0;
+    SMB2_QUERY_INFO_Request *queryInfoReq;
+    uint16_t readMsgNum, queryInfoMsgNum, closeMsgNum;
 
     Word base, displacement, entryNum;
     
@@ -409,8 +411,9 @@ Word GetDirEntry(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
                 } else {
                     break;
                 }
-            } else if (result != rsDone)
+            } else if (result != rsDone) {
                 return GDEError(result);
+            }
         
             fileID = createResponse.FileId;
         
@@ -430,19 +433,51 @@ Word GetDirEntry(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
                 readRequest.ReadChannelInfoOffset = 0;
                 readRequest.ReadChannelInfoLength = 0;
             
-                result = SendRequestAndGetResponse(&dibs[i], SMB2_READ,
+                readMsgNum = EnqueueRequest(&dibs[i], SMB2_READ,
                     sizeof(readRequest));
+            }
+
+            /*
+             * Get stream information
+             */
+            queryInfoReq = (SMB2_QUERY_INFO_Request*)nextMsg->Body;
+            // no need to check for space (any previous message is fixed-length)
+
+            queryInfoReq->InfoType = SMB2_0_INFO_FILE;
+            queryInfoReq->FileInfoClass = FileStreamInformation;
+            queryInfoReq->OutputBufferLength =
+                sizeof(msg.body) - offsetof(SMB2_QUERY_INFO_Response, Buffer);
+            queryInfoReq->InputBufferOffset = 0;
+            queryInfoReq->Reserved = 0;
+            queryInfoReq->InputBufferLength = 0;
+            queryInfoReq->AdditionalInformation = 0;
+            queryInfoReq->Flags = 0;
+            queryInfoReq->FileId = fileID;
+        
+            queryInfoMsgNum = EnqueueRequest(&dibs[i], SMB2_QUERY_INFO,
+                sizeof(*queryInfoReq));
+        
+            /*
+             * Close AFP Info ADS (or main stream, for redo)
+             */
+            closeMsgNum = EnqueueCloseRequest(&dibs[i], &fileID);
+            // Cannot fail, because previous messages are fixed-length
+            
+            SendMessages(&dibs[i]);
+
+            if (infoState == usingInfoStream) {
+                result = GetResponse(&dibs[i], readMsgNum);
                 if (result == rsFailed) {
                     // just ignore too-short AFP Info or other errors
-                    goto get_stream_info;
+                    goto handle_stream_info;
                 } else if (result != rsDone) {
                     retval = GDEError(result);
-                    goto close_stream;
+                    goto handle_stream_info;
                 }
             
                 if (readResponse.DataLength != sizeof(AFPInfo)) {
                     retval = networkError;
-                    goto close_stream;
+                    goto handle_stream_info;
                 }
             
                 if (!VerifyBuffer(
@@ -450,7 +485,7 @@ Word GetDirEntry(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
                     readResponse.DataLength))
                 {
                     retval = networkError;
-                    goto close_stream;
+                    goto handle_stream_info;
                 }
             
                 memcpy(&afpInfo,
@@ -461,25 +496,13 @@ Word GetDirEntry(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
                 if (!AFPInfoValid(&afpInfo))
                     InitAFPInfo();
             }
-    
-get_stream_info:    
-            /*
-             * Get stream information
-             */
-            queryInfoRequest.InfoType = SMB2_0_INFO_FILE;
-            queryInfoRequest.FileInfoClass = FileStreamInformation;
-            queryInfoRequest.OutputBufferLength =
-                sizeof(msg.body) - offsetof(SMB2_QUERY_INFO_Response, Buffer);
-            queryInfoRequest.InputBufferOffset = 0;
-            queryInfoRequest.Reserved = 0;
-            queryInfoRequest.InputBufferLength = 0;
-            queryInfoRequest.AdditionalInformation = 0;
-            queryInfoRequest.Flags = 0;
-            queryInfoRequest.FileId = fileID;
-        
-            result = SendRequestAndGetResponse(&dibs[i], SMB2_QUERY_INFO,
-                sizeof(queryInfoRequest));
-            if (result == rsFailed) {
+
+handle_stream_info:
+            result = GetResponse(&dibs[i], queryInfoMsgNum);
+            if (retval != 0) {
+                // just ignore the response if we have an error already
+                goto handle_close;
+            } if (result == rsFailed) {
                 /*
                  * Do not report errors about getting the resource fork size.
                  *
@@ -489,23 +512,23 @@ get_stream_info:
                  */
                 if (infoState == usingInfoStream)
                     infoState = redoWithMainStream;
-                goto close_stream;
+                goto handle_close;
             } else if (result != rsDone) {
                 retval = GDEError(result);
-                goto close_stream;
+                goto handle_close;
             }
         
             if (queryInfoResponse.OutputBufferLength >
                 sizeof(msg.body) - offsetof(SMB2_QUERY_INFO_Response, Buffer)) {
                 retval = networkError;
-                goto close_stream;
+                goto handle_close;
             }
         
             if (!VerifyBuffer(
                 queryInfoResponse.OutputBufferOffset,
                 queryInfoResponse.OutputBufferLength)) {
                 retval = networkError;
-                goto close_stream;
+                goto handle_close;
             }
         
             streamInfoLen = queryInfoResponse.OutputBufferLength;
@@ -516,13 +539,13 @@ get_stream_info:
             while (streamInfoLen >= sizeof(FILE_STREAM_INFORMATION)) {
                 if (streamInfo->NextEntryOffset > streamInfoLen) {
                     retval = networkError;
-                    goto close_stream;
+                    goto handle_close;
                 }
                 if (streamInfo->StreamNameLength >
                     streamInfoLen
                     - offsetof(FILE_STREAM_INFORMATION, StreamName)) {
                     retval = networkError;
-                    goto close_stream;
+                    goto handle_close;
                 }
         
                 if (streamInfo->StreamNameLength == sizeof(resourceForkSuffix)
@@ -541,16 +564,13 @@ get_stream_info:
                 streamInfo =
                     (void*)((char*)streamInfo + streamInfo->NextEntryOffset);
             }
-        
-            /*
-             * Close AFP Info ADS (or main stream, for redo)
-             */
-close_stream:
-            result = SendCloseRequestAndGetResponse(&dibs[i], &fileID);
+
+handle_close:
+            result = GetResponse(&dibs[i], closeMsgNum);
             if (result == rsFailed) {
                 // ignore errors
-            } else if (result != rsDone) {
-                return retval ? retval : GDEError(result);
+            } else if (result != rsDone && retval != 0) {
+                retval = GDEError(result);
             }
             
             if (retval)

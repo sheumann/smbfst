@@ -126,6 +126,9 @@ uint16_t bodySize;   // size of last message received
 
 ReconnectInfo reconnectInfo;
 
+static uint16_t sentCommand;
+static uint16_t sentNextCommand;
+
 /*
  * Read an SMB2 protocol message from the connection.
  * On success, the message is left in msg.smb2Header and msg.body.
@@ -147,8 +150,6 @@ static ReadStatus ReadMessage(Connection *connection) {
         if (result != rsDone)
             return result;
     }
-
-    blockRetry = true;
 
     if (msg.smb2Header.NextCommand != 0) {
         if (msg.smb2Header.NextCommand >= connection->remainingCompoundSize)
@@ -178,7 +179,16 @@ static ReadStatus ReadMessage(Connection *connection) {
 
     if (msgSize > sizeof(SMB2Header) + sizeof(msg.body))
         return rsBadMsg;
-    
+
+    // Consider a deleted/expired session to be a protocol-level failure
+    if (msg.smb2Header.Status != 0) {
+        if (msg.smb2Header.Status == STATUS_USER_SESSION_DELETED
+            || msg.smb2Header.Status == STATUS_NETWORK_SESSION_EXPIRED)
+            return rsBadMsg;
+    }
+
+    blockRetry = true;
+
     result = ReadTCP(connection, msgSize - sizeof(SMB2Header), &msg.body);
     if (result != rsDone)
         return rsBadMsg;
@@ -312,10 +322,14 @@ bool SendMessages(DIB *dib) {
     msg.directTCPHeader.StreamProtocolLength =
         hton32(sendLength);
 
-    blockRetry = false;
-
     tcperr = TCPIPWriteTCP(connection->ipid, (void*)&msg, 4 + sendLength,
         TRUE, FALSE);
+
+    // save off header fields that are needed for reconnect
+    sentCommand = msg.smb2Header.Command;
+    sentNextCommand = msg.smb2Header.NextCommand;
+    blockRetry = false;
+
     return !(tcperr || toolerror());
 }
 
@@ -342,8 +356,7 @@ ReadStatus GetResponse(DIB *dib, uint16_t messageNum) {
 retry:
         status = ReadMessage(dib->session->connection);
         if (status != rsDone) {
-            if (status != rsBadMsg && !blockRetry
-                && Reconnect(dib)) {
+            if (!blockRetry && Reconnect(dib)) {
                 SendMessages(dib);
                 blockRetry = true;
                 goto retry;
@@ -417,14 +430,18 @@ static bool Reconnect(DIB *dib) {
     unsigned char *savedMsg;
     uint16_t savedLength;
     uint16_t msgLen;
+    static bool inReconnect = false;
+    
+    if (blockRetry || inReconnect)
+        return false;
 
-    // Don't reconnect just to disconnect
-    if (msg.smb2Header.Command == SMB2_LOGOFF
-        || msg.smb2Header.Command == SMB2_TREE_DISCONNECT)
+    // Don't retry an failed negotiate, and don't reconnect just to disconnect
+    if (sentCommand == SMB2_NEGOTIATE
+        || sentCommand == SMB2_LOGOFF
+        || sentCommand == SMB2_TREE_DISCONNECT)
         return false;
     
-    if (GetTick() - connection->reconnectTime
-        < MIN_RECONNECT_TIME * 60)
+    if (GetTick() - connection->reconnectTime < MIN_RECONNECT_TIME * 60)
         return false;
     
     connection->reconnectTime = GetTick();
@@ -434,6 +451,8 @@ static bool Reconnect(DIB *dib) {
     if (savedMsg == NULL)
         return false;
     memcpy(savedMsg, &msg.smb2Header, savedLength);
+    ((SMB2Header*)savedMsg)->Command = sentCommand;
+    ((SMB2Header*)savedMsg)->NextCommand = sentNextCommand;
     
     /*
      * Save info about the file being accessed (if any), so that the fileId
@@ -441,13 +460,15 @@ static bool Reconnect(DIB *dib) {
      * NOTE: This currently only works for the first message in a compound set.
      */
     reconnectInfo.dib = dib;
-    if (fileIdOffsets[msg.smb2Header.Command] != 0) {
+    if (fileIdOffsets[sentCommand] != 0) {
         reconnectInfo.fileId =
             (SMB2_FILEID*)(savedMsg + sizeof(SMB2Header)
-            + fileIdOffsets[msg.smb2Header.Command]);
+            + fileIdOffsets[sentCommand]);
     } else {
         reconnectInfo.fileId = NULL;
     }
+
+    inReconnect = true;
 
     ResetSendStatus();
     result = Connection_Reconnect(connection) == 0;
@@ -466,6 +487,8 @@ static bool Reconnect(DIB *dib) {
             msgLen - sizeof(SMB2Header));
         savedLength -= msgLen;
     } while (savedLength != 0);
+
+    inReconnect = false;
 
     if (reconnectInfo.fileId != NULL)
         return false;

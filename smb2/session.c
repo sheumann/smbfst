@@ -35,6 +35,7 @@ void Session_Release(Session *sess) {
         smb_free(sess->authInfo.userName);
         smb_free(sess->authInfo.userDomain);
         sess->connection = NULL;
+        sess->established = false;
     }
 }
 
@@ -146,6 +147,7 @@ Word SessionSetup(Session *session) {
             }
             
             session->sessionId = msg.smb2Header.SessionId;
+            session->established = true;
             return 0;
         } else if (result == rsMoreProcessingRequired) {
             if (!VerifyBuffer(
@@ -172,6 +174,9 @@ Word SessionSetup(Session *session) {
 Word Session_Reconnect(Session *session) {
     Word result, result2;
     unsigned i;
+
+    if (!session->established)
+        return false;
 
     session->signingRequired = false;
     

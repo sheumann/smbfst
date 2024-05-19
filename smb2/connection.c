@@ -169,6 +169,7 @@ Word Connection_Reconnect(Connection *connection) {
     unsigned i;
     
     oldIpid = connection->ipid;
+    TCPIPAbortTCP(oldIpid);
     result = Connect(connection);
     
     if (result != 0) {

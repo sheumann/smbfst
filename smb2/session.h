@@ -24,6 +24,8 @@ typedef struct {
     Word refCount;
     
     AuthInfo authInfo;
+    
+    bool established;
 } Session;
 
 extern Session sessions[NDIBS];

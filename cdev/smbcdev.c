@@ -60,6 +60,10 @@
 #define addressLine         3
 #define connectBtn          1
 #define serversLst          4
+#define goOnlineTxt         5
+#define goOnlineBtn         6
+
+#define GO_ONLINE_OFFSET    (-10000)
 
 #define INITIAL_INTERVAL (1 * 60)  /* ticks */
 #define MAX_INTERVAL     (16 * 60) /* ticks */
@@ -77,6 +81,13 @@ uint16_t interval;
 
 CtlRecHndl addressLineHndl;
 CtlRecHndl serversListHndl;
+CtlRecHndl goOnlineTxtHndl;
+CtlRecHndl goOnlineBtnHndl;
+
+Point goOnlineTxtOffscreenPos;
+Point goOnlineTxtOnscreenPos;
+Point goOnlineBtnOffscreenPos;
+Point goOnlineBtnOnscreenPos;
 
 #define SERVER_LIST_SIZE 254
 #define SERVER_LIST_BLANKS 10
@@ -97,6 +108,9 @@ Long lastClickTime;
 Word lastSelection;
 ServerInfo *lastServerInfo;
 Point eventLoc;
+
+bool networkUp;
+bool networkDown;
 
 #pragma databank 1
 #pragma toolparms 1
@@ -197,12 +211,21 @@ void DoMDNS(void) {
     }
 }
 
-void StartMDNS(void) {
+void StopMDNS(void) {
+    if (mdnsActive) {
+        TCPIPLogout(ipid);
+        mdnsActive = false;
+    }
+}
+
+bool StartMDNS(void) {
     static const uint8_t smbName[] = "\x04_smb\x04_tcp\x05local";
+
+    StopMDNS();
 
     ipid = TCPIPLogin(userid(), MDNS_IP, MDNS_PORT, 0, 0x40);
     if (toolerror())
-        return;
+        return false;
     // TODO ensure local port is not MDNS_PORT
     
     MDNSInitQuery(smbName);
@@ -212,6 +235,7 @@ void StartMDNS(void) {
     interval = INITIAL_INTERVAL / 2;
     
     DoMDNS();
+    return true;
 }
 
 void DisplayError(unsigned errorCode) {
@@ -279,6 +303,29 @@ void ClearListSelection(void) {
 
 void ClearAddressLine(void) {
     SetLETextByID(wPtr, addressLine, (StringPtr)"");
+}
+
+/*
+ * Show the "Go Online" butten and descriptive text.
+ *
+ * Note: These controls are moved in/out of the visible area rather than
+ * actually being hidden via the Control Manager, because the Control Panel
+ * will unhide hidden controls.
+ */
+void ShowGoOnlineControls(void) {
+    if (!TCPIPGetConnectStatus()) {
+        MoveControl(goOnlineTxtOnscreenPos.h, goOnlineTxtOnscreenPos.v,
+            goOnlineTxtHndl);
+        MoveControl(goOnlineBtnOnscreenPos.h, goOnlineBtnOnscreenPos.v,
+            goOnlineBtnHndl);
+    }
+}
+
+void HideGoOnlineControls(void) {
+    MoveControl(goOnlineTxtOffscreenPos.h, goOnlineTxtOffscreenPos.v,
+        goOnlineTxtHndl);
+    MoveControl(goOnlineBtnOffscreenPos.h, goOnlineBtnOffscreenPos.v,
+        goOnlineBtnHndl);
 }
 
 void DoConnect(void)
@@ -378,6 +425,10 @@ void DoHit(Long ctlID, CtlRecHndl ctlHandle)
 
     if (ctlID == connectBtn) {
         DoConnect();
+    } else if (ctlID == goOnlineBtn) {
+        TCPIPConnect(NULL);
+        if (!toolerror() || toolerror() == terrCONNECTED)
+            HideGoOnlineControls();
     } else if (ctlHandle == addressLineHndl) {
         ClearListSelection();
     } else if (ctlHandle == serversListHndl) {
@@ -461,6 +512,21 @@ ret:
     SetPort(port);
 }
 
+#pragma toolparms 1
+#pragma databank 1
+pascal Word RequestHandler(Word reqCode, void *dataIn, void *dataOut) {
+    if (reqCode == TCPIPSaysNetworkUp) {
+        networkUp = true;
+        networkDown = false;
+    } else if (reqCode == TCPIPSaysNetworkDown) {
+        networkDown = true;
+        networkUp = false;
+    }
+    return 0;
+}
+#pragma databank 0
+#pragma toolparms 0
+
 void DoCreate(WindowPtr windPtr)
 {
     unsigned i;
@@ -473,6 +539,18 @@ void DoCreate(WindowPtr windPtr)
         NewControl2(wPtr, resourceToResource, cdevWindow+320);
     }
     
+    goOnlineTxtHndl = GetCtlHandleFromID(wPtr, goOnlineTxt);
+    goOnlineTxtOffscreenPos.h = (*goOnlineTxtHndl)->ctlRect.h1;
+    goOnlineTxtOffscreenPos.v = (*goOnlineTxtHndl)->ctlRect.v1;
+    goOnlineTxtOnscreenPos.h = goOnlineTxtOffscreenPos.h - GO_ONLINE_OFFSET;
+    goOnlineTxtOnscreenPos.v = goOnlineTxtOffscreenPos.v - GO_ONLINE_OFFSET;
+
+    goOnlineBtnHndl = GetCtlHandleFromID(wPtr, goOnlineBtn);
+    goOnlineBtnOffscreenPos.h = (*goOnlineBtnHndl)->ctlRect.h1;
+    goOnlineBtnOffscreenPos.v = (*goOnlineBtnHndl)->ctlRect.v1;
+    goOnlineBtnOnscreenPos.h = goOnlineBtnOffscreenPos.h - GO_ONLINE_OFFSET;
+    goOnlineBtnOnscreenPos.v = goOnlineBtnOffscreenPos.v - GO_ONLINE_OFFSET;
+
     serversListHndl = GetCtlHandleFromID(wPtr, serversLst);
     addressLineHndl = GetCtlHandleFromID(wPtr, addressLine);
     
@@ -488,7 +566,12 @@ void DoCreate(WindowPtr windPtr)
     
     serverListEntries = 0;
 
-    StartMDNS();
+    if (!StartMDNS()) {
+        ShowGoOnlineControls();
+    }
+    
+    AcceptRequests("\pTCP/IP~STH~SMBCDev~", userid(),
+        (WordProcPtr)RequestHandler);
 }
 
 void DoEvent(EventRecord *event)
@@ -521,15 +604,27 @@ void DoEvent(EventRecord *event)
 }
 
 void DoClose(void) {
-    if (mdnsActive) {
-        TCPIPLogout(ipid);
-        mdnsActive = false;
-    }
+    AcceptRequests(NULL, userid(), NULL);
+
+    StopMDNS();
 
     wPtr = NULL;
 }
 
 void DoRun(void) {
+    if (networkUp) {
+        StartMDNS();
+        HideGoOnlineControls();
+        networkUp = false;
+    }
+    
+    if (networkDown) {
+        StopMDNS();
+        if (serverList[0].memFlag & memNever)
+            ShowGoOnlineControls();
+        networkDown = false;
+    }
+    
     DoMDNS();
 }
 

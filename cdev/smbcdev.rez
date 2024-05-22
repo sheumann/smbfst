@@ -88,6 +88,8 @@ resource rIcon (1) {
 #define addressLine         3
 #define connectBtn          1
 #define serversLst          4
+#define goOnlineTxt         5
+#define goOnlineBtn         6
 
 #define helpTxt             5
 
@@ -96,6 +98,8 @@ resource rIcon (1) {
  */
 resource rControlList (cdevWindow) {
     {
+        cdevWindow+goOnlineBtn,
+        cdevWindow+goOnlineTxt,
         cdevWindow+connectBtn,
         cdevWindow+serversLst,
         cdevWindow+addressLine,
@@ -105,6 +109,8 @@ resource rControlList (cdevWindow) {
 
 resource rControlList (cdevWindow+320) {
     {
+        cdevWindow+goOnlineBtn,
+        cdevWindow+goOnlineTxt,
         cdevWindow+connectBtn,
         cdevWindow+serversLst+320,
         cdevWindow+addressLine,
@@ -189,6 +195,39 @@ resource rControlTemplate (cdevWindow+connectBtn) {
 };
 
 resource rPString(cdevWindow+connectBtn) { "Connect" };
+
+#define GO_ONLINE_OFFSET    (-10000)
+
+resource rControlTemplate (cdevWindow+goOnlineTxt) {
+    goOnlineTxt,                            /* control ID */
+    {GO_ONLINE_OFFSET+68, GO_ONLINE_OFFSET+47,
+    GO_ONLINE_OFFSET+79, GO_ONLINE_OFFSET+250},  /* control rect */
+    statTextControl {{
+        ctlInvis+fBlastText,                /* flags */
+        $1000+RefIsResource,                /* moreFlags */
+        0,                                  /* refCon */
+        cdevWindow+goOnlineTxt /* title ref */
+    }};
+};
+
+resource rTextForLETextBox2 (cdevWindow+goOnlineTxt) {
+    "Go online to see SMB servers"
+};
+
+resource rControlTemplate (cdevWindow+goOnlineBtn) {
+    goOnlineBtn,
+    {GO_ONLINE_OFFSET+83, GO_ONLINE_OFFSET+100, 0, 0},
+    SimpleButtonControl {{
+        ctlInvis,
+        $1000+RefIsResource,
+        0,
+        cdevWindow+goOnlineBtn,
+        0,                                  /* color table ref */
+        {"","",0,0}                         /* key equivalent */
+    }};
+};
+
+resource rPString(cdevWindow+goOnlineBtn) { "Go Online" };
 
 /*
  * Controls in the help window

@@ -27,9 +27,9 @@ Reboot the system to complete the installation.
 
 Compatibility
 -------------
-The SMB FST is compatible with Windows, macOS, and Samba file servers. See the Server Configuration section below for information on how to configure these servers to work with the SMB FST.
+The SMB FST is compatible with Windows, macOS, and Samba file servers. Using a modern, currently-supported version of the server software is strongly recommended. See the Server Configuration section below for information on how to configure these servers to work with the SMB FST.
 
-The SMB FST may also work with other servers that support the SMB 2 or SMB 3 protocols, but they have not been tested. Using a modern, currently-supported version of the server software is strongly recommended.
+The SMB FST may also work with other servers that support the SMB 2 or SMB 3 protocols, but they have not been tested.
 
 
 Connecting to SMB Servers
@@ -74,7 +74,7 @@ To support logging in using the SMB FST, you must enable "Windows File Sharing" 
 1. Open System Settings.
 2. Go to the General -> Sharing section.
 3. Click the circled `i` by File Sharing.
-4. Click __Options...__.
+4. Click __Options...__
 5. Under Windows File Sharing, click the check boxes to turn it on for any accounts you want to use from the IIGS, and enter their passwords when prompted.
 
 macOS servers require message signing by default. The SMB FST is compatible with this, but for best performance it should be turned off. To do this, enter the following command in the Terminal, and then turn File Sharing off and back on:
@@ -89,7 +89,7 @@ In order to properly support IIGS-style file types and resource forks, it is str
     vfs objects = catia fruit streams_xattr
     fruit:encoding = native
 
-In order for Samba servers to be listed in the SMB control panel, the server system must be running an mDNS responder such as Avahi.  This is installed by default in many Linux distributions, but on some systems you may need to install it yourself.  (You can still connect to Samba servers by entering their address in the SMB control panel, even if they do not have an mDNS responder.)
+In order for Samba servers to be listed in the SMB control panel, the server system must be running an mDNS responder such as Avahi.  This is installed by default in many Linux distributions, but on some systems you may need to install it yourself. (You can still connect to Samba servers by entering their address in the SMB control panel, even if they do not have an mDNS responder.)
 
 
 ### General Server Requirements
@@ -108,4 +108,4 @@ In order to work with the SMB FST, a server must meet the following requirements
 
 * The SMB FST can use an Apple-specific protocol extension to improve the speed of listing directory contents, so this should be enabled if it is available on the server.
 
-* The SMB control panel detects servers on the local network using multicast DNS Service Discovery (mDNS-SD), so servers must support this in order to be detects. You can still connect to servers that are not detected by manually entering their address.
+* The SMB control panel detects servers on the local network using multicast DNS Service Discovery (mDNS-SD), so servers must support this in order to be detected. You can still connect to servers that are not detected by manually entering their address.

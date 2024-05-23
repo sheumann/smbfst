@@ -7,13 +7,13 @@
 
 #define smbFSID 0x400e
 
-#define SMB_CONNECT 0
-#define SMB_CONNECTION_RETAIN 1
-#define SMB_CONNECTION_RELEASE 2
-#define SMB_AUTHENTICATE 3
-#define SMB_SESSION_RETAIN 4
-#define SMB_SESSION_RELEASE 5
-#define SMB_MOUNT 6
+#define SMB_CONNECT            0xC000
+#define SMB_CONNECTION_RETAIN  0xC001
+#define SMB_CONNECTION_RELEASE 0xC002
+#define SMB_AUTHENTICATE       0xC003
+#define SMB_SESSION_RETAIN     0xC004
+#define SMB_SESSION_RELEASE    0xC005
+#define SMB_MOUNT              0xC006
 
 typedef struct SMBConnectRec {
     Word pCount;

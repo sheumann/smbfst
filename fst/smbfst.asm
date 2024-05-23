@@ -144,11 +144,14 @@ fstspec tyx                             ; must be class 1
         ldy     #4                      ; get command number
         lda     [pblock],y
         
-        cmp     #maxFSTSpecificCall+1   ; check for valid call number
+        asl     a
+        bcc     badcall
+        asl     a
+        bcc     badcall
+
+        cmp     #4*(maxFSTSpecificCall+1) ; check for valid call number
         bge     badcall
-        
-        asl     a
-        asl     a
+
         tax
 
         lda     fstspecific_calls+1,x   ; get address to call

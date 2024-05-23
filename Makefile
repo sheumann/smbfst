@@ -72,8 +72,13 @@ FST_OBJ =  fst/smbfst.A \
 FST_LIBS = crypto/lib65816crypto \
            crypto/lib65816hash
 
+FST_RSRC = fst/smbfst.rez
+
 FEXT_OBJ = finderext/longnames.a \
            finderext/namespatch.A
+
+FEXT_RSRC = \
+	   finderext/longnames.rez
 
 CDEV_OBJ = cdev/smbcdev.a \
            cdev/addressparser.a \
@@ -118,11 +123,11 @@ all: $(BINARIES)
 %.A: %.asm
 	$(CC) -c $<
 
-SMB.FST: $(FST_OBJ) $(FST_LIBS)
+SMB.FST: $(FST_OBJ) $(FST_LIBS) $(FST_RSRC)
 	$(CC) $^ -o $@
 	iix chtyp -tfst $@
 
-LongNamesPatch: $(FEXT_OBJ)
+LongNamesPatch: $(FEXT_OBJ) $(FEXT_RSRC)
 	$(CC) $^ -o $@
 	iix chtyp -t 0xBC -a 0x0001 LongNamesPatch
 

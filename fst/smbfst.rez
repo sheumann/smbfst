@@ -1,0 +1,17 @@
+#include "types.rez"
+
+resource rVersion (1) {
+    { 1,0,0,development,1 },
+    verUS,
+    "SMB FST",
+    "By Stephen Heumann"
+};
+
+resource rComment (1) {
+    "The SMB FST allows you to access file servers using the SMB protocol.\n"
+    "\n"
+    "Copyright 2024 Stephen Heumann\n"
+    "\n"
+    "This program contains material from the ORCA/C Run-Time Libraries, "
+    "copyright 1987-1996 by Byte Works, Inc. Used with permission."
+};

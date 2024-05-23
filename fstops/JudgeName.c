@@ -4,7 +4,7 @@
 #undef JudgeName
 #include "gsos/gsosdata.h"
 #include "fst/fstspecific.h"
-#include <misctool.h>
+#include "helpers/path.h"
 
 // JudgeName name types
 #define NAME_TYPE_UNKNOWN        0
@@ -16,6 +16,9 @@
 #define FLAG_NAME_CONTAINED_ILLEGAL_CHARACTERS 0x8000
 #define FLAG_NAME_TOO_LONG                     0x4000
 #define FLAG_SYNTAX_ERROR                      0x2000
+
+// Max length of a SMB2 file/directory name, in UTF-16 code units
+#define SMB2_MAX_NAME_LEN 255
 
 Word JudgeName(JudgeNameRecGS *pblock, struct GSOSDP *gsosdp, Word pcount) {
     Word flags;
@@ -33,7 +36,7 @@ Word JudgeName(JudgeNameRecGS *pblock, struct GSOSDP *gsosdp, Word pcount) {
         "Some servers may disallow certain names.";
 
     if (pcount >= 4) {
-        pblock->maxLen = 255;
+        pblock->maxLen = SMB2_MAX_NAME_LEN;
 
     if (pcount >= 5) {
         flags = 0;
@@ -59,6 +62,14 @@ Word JudgeName(JudgeNameRecGS *pblock, struct GSOSDP *gsosdp, Word pcount) {
                         || name->bufString.text[i] == ':') {
                         name->bufString.text[i] = '_';
                         flags |= FLAG_NAME_CONTAINED_ILLEGAL_CHARACTERS;
+                    }
+                }
+
+                if (name->bufString.length > SMB2_MAX_NAME_LEN) {
+                    if (GSPathToSMB(&name->bufString, gbuf, GBUF_SIZE)
+                        > SMB2_MAX_NAME_LEN * sizeof(char16_t)) {
+                        flags |= FLAG_NAME_TOO_LONG;
+                        name->bufString.length = SMB2_MAX_NAME_LEN;
                     }
                 }
             }

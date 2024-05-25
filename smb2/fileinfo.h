@@ -179,4 +179,12 @@ typedef struct {
     char16_t FileName[];
 } FILE_ID_BOTH_DIR_INFORMATION;
 
+typedef struct {
+    uint64_t TotalAllocationUnits;
+    uint64_t CallerAvailableAllocationUnits;
+    uint64_t ActualAvailableAllocationUnits;
+    uint32_t SectorsPerAllocationUnit;
+    uint32_t BytesPerSector;
+} FILE_FS_FULL_SIZE_INFORMATION;
+
 #endif

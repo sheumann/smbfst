@@ -10,6 +10,7 @@
 #include "driver/driver.h"
 #include "systemops/Startup.h"
 #include "utils/random.h"
+#include "utils/finderstate.h"
 #include "smb2/smb2.h"
 
 extern pascal void SystemUserID (unsigned, char *);
@@ -153,6 +154,8 @@ static void Startup2(void) {
         addNotifyProcRec.pCount = 1;
         addNotifyProcRec.procPointer = (ProcPtr)&notificationProcRec;
         AddNotifyProcGS(&addNotifyProcRec);
+        
+        InstallFinderRequestProc();
     }
 }
 #pragma databank 0

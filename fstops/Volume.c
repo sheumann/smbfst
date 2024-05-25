@@ -9,7 +9,7 @@
 #include "smb2/smb2.h"
 #include "smb2/fileinfo.h"
 #include "helpers/closerequest.h"
-
+#include "utils/finderstate.h"
 
 Word Volume(void *pblock, struct GSOSDP *gsosDP, Word pcount) {
     unsigned i;
@@ -119,6 +119,37 @@ Word Volume(void *pblock, struct GSOSDP *gsosDP, Word pcount) {
 
         totalBlocks = min(totalBlocks, 0xffffffff);
         freeBlocks = min(freeBlocks, 0xffffffff);
+
+        /*
+         * If this Volume call is coming from a known version of the Finder,
+         * adjust returned values if necessary to work around Finder issues.
+         */
+        if (CallIsFromFinder(pblock, FINDER_600, FINDER_603)) {
+            /*
+             * Finder 6.0.1 - 6.0.3 will display garbage in the info
+             * bar for unknown FST names.  Setting totalBlocks equal
+             * to freeBlocks (so there are no "used" blocks) causes
+             * Finder to display the alternate info bar style with
+             * just the item count, and therefore prevents it from
+             * showing the garbage.  Also, Finder 6.0.1 - 6.0.3 may
+             * crash or hang when displaying sizes that are too large
+             * (above "99,999.9 MB"), so limit the size to avoid this.
+             */
+            freeBlocks =
+                min(freeBlocks, FINDER_601_MAX_DISPLAYABLE_BLOCKS);
+            totalBlocks = freeBlocks;        
+        } else if (CallIsFromFinder(pblock, FINDER_604, FINDER_604)) {
+            /*
+             * Finder 6.0.4 will display the used space or free space
+             * incorrectly (in the info bar and the info window) if the
+             * values are too large.  In these cases, force the use of
+             * the alternate info bar without the incorrect values.
+             */
+            if (freeBlocks > FINDER_604_MAX_DISPLAYABLE_BLOCKS ||
+                totalBlocks-freeBlocks > FINDER_604_MAX_DISPLAYABLE_BLOCKS) {
+                totalBlocks = freeBlocks;
+            }
+        }
 
 handle_close:
         result = GetResponse(&dibs[i], closeMsgNum);

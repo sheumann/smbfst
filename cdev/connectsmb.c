@@ -1,6 +1,7 @@
 #define USE_BLANK_SEG
 #include "defs.h"
 #include <stdlib.h>
+#include <string.h>
 #include <errno.h>
 #include <tcpip.h>
 #include <gsos.h>
@@ -24,10 +25,28 @@ unsigned ConnectToSMBServer(char *host, char *port, LongWord *connectionID) {
     char *endPtr;
     cvtRec theCvtRec;
     unsigned long portNum;
+    static char hostPstring[256];
+    static dnrBuffer dnrState;
 
-    // TODO handle domain names
-    TCPIPConvertIPCToHex(&theCvtRec, host);
-    connectPB.serverIP = theCvtRec.cvtIPAddress;
+    if (TCPIPValidateIPCString(host)) {
+        TCPIPConvertIPCToHex(&theCvtRec, host);
+        connectPB.serverIP = theCvtRec.cvtIPAddress;
+    } else if (strlen(host) <= 255) {
+        hostPstring[0] = strlen(host);
+        memcpy(hostPstring+1, host, hostPstring[0]);
+        TCPIPDNRNameToIP(hostPstring, &dnrState);
+        do {
+            TCPIPPoll();
+        } while (dnrState.DNRstatus == DNR_Pending);
+        
+        if (dnrState.DNRstatus == DNR_OK) {
+            connectPB.serverIP = dnrState.DNRIPaddress;
+        } else {
+            return connectToServerError;
+        }
+    } else {
+        return connectToServerError;
+    }
 
     if (port) {
         errno = 0;

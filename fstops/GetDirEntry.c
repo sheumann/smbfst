@@ -16,6 +16,7 @@
 #include "helpers/blocks.h"
 #include "helpers/attributes.h"
 #include "helpers/closerequest.h"
+#include "utils/finderstate.h"
 
 #define NUMBER_OF_DOT_DIRS 2
 
@@ -658,6 +659,42 @@ handle_close:
 
     if (pcount >= 17) {
         pblock->resourceBlocks = GetBlockCount(resourceAlloc);
+
+        /*
+         * If this call is from Finder 6.0.1 - 6.0.3, adjust the reported
+         * block sizes of very large files to prevent crashes or hangs when
+         * Finder displays the Icon Info window.
+         */
+        if (pblock->blockCount + pblock->resourceBlocks
+            > FINDER_601_MAX_DISPLAYABLE_BLOCKS
+            && CallIsFromFinder(pblock, FINDER_600, FINDER_603)) {
+            if (pblock->blockCount > FINDER_601_MAX_DISPLAYABLE_BLOCKS)
+                pblock->blockCount = FINDER_601_MAX_DISPLAYABLE_BLOCKS;
+            pblock->resourceBlocks =
+                FINDER_601_MAX_DISPLAYABLE_BLOCKS - pblock->blockCount;
+        }
+
+        /*
+         * Finder assumes that file names cannot exceed the 32-byte length
+         * of its buffer, so it does not handle longer names correctly.
+         * Finder assumes pblock->name->bufString.length is always <= 32.
+         * If it is actually larger then Finder will wind up treating
+         * data beyond the end of the buffer as part of the file name.
+         * This causes it to display garbage at the end of the file name,
+         * and if it encounters very long file names it can crash.
+         *
+         * To avoid these issues, we truncate longer file names being
+         * returned to Finder, inserting an ellipsis for display purposes.
+         * Finder will not know the true name of such files, so it will not
+         * be able to open them or perform most other operations on them,
+         * but at least they are displayed reasonably in Finder windows and
+         * do not cause Finder crashes.
+         */
+        if (pblock->name->bufSize == 36 && pblock->name->bufString.length > 32
+            && CallIsFromFinder(pblock, FINDER_600, FINDER_604)) {
+            pblock->name->bufString.length = 32;
+            pblock->name->bufString.text[31] = '\xC9';   /* ellipsis */
+        }
     }}}}}}}}}}}}
 
     return retval;

@@ -227,8 +227,19 @@ static unsigned BuildShareList(const ShareInfoRec *infoRec,
     entry = list;
     entryCount = 0;
     for (i = 0; i < n; i++) {
-        if ((infoRec->shares[i].shareType & ~STYPE_TEMPORARY)
+        if ((infoRec->shares[i].shareType & ~(STYPE_TEMPORARY|STYPE_SPECIAL))
             == STYPE_DISKTREE) {
+            /*
+             * Skip "special" shares ending in $, which are not generally
+             * mountable disk shares.  ("Special" shares not ending in $
+             * are shown.  These include whole-disk shares from macOS.)
+             */
+            if ((infoRec->shares[i].shareType & STYPE_SPECIAL)
+                && infoRec->shares[i].shareName->len >= 2
+                && infoRec->shares[i].shareName->str[
+                    infoRec->shares[i].shareName->len - 2] == '$')
+                continue;
+
             entry->memPtr = UTF16ToMacRoman(infoRec->shares[i].shareName->len,
                 infoRec->shares[i].shareName->str);
             if (entry->memPtr == NULL)

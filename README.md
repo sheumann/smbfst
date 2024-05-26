@@ -20,7 +20,6 @@ To install the SMB FST:
 
 * Place the `SMB.FST` file in the `*:System:FSTs` folder (where `*` indicates your boot disk).
 * Place the `SMB` file in the `*:System:CDevs` folder.
-* Place the `LongNamesPatch` file in the `*:System:FinderExtras` folder. (If your IIGS uses a multi-user network booting setup, place it in the `FinderExtras` folder within your user folder instead.)
 
 Reboot the system to complete the installation.
 

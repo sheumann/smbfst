@@ -75,12 +75,6 @@ FST_LIBS = crypto/lib65816crypto \
 
 FST_RSRC = fst/smbfst.rez
 
-FEXT_OBJ = finderext/longnames.a \
-           finderext/namespatch.A
-
-FEXT_RSRC = \
-	   finderext/longnames.rez
-
 CDEV_OBJ = cdev/smbcdev.a \
            cdev/addressparser.a \
            cdev/strncasecmp.a \
@@ -113,7 +107,7 @@ LISTSERVERS_OBJ = \
            commands/listservers.a \
            mdns/mdnssd.a
 
-BINARIES = SMB.FST LongNamesPatch SMB mountsmb listshares listservers
+BINARIES = SMB.FST SMB mountsmb listshares listservers
 
 .PHONY: all
 all: $(BINARIES)
@@ -127,10 +121,6 @@ all: $(BINARIES)
 SMB.FST: $(FST_OBJ) $(FST_LIBS) $(FST_RSRC)
 	$(CC) $^ -o $@
 	iix chtyp -tfst $@
-
-LongNamesPatch: $(FEXT_OBJ) $(FEXT_RSRC)
-	$(CC) $^ -o $@
-	iix chtyp -t 0xBC -a 0x0001 LongNamesPatch
 
 $(CDEV_CODE_BINARY): $(CDEV_OBJ)
 	$(CC) -X $^ -o $@

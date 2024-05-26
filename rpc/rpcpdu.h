@@ -2,7 +2,7 @@
 #define RPCPDU_H
 
 #include <stdint.h>
-#include "utils/guid.h"
+#include "smb2/guid.h"
 
 /*
  * DCE/RPC Protocol Data Unit definitions.

@@ -65,6 +65,7 @@ FST_OBJ =  fst/smbfst.A \
            helpers/position.a \
            utils/alloc.a \
            utils/finderstate.a \
+           utils/guidutils.a \
            utils/macromantable.a \
            utils/memcasecmp.a \
            utils/random.a \

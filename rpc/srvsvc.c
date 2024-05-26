@@ -7,7 +7,7 @@
 #include "rpc/ndr.h"
 #include "rpc/srvsvc.h"
 #include "rpc/srvsvcproto.h"
-#include "utils/guid.h"
+#include "utils/guidutils.h"
 
 // UUID and version for SRVSVC (see [MS-SRVS])
 p_syntax_id_t srvsvcSyntax =

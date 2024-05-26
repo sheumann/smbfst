@@ -78,6 +78,8 @@ typedef struct {
 
 extern ReconnectInfo reconnectInfo;
 
+extern GUID clientGUID;
+
 bool SpaceAvailable(uint16_t bodyLength);
 unsigned EnqueueRequest(DIB *dib, uint16_t command, uint16_t bodyLength);
 bool SendMessages(DIB *dib);

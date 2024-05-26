@@ -6,6 +6,7 @@
 #include <gsos.h>
 #include <orca.h>
 #include "rpc/rpc.h"
+#include "utils/guidutils.h"
 
 // UUID and version for NDR with MS extensions (see C706 and [MS-RPCE])
 #define NDR_SYNTAX {.if_uuid = GUID(8a885d04,1ceb,11c9,9fe8,08002b104860), 2}

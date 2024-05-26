@@ -114,6 +114,8 @@ bool blockRetry = false;
 
 static bool Reconnect(DIB *dib);
 
+GUID clientGUID = {0};
+
 static const smb_u128 u128_zero = {0,0};
 
 // File Id indicating the file created previously within a compounded request

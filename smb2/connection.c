@@ -10,6 +10,7 @@
 #include "smb2/connection.h"
 #include "smb2/session.h"
 #include "utils/alloc.h"
+#include "utils/guidutils.h"
 #include "driver/driver.h"
 #include "helpers/datetime.h"
 
@@ -80,9 +81,10 @@ Word Connect(Connection *connection) {
     negotiateRequest.SecurityMode = 0;
     negotiateRequest.Reserved = 0;
     negotiateRequest.Capabilities = 0;
-    
-    // TODO generate real GUID
-    negotiateRequest.ClientGuid = (smb_u128){0xa248283946289746,0xac65879365873456};
+
+    if (clientGUID.time_high_and_version == 0)
+        GenerateGUID(&clientGUID);
+    negotiateRequest.ClientGuid = clientGUID;
     
     negotiateRequest.ClientStartTime = 0;
 

@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 
+#include "smb2/guid.h"
 #include "smb2/ntstatus.h"
 
 #define SMB2_ASSERT_SIZE(type,size) _Static_assert(sizeof(type) == (size), "");
@@ -101,7 +102,7 @@ typedef struct {
     uint16_t SecurityMode;
     uint16_t Reserved;
     uint32_t Capabilities;
-    smb_u128 ClientGuid;
+    GUID ClientGuid;
     union {
         struct {
             uint32_t NegotiateContextOffset;
@@ -129,7 +130,7 @@ typedef struct {
         uint16_t NegotiateContextCount;
         uint16_t Reserved;
     };
-    smb_u128 ServerGuid;
+    GUID ServerGuid;
     uint32_t Capabilities;
     uint32_t MaxTransactSize;
     uint32_t MaxReadSize;

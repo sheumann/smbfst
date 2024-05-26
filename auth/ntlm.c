@@ -4,6 +4,7 @@
 
 #include <ctype.h>
 #include <stdlib.h>
+#include <intmath.h>
 
 #include "defs.h"
 #include "crypto/md4.h"
@@ -15,6 +16,7 @@
 #include "gsos/gsosdata.h"
 #include "utils/alloc.h"
 #include "utils/random.h"
+#include "smb2/smb2.h"
 
 static const NTLM_NEGOTIATE_MESSAGE negotiateMessage = {
     .Signature = "NTLMSSP",
@@ -34,9 +36,8 @@ static const NTLM_NEGOTIATE_MESSAGE negotiateMessage = {
     .Version = {0},
 };
 
-// workstation name = "IIGS"
-// TODO generate a more unique one, or allow it to be configured
-static const char16_t workstationName[4] = u"IIGS";
+static char16_t workstationName[13] = u"IIGS-00000000";
+static bool workstationNameInitialized = false;
 
 #define LM_CHALLENGE_RESPONSE_SIZE 24
 
@@ -51,6 +52,18 @@ typedef struct {
 _Static_assert(sizeof(ctxRec) <= GBUF_SIZE, "");
 
 #define c (*(ctxRec*)gbuf)
+
+static void InitWorkstationName(void) {
+    static char num[8] = "00000000";
+    unsigned i;
+    
+    Long2Hex(clientGUID.time_low, num, sizeof(num));
+    for (i = 0; i < sizeof(num); i++) {
+        workstationName[i+5] = num[i];
+    }
+    
+    workstationNameInitialized = true;
+}
 
 /*
  * Compute NT one-way function v2 for given user, user domain, and password
@@ -372,6 +385,8 @@ unsigned char *NTLM_HandleChallenge(NTLM_Context *ctx, AuthInfo *authInfo,
     memcpy(payloadPtr, authInfo->userName, authInfo->userNameSize);
     payloadPtr += authInfo->userNameSize;
 
+    if (!workstationNameInitialized)
+        InitWorkstationName();
     authMsg.WorkstationNameFields.Len =
         authMsg.WorkstationNameFields.MaxLen = sizeof(workstationName);
     authMsg.WorkstationNameFields.BufferOffset =

@@ -16,10 +16,10 @@ typedef struct {
     uint64_t sessionId; // TODO separate session structure?
     
     bool signingRequired;
-    union {
-        struct hmac_sha256_context *hmacSigningContext;
-        struct aes_cmac_context *cmacSigningContext;
-    };
+    
+    // If signingRequired is true, this points to either a
+    // struct hmac_sha256_context (SMB 2.x) or struct aes_cmac_context (3.x).
+    void *signingContext;
     
     Word refCount;
     

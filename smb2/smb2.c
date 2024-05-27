@@ -305,15 +305,19 @@ bool SendMessages(DIB *dib) {
             message->Header.Flags |= SMB2_FLAGS_SIGNED;
             
             if (connection->dialect <= SMB_21) {
-                hmac_sha256_compute(session->hmacSigningContext,
+                memcpy(gbuf, session->signingContext,
+                    sizeof(struct hmac_sha256_context));
+                hmac_sha256_compute((struct hmac_sha256_context*)gbuf,
                     (void*)message, msgLen);
                 memcpy(&message->Header.Signature,
-                    session->hmacSigningContext->u[0].ctx.hash, 16);
+                    hmac_sha256_result((struct hmac_sha256_context*)gbuf), 16);
             } else {
-                aes_cmac_compute(session->cmacSigningContext,
+                memcpy(gbuf, session->signingContext,
+                    sizeof(struct aes_cmac_context));
+                aes_cmac_compute((struct aes_cmac_context*)gbuf,
                     (void*)message, msgLen);
                 memcpy(&message->Header.Signature,
-                    session->cmacSigningContext->ctx.data, 16);
+                    ((struct aes_cmac_context*)gbuf)->ctx.data, 16);
             }
             
             message = (SMB2Message *)((char*)message + msgLen);

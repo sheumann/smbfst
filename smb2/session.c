@@ -1,5 +1,6 @@
 #include "defs.h"
 
+#include <string.h>
 #include <memory.h>
 #include <tcpip.h>
 #include <gsos.h>
@@ -27,8 +28,7 @@ void Session_Release(Session *sess) {
         SendRequestAndGetResponse(&fakeDIB, SMB2_LOGOFF, sizeof(logoffRequest));
         // ignore errors from logoff
 
-        if (sess->hmacSigningContext != NULL)
-            DisposeHandle(FindHandle((Pointer)sess->hmacSigningContext));
+        smb_free(sess->signingContext);
 
         Connection_Release(sess->connection);
         
@@ -71,10 +71,8 @@ Word SessionSetup(Session *session) {
     previousAuthMsg = NULL;
     previousAuthSize = 0;
 
-    if (session->hmacSigningContext != NULL) {
-        DisposeHandle(FindHandle((void*)session->hmacSigningContext));
-        session->hmacSigningContext = NULL;
-    }
+    smb_free(session->signingContext);
+    session->signingContext = NULL;
 
     while (1) {
         authSize = DoAuthStep(&authState, previousAuthMsg,
@@ -104,33 +102,21 @@ Word SessionSetup(Session *session) {
                 (sessionSetupResponse.SessionFlags &
                     (SMB2_SESSION_FLAG_IS_GUEST|SMB2_SESSION_FLAG_IS_NULL)) == 0)
             {
+                session->signingContext = smb_malloc(
+                    session->connection->dialect <= SMB_21 ?
+                    sizeof(struct hmac_sha256_context) :
+                    sizeof(struct aes_cmac_context));
+                if (session->signingContext == NULL) {
+                    session->sessionId = previousSessionId;
+                    return outOfMem;
+                }
+                
+                session->signingRequired = true;
+                
                 if (session->connection->dialect <= SMB_21) {
-                    Handle ctxHandle = NewHandle(
-                        sizeof(struct hmac_sha256_context), userid(), 0x8015, 0);
-                    if (toolerror()) {
-                        // TODO clean up on errors?
-                        session->sessionId = previousSessionId;
-                        return outOfMem;
-                    }
-                
-                    session->signingRequired = true;
-                    session->hmacSigningContext = (void*)*ctxHandle;
-                
-                    hmac_sha256_init(session->hmacSigningContext,
-                        authState.signKey,
-                        16);
+                    hmac_sha256_init((struct hmac_sha256_context *)gbuf,
+                        authState.signKey, 16);
                 } else {
-                    Handle ctxHandle = NewHandle(
-                        sizeof(struct aes_cmac_context), userid(), 0x8015, 0);
-                    if (toolerror()) {
-                        // TODO clean up on errors?
-                        session->sessionId = previousSessionId;
-                        return outOfMem;
-                    }
-                
-                    session->signingRequired = true;
-                    session->cmacSigningContext = (void*)*ctxHandle;
-
                     /*
                      * Compute signing key using a key-derivation function,
                      * as specified in [MS-SMB2] sections 3.1.4.2 and 3.2.5.3.
@@ -142,8 +128,13 @@ Word SessionSetup(Session *session) {
                     } else {
                         UNIMPLEMENTED
                     }
-                    aes_cmac_init(session->cmacSigningContext, cmac_key);
+                    aes_cmac_init((struct aes_cmac_context*)gbuf, cmac_key);
                 }
+
+                memcpy(session->signingContext, gbuf,
+                    session->connection->dialect <= SMB_21 ?
+                    sizeof(struct hmac_sha256_context) :
+                    sizeof(struct aes_cmac_context));
             }
             
             session->sessionId = msg.smb2Header.SessionId;

@@ -58,6 +58,17 @@ static SMBMountRec mountPB = {
 ResultBuf32 devName = {32};
 ResultBuf255 volName = {255};
 
+DInfoRec dInfoPB = {
+    .pCount = 2,
+    .devName = &devName,
+};
+
+VolumeRec volumePB = {
+    .pCount = 2,
+    .devName = &devName.bufString,
+    .volName = &volName,
+};
+
 DAccessRecGS dControlPB = {
     .pCount = 5,
     .code = eject,
@@ -196,6 +207,19 @@ static Word MountVolume(char16_t *shareName, uint16_t shareNameSize,
     }
 
     free(nameBuffer);
+
+    dInfoPB.devNum = mountPB.devNum;
+    DInfo(&dInfoPB);
+    if (toolerror())
+        return mountError;
+
+    /*
+     * This call forces GS/OS to recognize the online status of the volume now,
+     * rather than at some later time when system state may be unpredictable.
+     * This shouldn't really be necessary, but without it I experienced hangs
+     * in the MicroDriveTurbo driver.
+     */
+    VolumeGS(&volumePB);
 
     return 0;
 }

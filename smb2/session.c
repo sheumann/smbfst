@@ -85,7 +85,7 @@ Word SessionSetup(Session *session) {
         }
 
         sessionSetupRequest.Flags = 0;
-        sessionSetupRequest.SecurityMode = 0;
+        sessionSetupRequest.SecurityMode = SMB2_NEGOTIATE_SIGNING_ENABLED;
         sessionSetupRequest.Capabilities = 0;
         sessionSetupRequest.Channel = 0;
         sessionSetupRequest.SecurityBufferOffset = 

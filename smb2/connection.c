@@ -78,7 +78,7 @@ Word Connect(Connection *connection) {
     connection->remainingCompoundSize = 0;
     connection->requestedCredits = false;
 
-    negotiateRequest.SecurityMode = 0;
+    negotiateRequest.SecurityMode = SMB2_NEGOTIATE_SIGNING_ENABLED;
     negotiateRequest.Reserved = 0;
     negotiateRequest.Capabilities = 0;
 

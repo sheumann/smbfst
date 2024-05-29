@@ -58,6 +58,9 @@ Word ConvertError(ReadStatus rs) {
         case STATUS_NO_MORE_FILES:
             return endOfDir;
 
+        case STATUS_MEDIA_WRITE_PROTECTED:
+            return drvrWrtProt;
+
         case STATUS_INSUFFICIENT_RESOURCES:
         case STATUS_INSUFF_SERVER_RESOURCES:
         case STATUS_NO_MEMORY:

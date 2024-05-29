@@ -2,7 +2,6 @@
 #include <string.h>
 #include <uchar.h>
 
-#include <ctype.h>
 #include <stdlib.h>
 #include <intmath.h>
 
@@ -16,6 +15,7 @@
 #include "gsos/gsosdata.h"
 #include "utils/alloc.h"
 #include "utils/random.h"
+#include "utils/charsetutils.h"
 #include "smb2/smb2.h"
 
 static const NTLM_NEGOTIATE_MESSAGE negotiateMessage = {
@@ -93,16 +93,12 @@ bool GetNTLMv2Hash(uint16_t passwordSize, char16_t password[],
                    uint16_t userDomainSize, char16_t userDomain[],
                    unsigned  char result[16]) {
     char16_t *userNameUpperCase;
-    unsigned i;
 
     userNameUpperCase = smb_malloc(userNameSize);
     if (!userNameUpperCase && userNameSize != 0)
         return false;
 
-    for (i = 0; i < userNameSize; i++) {
-        // TODO properly uppercase non-ASCII characters
-        userNameUpperCase[i] = toupper(userName[i]);
-    }
+    UTF16ToUpper(userNameUpperCase, userName, userNameSize / 2);
 
     /* Compute NT one-way function v2 */
     NTOWFv2(passwordSize, password,

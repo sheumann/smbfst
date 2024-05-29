@@ -226,7 +226,10 @@ bool StartMDNS(void) {
     ipid = TCPIPLogin(userid(), MDNS_IP, MDNS_PORT, 0, 0x40);
     if (toolerror())
         return false;
-    // TODO ensure local port is not MDNS_PORT
+
+    // Don't send from the mDNS port, which indicates a full mDNS implementation
+    if (TCPIPGetSourcePort(ipid) == MDNS_PORT)
+        TCPIPSetSourcePort(ipid, 59627);
     
     MDNSInitQuery(smbName);
 

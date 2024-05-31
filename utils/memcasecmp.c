@@ -13,5 +13,5 @@ int memcasecmp(const char *s1, const char *s2, size_t n)
         n--;
     }
     
-    return (int)*s1 - (int)*s2;
+    return (int)tolower(*s1) - (int)tolower(*s2);
 }

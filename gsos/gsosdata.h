@@ -125,6 +125,17 @@ typedef struct FCR {
     // number of next dir entry that would be fetched from server
     // (. and .. are considered entries -1 and 0; GDE returns entries 1 onward)
     int32_t nextServerEntryNum; 
+
+    // Handle holding cached directory entires
+    Handle dirCacheHandle;
+
+    /* These fields are only valid if dirCacheHandle != NULL */
+    // First entry in the cache
+    int32_t firstCachedEntryNum;
+    // Last used entry in the cache
+    uint16_t lastUsedCachedEntryNum;
+    // Offset of last used entry within cached data
+    uint16_t lastUsedCachedEntryOffset;
     
     uint16_t smbFlags;
     uint64_t createTime;

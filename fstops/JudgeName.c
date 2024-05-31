@@ -17,9 +17,6 @@
 #define FLAG_NAME_TOO_LONG                     0x4000
 #define FLAG_SYNTAX_ERROR                      0x2000
 
-// Max length of a SMB2 file/directory name, in UTF-16 code units
-#define SMB2_MAX_NAME_LEN 255
-
 Word JudgeName(JudgeNameRecGS *pblock, struct GSOSDP *gsosdp, Word pcount) {
     Word flags;
     Word i;

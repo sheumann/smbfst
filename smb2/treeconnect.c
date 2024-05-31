@@ -215,6 +215,7 @@ static void ReconnectFile(DIB *dib, FCR *fcr) {
     
     fcr->fileID = createResponse.FileId;
     fcr->eof = createResponse.EndofFile;
+    fcr->nextServerEntryNum = -1;
 }
 
 Word TreeConnect_Reconnect(DIB *dib) {

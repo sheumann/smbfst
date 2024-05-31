@@ -10,6 +10,9 @@
 
 #define SMB_PORT 445
 
+// Max length of a SMB2 file/directory name, in UTF-16 code units
+#define SMB2_MAX_NAME_LEN 255
+
 typedef struct {
     uint64_t hi;
     uint64_t lo;

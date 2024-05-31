@@ -1,7 +1,9 @@
 #include "defs.h"
 #include <gsos.h>
 #include <prodos.h>
+#include <memory.h>
 #include <string.h>
+#include <orca.h>
 #include "smb2/smb2.h"
 #include "smb2/aapl.h"
 #include "smb2/fileinfo.h"
@@ -56,8 +58,7 @@ Word GetDirEntry(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     
     uint32_t count;
     FILE_NAMES_INFORMATION *namesEntry;
-    static FILE_DIRECTORY_INFORMATION dirEntry; 
-    FILE_ID_BOTH_DIR_INFORMATION_AAPL *aaplDirEntry;
+    static FILE_DIRECTORY_INFORMATION dirEntry;
     uint16_t sizeLeft;
     bool needRestart;
     unsigned char *namePtr;
@@ -70,6 +71,14 @@ Word GetDirEntry(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     static uint64_t resourceEOF, resourceAlloc;
     static FileType fileType;
     enum {usingInfoStream, redoWithMainStream, usingMainStream} infoState;
+    
+    uint16_t dirEntrySize;
+    bool entryCached;
+    int32_t cacheEntryNum;
+    FILE_DIRECTORY_INFORMATION *entryPtr;
+    FILE_DIRECTORY_INFORMATION *desiredEntry;
+    uint16_t remainingSize;
+    static char16_t nameBuf[SMB2_MAX_NAME_LEN * sizeof(char16_t)];
 
     vp = gsosdp->fcrPtr;
     DerefVP(fcr, vp);
@@ -98,6 +107,11 @@ Word GetDirEntry(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
         count = 0;
         fcr->nextServerEntryNum = -1;
         fcr->dirEntryNum = 0;
+
+        if (fcr->dirCacheHandle != NULL) {
+            DisposeHandle(fcr->dirCacheHandle);
+            fcr->dirCacheHandle = NULL;
+        }
         
         do {
             queryDirectoryRequest.FileInformationClass = FileNamesInformation;
@@ -201,70 +215,157 @@ Word GetDirEntry(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     if (entryNum == 0)
         return endOfDir;
     
-    needRestart = entryNum < fcr->nextServerEntryNum;
+    // Check if cache is valid, un-purged, and may contain desired entry
+    if (fcr->dirCacheHandle != NULL) {
+        HLock(fcr->dirCacheHandle);
+        if (*fcr->dirCacheHandle == NULL
+            || entryNum < fcr->firstCachedEntryNum) {
+            DisposeHandle(fcr->dirCacheHandle);
+            fcr->dirCacheHandle = NULL;
+        }
+    }
 
-    do {
-        if (dibs[i].flags & FLAG_AAPL_READDIR) {
-            queryDirectoryRequest.FileInformationClass =
-                FileIdBothDirectoryInformation;
+    if (dibs[i].flags & FLAG_AAPL_READDIR) {
+        dirEntrySize = sizeof(FILE_ID_BOTH_DIR_INFORMATION);
+    } else {
+        dirEntrySize = sizeof(FILE_DIRECTORY_INFORMATION);
+    }
+
+    if (fcr->dirCacheHandle != NULL) {
+        if (entryNum >= fcr->lastUsedCachedEntryNum) {
+            cacheEntryNum = fcr->lastUsedCachedEntryNum;
+            entryPtr = (void*)((char*)*fcr->dirCacheHandle
+                + fcr->lastUsedCachedEntryOffset);
+            remainingSize = GetHandleSize(fcr->dirCacheHandle)
+                - fcr->lastUsedCachedEntryOffset;
         } else {
-            queryDirectoryRequest.FileInformationClass =
-                FileDirectoryInformation;
+            cacheEntryNum = fcr->firstCachedEntryNum;
+            entryPtr = (void*)*fcr->dirCacheHandle;
+            remainingSize = GetHandleSize(fcr->dirCacheHandle);
         }
-        queryDirectoryRequest.Flags = SMB2_RETURN_SINGLE_ENTRY;
-        if (needRestart) {
-            queryDirectoryRequest.Flags |= SMB2_RESTART_SCANS;
-            fcr->nextServerEntryNum = -1;
-            needRestart = false;
+
+        entryCached = true;
+        while (cacheEntryNum != entryNum) {
+            if (entryPtr->NextEntryOffset == 0) {
+                entryCached = false;
+                DisposeHandle(fcr->dirCacheHandle);
+                fcr->dirCacheHandle = NULL;
+                break;
+            }
+            
+            entryPtr = (void*)((char*)entryPtr + entryPtr->NextEntryOffset);
+            remainingSize -= entryPtr->NextEntryOffset;
+            cacheEntryNum++;
         }
-        queryDirectoryRequest.FileIndex = 0;
-        queryDirectoryRequest.FileId = fcr->fileID;
-        queryDirectoryRequest.FileNameOffset = sizeof(SMB2Header)
-            + offsetof(SMB2_QUERY_DIRECTORY_Request, Buffer);
-        queryDirectoryRequest.FileNameLength = sizeof(char16_t);
-        queryDirectoryRequest.OutputBufferLength = DIR_DATA_LENGTH(
-            sizeof(msg.body) - sizeof(SMB2_QUERY_DIRECTORY_Response));
+    } else {
+        entryCached = false;
+    }
     
-        /* 
-         * Note: [MS-SMB2] says the file name pattern is optional,
-         * but Mac (at least) requires it.
-         */
-        ((char16_t*)queryDirectoryRequest.Buffer)[0] = '*';
+    if (entryCached) {
+        desiredEntry = entryPtr;
+        fcr->lastUsedCachedEntryNum = entryNum;
+        fcr->lastUsedCachedEntryOffset = (char*)entryPtr - *fcr->dirCacheHandle;
+    } else {    
+        needRestart = entryNum < fcr->nextServerEntryNum;
+        desiredEntry = NULL;
     
-        result = SendRequestAndGetResponse(&dibs[i], SMB2_QUERY_DIRECTORY,
-            sizeof(queryDirectoryRequest)
-            + queryDirectoryRequest.FileNameLength);
-        if (result != rsDone)
-            return GDEError(result);
-
-        fcr->nextServerEntryNum++;
-
-        if (queryDirectoryResponse.OutputBufferLength > DIR_DATA_LENGTH(
-            sizeof(msg.body) - sizeof(SMB2_QUERY_DIRECTORY_Response)))
-            return networkError;
-        if (!VerifyBuffer(queryDirectoryResponse.OutputBufferOffset,
-            queryDirectoryResponse.OutputBufferLength))
-            return networkError;
-        if (dibs[i].flags & FLAG_AAPL_READDIR) {
-            if (queryDirectoryResponse.OutputBufferLength <
-                sizeof(FILE_ID_BOTH_DIR_INFORMATION_AAPL))
+        do {
+            if (dibs[i].flags & FLAG_AAPL_READDIR) {
+                queryDirectoryRequest.FileInformationClass =
+                    FileIdBothDirectoryInformation;
+            } else {
+                queryDirectoryRequest.FileInformationClass =
+                    FileDirectoryInformation;
+            }
+            queryDirectoryRequest.Flags = 0;
+            if (needRestart) {
+                queryDirectoryRequest.Flags |= SMB2_RESTART_SCANS;
+                fcr->nextServerEntryNum = -1;
+                needRestart = false;
+            }
+            queryDirectoryRequest.FileIndex = 0;
+            queryDirectoryRequest.FileId = fcr->fileID;
+            queryDirectoryRequest.FileNameOffset = sizeof(SMB2Header)
+                + offsetof(SMB2_QUERY_DIRECTORY_Request, Buffer);
+            queryDirectoryRequest.FileNameLength = sizeof(char16_t);
+            queryDirectoryRequest.OutputBufferLength = DIR_DATA_LENGTH(
+                sizeof(msg.body) - sizeof(SMB2_QUERY_DIRECTORY_Response));
+        
+            /* 
+             * Note: [MS-SMB2] says the file name pattern is optional,
+             * but Mac (at least) requires it.
+             */
+            ((char16_t*)queryDirectoryRequest.Buffer)[0] = '*';
+        
+            result = SendRequestAndGetResponse(&dibs[i], SMB2_QUERY_DIRECTORY,
+                sizeof(queryDirectoryRequest)
+                + queryDirectoryRequest.FileNameLength);
+            if (result != rsDone) {
+                if (fcr->dirCacheHandle != NULL) {
+                    DisposeHandle(fcr->dirCacheHandle);
+                    fcr->dirCacheHandle = NULL;
+                }
+                return GDEError(result);
+            }
+    
+            if (queryDirectoryResponse.OutputBufferLength > DIR_DATA_LENGTH(
+                sizeof(msg.body) - sizeof(SMB2_QUERY_DIRECTORY_Response)))
                 return networkError;
+            if (!VerifyBuffer(queryDirectoryResponse.OutputBufferOffset,
+                queryDirectoryResponse.OutputBufferLength))
+                return networkError;
+
+            fcr->firstCachedEntryNum = fcr->nextServerEntryNum;
+
+            // Check that returned data is valid
+            remainingSize = queryDirectoryResponse.OutputBufferLength;
+            entryPtr = (FILE_DIRECTORY_INFORMATION *)((char*)&msg.smb2Header +
+                queryDirectoryResponse.OutputBufferOffset);
+            do {
+                fcr->nextServerEntryNum++;
+                if (remainingSize < dirEntrySize
+                    || remainingSize - dirEntrySize < entryPtr->FileNameLength
+                    || entryPtr->NextEntryOffset > remainingSize)
+                    return networkError;
+                
+                if (fcr->nextServerEntryNum - 1 == entryNum)
+                    desiredEntry = entryPtr;
+
+                if (entryPtr->NextEntryOffset == 0) {
+                    break;
+                }
+
+                remainingSize -= entryPtr->NextEntryOffset;
+                entryPtr = (void*)((char*)entryPtr + entryPtr->NextEntryOffset);
+            } while (1);
+        } while (desiredEntry == NULL);
+        
+        // Cache the directory entries
+        fcr->dirCacheHandle = NewHandle(
+            queryDirectoryResponse.OutputBufferLength, userid(),
+            attrLocked | attrNoSpec | attrPurge2, 0);
+        if (toolerror()) {
+            fcr->dirCacheHandle = NULL;
         } else {
-            if (queryDirectoryResponse.OutputBufferLength <
-                sizeof(FILE_DIRECTORY_INFORMATION))
-                return networkError;
+            memcpy(*fcr->dirCacheHandle, (char*)&msg.smb2Header +
+                queryDirectoryResponse.OutputBufferOffset,
+                queryDirectoryResponse.OutputBufferLength);
+
+            fcr->lastUsedCachedEntryNum = entryNum;
+            fcr->lastUsedCachedEntryOffset =
+                (char*)desiredEntry - (char*)&msg.smb2Header
+                - queryDirectoryResponse.OutputBufferOffset;
+
+            HUnlock(fcr->dirCacheHandle);
         }
-    } while (entryNum != fcr->nextServerEntryNum - 1);
+    }
 
     /*
      * Save directory entry.
      * Note: The fixed fields of FILE_DIRECTORY_INFORMATION match the beginning
      * of FILE_ID_BOTH_DIR_INFORMATION_AAPL, so this works for both variants.
      */
-    dirEntry = *(FILE_DIRECTORY_INFORMATION *)((char*)&msg.smb2Header +
-        queryDirectoryResponse.OutputBufferOffset);
-    if (dirEntry.FileNameLength > GBUF_SIZE)
-        return networkError;
+    dirEntry = *desiredEntry;
 
     InitAFPInfo();
 
@@ -272,19 +373,7 @@ Word GetDirEntry(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
         /*
          * Get directory information using Apple extensions.
          */
-
-        if (sizeof(FILE_ID_BOTH_DIR_INFORMATION_AAPL) + dirEntry.FileNameLength
-            > queryDirectoryResponse.OutputBufferLength)
-            return networkError;
-        
-        // Save file name to gbuf
-        memcpy(gbuf, 
-            (char*)&msg.smb2Header + queryDirectoryResponse.OutputBufferOffset
-            + offsetof(FILE_ID_BOTH_DIR_INFORMATION_AAPL, FileName),
-            dirEntry.FileNameLength);
-
-        aaplDirEntry = (FILE_ID_BOTH_DIR_INFORMATION_AAPL *)(
-            (char*)&msg.smb2Header + queryDirectoryResponse.OutputBufferOffset);
+#define aaplDirEntry ((FILE_ID_BOTH_DIR_INFORMATION_AAPL *)desiredEntry)
 
         resourceEOF = aaplDirEntry->RsrcForkLen;
         // TODO Maybe figure this out based on server allocation block size
@@ -309,20 +398,28 @@ Word GetDirEntry(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
             aaplDirEntry->CompressedFinderInfo.extFlags;
         afpInfo.finderInfo.dateAdded =
             aaplDirEntry->CompressedFinderInfo.dateAdded;
+        
+        retval = SMBNameToGS(aaplDirEntry->FileName,
+            aaplDirEntry->FileNameLength, pblock->name);
+
+        if (fcr->dirCacheHandle != NULL)
+            HUnlock(fcr->dirCacheHandle);
+#undef aaplDirEntry
     } else {
         /*
          * Get directory information without using Apple extensions.
          */
 
-        if (sizeof(FILE_DIRECTORY_INFORMATION) + dirEntry.FileNameLength >
-            queryDirectoryResponse.OutputBufferLength)
+        // Save file name to nameBuf
+        if (dirEntry.FileNameLength > sizeof(nameBuf)) {
+            if (fcr->dirCacheHandle != NULL)
+                HUnlock(fcr->dirCacheHandle);
             return networkError;
+        }
+        memcpy(nameBuf, desiredEntry->FileName, desiredEntry->FileNameLength);
         
-        // Save file name to gbuf
-        memcpy(gbuf, 
-            (char*)&msg.smb2Header + queryDirectoryResponse.OutputBufferOffset
-            + offsetof(FILE_DIRECTORY_INFORMATION, FileName),
-            dirEntry.FileNameLength);
+        if (fcr->dirCacheHandle != NULL)
+            HUnlock(fcr->dirCacheHandle);
 
         haveResourceFork = false;
         resourceEOF = resourceAlloc = 0;
@@ -376,7 +473,7 @@ Word GetDirEntry(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
         
             if (NAME_SPACE < dirEntry.FileNameLength)
                 return badPathSyntax;
-            memcpy(namePtr, gbuf, dirEntry.FileNameLength);
+            memcpy(namePtr, nameBuf, dirEntry.FileNameLength);
             namePtr += dirEntry.FileNameLength;
         
             if (infoState == usingInfoStream) {
@@ -577,6 +674,8 @@ handle_close:
             if (retval)
                 return retval;
         } while (infoState == redoWithMainStream);
+        
+        retval = SMBNameToGS(nameBuf, dirEntry.FileNameLength, pblock->name);
     }
 
     /*
@@ -587,7 +686,7 @@ handle_close:
     fcr->dirEntryNum = entryNum;
 
     /*
-     * Fill in results
+     * Fill in results (name was done above)
      */
     if (haveResourceFork
         && !(dirEntry.FileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
@@ -595,9 +694,6 @@ handle_close:
     } else {
         pblock->flags = 0;
     }
-
-    retval =
-        SMBNameToGS((char16_t*)gbuf, dirEntry.FileNameLength, pblock->name);
 
     if (pcount >= 6) {
         pblock->entryNum = entryNum;

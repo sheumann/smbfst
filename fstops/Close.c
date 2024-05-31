@@ -1,6 +1,7 @@
 #include "defs.h"
 #include <gsos.h>
 #include <prodos.h>
+#include <memory.h>
 #include "smb2/smb2.h"
 #include "gsos/gsosdata.h"
 #include "driver/driver.h"
@@ -25,6 +26,11 @@ Word Close(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     }
     if (i == NDIBS)
         return volNotFound;
+
+    if (fcr->dirCacheHandle != NULL) {
+        DisposeHandle(fcr->dirCacheHandle);
+        fcr->dirCacheHandle = NULL;
+    }
 
     result = SendCloseRequestAndGetResponse(&dibs[i], &fcr->fileID);
     if (result != rsDone)

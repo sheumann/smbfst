@@ -264,6 +264,7 @@ open_done:
     fcr->fileID = fileID;
     fcr->dirEntryNum = 0;
     fcr->nextServerEntryNum = -1;
+    fcr->dirCacheHandle = NULL;
     fcr->smbFlags = pcount == 0 ? SMB_FLAG_P16SHARING : 0;
     fcr->createTime = createResponse.CreationTime;
 

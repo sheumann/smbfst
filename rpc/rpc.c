@@ -102,6 +102,19 @@ uint32_t RPCBind(RPCConnection *conn, const p_syntax_id_t *abstractSyntax) {
     uint32_t callId;
     uint32_t msgSize;
 
+    /*
+     * DCE/RPC bind call
+     *
+     * There seems to be some confusion about the meaning of max_xmit_frag and
+     * max_recv_frag in bind calls.  I believe max_xmit_frag is supposed to
+     * limit the size of fragments sent from the client to the server, and
+     * max_recv_frag is supposed to limit the size of fragments sent from the
+     * server to the client.  However, Solaris and illumos appear to interpret
+     * these in the opposite way.  To avoid problems, we just set them both to
+     * the size of our receive buffer.  This has the effect of limiting the
+     * size of fragments we can send as well as receive, but that is not a
+     * problem, because we never send anything larger than MustRecvFragSize.
+     */
     static rpcconn_bind_hdr_t bindMsg = {
         .hdr.rpc_vers = RPC_CO_MAJOR_VERSION,
         .hdr.rpc_vers_minor = 0,
@@ -114,8 +127,8 @@ uint32_t RPCBind(RPCConnection *conn, const p_syntax_id_t *abstractSyntax) {
         .hdr.frag_length = sizeof(bindMsg),
         .hdr.auth_length = 0,
         .hdr.call_id = 0,           // set dynamically
-        .max_xmit_frag = 0xFFFF,
-        .max_recv_frag = 0x7FFF,    // set dynamically
+        .max_xmit_frag = sizeof(ioBuf),
+        .max_recv_frag = sizeof(ioBuf),
         .assoc_group_id = 0,
         .p_context_elem.n_context_elem = 1,
         .p_context_elem.reserved = 0,
@@ -130,9 +143,6 @@ uint32_t RPCBind(RPCConnection *conn, const p_syntax_id_t *abstractSyntax) {
     callId = conn->callId++;
     bindMsg.hdr.call_id = callId;
     bindMsg.p_context_elem.p_cont_elem_1.abstract_syntax = *abstractSyntax;
-
-    // ensure messages from server will fit in our buffer
-    bindMsg.max_recv_frag = sizeof(ioBuf);
 
     if (!SendRPCData(conn, &bindMsg, sizeof(bindMsg)))
         return 0;

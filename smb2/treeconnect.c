@@ -100,12 +100,12 @@ Word TreeConnect(DIB *dib) {
     
         if (aaplResponse->CommandCode != kAAPL_SERVER_QUERY)
             goto close;
-        if (aaplResponse->ReplyBitmap 
-            & (kAAPL_SERVER_CAPS | kAAPL_VOLUME_CAPS| kAAPL_MODEL_INFO)
-            != (kAAPL_SERVER_CAPS | kAAPL_VOLUME_CAPS| kAAPL_MODEL_INFO))
+        if (!(aaplResponse->ReplyBitmap & kAAPL_SERVER_CAPS))
             goto close;
-        if (aaplResponse->ModelStringLength >
-            dataLen - sizeof(AAPL_SERVER_QUERY_RESPONSE))
+        if ((aaplResponse->ReplyBitmap & kAAPL_VOLUME_CAPS)
+            && (aaplResponse->ReplyBitmap & kAAPL_MODEL_INFO)
+            && aaplResponse->ModelStringLength >
+                dataLen - sizeof(AAPL_SERVER_QUERY_RESPONSE))
             goto close;
 
         if (aaplResponse->ServerCapabilities & kAAPL_SUPPORTS_READ_DIR_ATTR)
@@ -120,6 +120,8 @@ Word TreeConnect(DIB *dib) {
         if ((aaplResponse->ServerCapabilities & kAAPL_SUPPORTS_READ_DIR_ATTR)
             && (aaplResponse->ServerCapabilities & kAAPL_SUPPORTS_OSX_COPYFILE)
             && (aaplResponse->ServerCapabilities & kAAPL_UNIX_BASED)
+            && (aaplResponse->ReplyBitmap & kAAPL_VOLUME_CAPS)
+            && (aaplResponse->ReplyBitmap & kAAPL_MODEL_INFO)
             && (aaplResponse->ModelStringLength != 2*8
                 || memcmp(aaplResponse->ModelString, u"MacSamba", 2*8) != 0)) {
             dib->flags |= FLAG_MACOS;

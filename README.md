@@ -26,7 +26,7 @@ Reboot the system to complete the installation.
 
 Compatibility
 -------------
-The SMB FST is compatible with Windows, macOS, and Samba file servers. Using a modern, currently-supported version of the server software is strongly recommended. See the Server Configuration section below for information on how to configure these servers to work with the SMB FST.
+The SMB FST is compatible with Windows, macOS, Samba, Solaris, and illumos file servers. Using a modern, currently-supported version of the server software is strongly recommended. See the Server Configuration section below for information on how to configure these servers to work with the SMB FST.
 
 The SMB FST may also work with other servers that support the SMB 2 or SMB 3 protocols, but they have not been tested.
 
@@ -44,7 +44,7 @@ To disconnect from a file share when you are done with it, drag it to the Trash 
 
 Server Configuration
 --------------------
-The following subsections give instructions for configuring Windows, macOS, or Samba servers for use with the SMB FST, as well as general requirements applicable to any SMB server.
+The following subsections give instructions for configuring Windows, macOS, Samba, Solaris, or illumos servers for use with the SMB FST, as well as general requirements applicable to any SMB server.
 
 
 ### Windows Server Configuration
@@ -83,17 +83,28 @@ macOS servers require message signing by default. The SMB FST is compatible with
 
 ### Samba Server Configuration
 
-In order to properly support IIGS-style file types and resource forks, it is strongly recommended to enable the `vfs_fruit` module.  This can be done by adding setting like the following to the `smb.conf` file (in the `[global]` section or the section for a specific share):
+In order to properly support IIGS-style file types and resource forks, it is strongly recommended to enable the `vfs_fruit` module. This can be done by adding setting like the following to the `smb.conf` file (in the `[global]` section or the section for a specific share):
 
     vfs objects = catia fruit streams_xattr
     fruit:encoding = native
 
-In order for Samba servers to be listed in the SMB control panel, the server system must be running an mDNS responder such as Avahi.  This is installed by default in many Linux distributions, but on some systems you may need to install it yourself. (You can still connect to Samba servers by entering their address in the SMB control panel, even if they do not have an mDNS responder.)
+If you are configuring Samba via a management interface (e.g. on a NAS) rather than by editing `smb.conf` directly, use of the `vfs_fruit` module may be controlled by a Mac compatibility setting.
+
+In order for Samba servers to be listed in the SMB control panel, the server system must be running an mDNS responder such as Avahi. This is installed by default in many Linux distributions, but on some systems you may need to install it yourself. (You can still connect to Samba servers by entering their address in the SMB control panel, even if they do not have an mDNS responder.)
+
+
+### Solaris or illumos Server Configuration
+
+The Solaris or illumos SMB servers should typically work without requiring configuration changes.
+
+By default, Solaris or illumos SMB servers do not advertise themselves using mDNS-SD, so they will not be listed in the SMB control panel. You can still connect to them by entering their addresses, but if you want them to show up in the list, you can follow the steps described [here][2].
+
+[2]: https://www.tumfatig.net/2023/smb-shares-using-omnios-zones-and-zfs/#announce-the-smb-service
 
 
 ### General Server Requirements
 
-In order to work with the SMB FST, a server must meet the following requirements. The default configurations of Windows, macOS, and Samba servers meet most of these requirements (except as mentioned above), but if you have customized your server configuration, you should check that it follows them.
+In order to work with the SMB FST, a server must meet the following requirements. The default configurations of Windows, macOS, Samba, Solaris, and illumos servers meet most of these requirements (except as mentioned above), but if you have customized your server configuration, you should check that it follows them.
 
 * The SMB FST supports SMB protocol versions 2.0.2 through 3.0.2. The server must support at least one of these versions.
 

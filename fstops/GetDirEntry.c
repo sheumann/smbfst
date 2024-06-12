@@ -105,8 +105,10 @@ Word GetDirEntry(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
          */
 
         count = 0;
-        fcr->nextServerEntryNum = -1;
         fcr->dirEntryNum = 0;
+
+        // Ensure next query will restart (needed for Linux ksmbd)
+        fcr->nextServerEntryNum = INT32_MAX;
 
         if (fcr->dirCacheHandle != NULL) {
             DisposeHandle(fcr->dirCacheHandle);
@@ -164,7 +166,6 @@ Word GetDirEntry(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
                 if (sizeLeft < sizeof(FILE_NAMES_INFORMATION))
                     return networkError;
                 count++;
-                fcr->nextServerEntryNum++;
                 
                 if (namesEntry->NextEntryOffset == 0)
                     break;
@@ -304,6 +305,11 @@ Word GetDirEntry(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
                 if (fcr->dirCacheHandle != NULL) {
                     DisposeHandle(fcr->dirCacheHandle);
                     fcr->dirCacheHandle = NULL;
+                }
+                if (result == rsFailed
+                    && msg.smb2Header.Status == STATUS_NO_MORE_FILES) {
+                    // Ensure next query will restart (needed for Linux ksmbd)
+                    fcr->nextServerEntryNum = INT32_MAX;
                 }
                 return GDEError(result);
             }

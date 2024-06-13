@@ -49,6 +49,8 @@
 
 #define TAB 0x09
 
+#define DESIRED_MARINETTI_VERSION 0x03006011 /* 3.0b11 */
+
 // SortList/SortList2 compareProc value
 #define SORT_CASE_INSENSITIVE ((void*)0x00000001)
 
@@ -476,6 +478,18 @@ long DoMachine(void)
             DisplayError(fstMissingError);
             return 0;
         }
+    }
+    
+    TCPIPStatus();
+    if (toolerror()) {
+        InitCursor();
+        DisplayError(fstMissingError);
+        return 0;
+    }
+
+    if (TCPIPLongVersion() < DESIRED_MARINETTI_VERSION) {
+        InitCursor();
+        AlertWindow(awResource+awButtonLayout, NULL, marinettiVersionWarning);
     }
     
     return 1;

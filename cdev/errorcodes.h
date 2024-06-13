@@ -11,4 +11,6 @@
 #define shareEnumerationError       4008
 #define noSharesError               4009
 
+#define marinettiVersionWarning     4100
+
 #define canceled                    5000

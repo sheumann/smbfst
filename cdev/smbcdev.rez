@@ -324,3 +324,13 @@ resource rAlertString (noSharesError) {
     ":^#0\$00"
 };
 
+resource rAlertString (marinettiVersionWarning) {
+    "84:"
+    "You are currently using an outdated version of Marinetti. "
+    "You can try to continue with your current Marinetti version, "
+    "but to ensure proper operation of the SMB FST and control panel "
+    "you are strongly recommended to upgrade to the latest version "
+    "of Marinetti, available at www.apple2.org/marinetti."
+    ":^#6\$00"
+};
+

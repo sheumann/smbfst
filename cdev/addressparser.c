@@ -101,8 +101,8 @@ AddressParts ParseSMBURL(char *url) {
 
 /*
  * Parse an address and break it up into its component parts.
- * It can be a smb:// URL, a UNC path, or something of the form
- * server[\share[\path]] or server[/share[/path]].
+ * It can be a smb:// URL or something of the form
+ * [\\]server[\share[\path]] (including UNC paths) or [//]server[/share[/path]].
  *
  * This modifies the string that is passed in.
  */
@@ -123,6 +123,10 @@ AddressParts ParseAddress(char *addr) {
         // handle UNC path
         addr += 2;
         sepChar = '\\';
+    } else if (strncmp(addr, "//", 2) == 0) {
+        // handle UNC-like path with forward slashes (used by Samba tools)
+        addr += 2;
+        sepChar = '/';
     } else {
         slashPos = strchr(addr, '/');
         backslashPos = strchr(addr, '\\');

@@ -1,5 +1,8 @@
 /*
  * Config file resource formats.
+ *
+ * (These resources are normally created by the CDev, but this rez file
+ * can be used for creating them manually or derez-ing them.)
  */
 
 #define rSMBLoginInfo $0001

@@ -9,6 +9,10 @@
 #include <orca.h>
 #include "cdev/configfile.h"
 
+#define DIR_FILE_TYPE 0x0F
+#define CFG_FILE_TYPE 0x5A
+#define FULL_ACCESS (destroyEnable | renameEnable | readEnable | writeEnable)
+
 #define rSMBLoginInfo 0x0001
 
 /*
@@ -22,15 +26,24 @@ typedef struct {
     char buf[3 * 256 + 1];
 } LoginInfo;
 
+GSString32 configDirName  = {25, "*:System:Preferences"};
 GSString32 configFileName = {31, "*:System:Preferences:SMB.Config"};
 
 static char nameBuf[256];
 
 static LoginInfo loginInfo = {0};
 
+static void SetHostName(const char *host) {
+    unsigned i;
+
+    nameBuf[0] = min(strlen(host), 255);
+    for (i = 0; i < nameBuf[0]; i++) {
+        nameBuf[i+1] = tolower(host[i]);
+    }
+}
+
 void GetSavedLoginInfo(AddressParts *addressParts) {
     Word fileID;
-    unsigned i;
     Word depth;
     Handle loginInfoHandle;
     size_t infoSize;
@@ -44,11 +57,8 @@ void GetSavedLoginInfo(AddressParts *addressParts) {
 
     depth = SetResourceFileDepth(1);
 
-    nameBuf[0] = min(strlen(addressParts->host), 255);
-    for (i = 0; i < nameBuf[0]; i++) {
-        nameBuf[i+1] = tolower(addressParts->host[i]);
-    }
-    
+    SetHostName(addressParts->host);
+
     loginInfoHandle = RMLoadNamedResource(rSMBLoginInfo, nameBuf);
     if (toolerror())
         goto cleanup;
@@ -77,3 +87,107 @@ cleanup:
     SetResourceFileDepth(depth);
     CloseResourceFile(fileID);
 }
+
+void SaveLoginInfo(char *host, char *domain, char *username, char *password) {
+    Word fileID;
+    Word depth;
+    Handle loginInfoHandle = NULL;
+    Long rsrcID;
+    size_t domainLen = 0, usernameLen = 0, passwordLen = 0;
+    LoginInfo *loginInfo;
+
+    static CreateRecGS createRec = {
+        .pCount = 5,
+        .pathname = (GSString255*)&configDirName,
+        .access = FULL_ACCESS,
+        .fileType = DIR_FILE_TYPE,
+        .auxType = 0,
+        .storageType = directoryFile,
+    };
+
+    // Remove any existing login info for this server
+    DeleteLoginInfo(host);
+
+    // Create *:System:Preferences directory (if it does not exist)
+    CreateGS(&createRec);
+
+    // Create and initialize config file (if it does not exist)
+    CreateResourceFile(0x0000, CFG_FILE_TYPE, FULL_ACCESS,
+        (Pointer)&configFileName);
+
+    // Open resource file
+    fileID = OpenResourceFile(readWriteEnable, NULL, (Pointer)&configFileName);
+    if (toolerror())
+        return;
+
+    depth = SetResourceFileDepth(1);
+    
+    // Set up new login info record
+    domainLen = strlen(domain);
+    usernameLen = strlen(username);
+    passwordLen = strlen(password);
+    
+    if (domainLen > 255 || usernameLen > 255 || passwordLen > 255)
+        goto cleanup;
+
+    loginInfoHandle = NewHandle(4 + 3 + domainLen + usernameLen + passwordLen,
+        MMStartUp(), attrFixed, 0);
+    if (toolerror()) {
+        loginInfoHandle = NULL;
+        goto cleanup;
+    }
+    
+    loginInfo = (LoginInfo*)*loginInfoHandle;
+    loginInfo->userOffset = domainLen + 1;
+    loginInfo->passwordOffset = loginInfo->userOffset + usernameLen + 1;
+    strcpy(loginInfo->buf, domain);
+    strcpy(loginInfo->buf + loginInfo->userOffset, username);
+    strcpy(loginInfo->buf + loginInfo->passwordOffset, password);
+
+    // Add the new resource and name it
+    rsrcID = UniqueResourceID(0xFFFF, rSMBLoginInfo);
+    if (toolerror())
+        goto cleanup;
+
+    AddResource(loginInfoHandle, attrFixed, rSMBLoginInfo, rsrcID);
+    if (toolerror())
+        goto cleanup;
+
+    loginInfoHandle = NULL; // now owned by Resource Manager
+
+    SetHostName(host);
+    RMSetResourceName(rSMBLoginInfo, rsrcID, nameBuf);
+
+cleanup:
+    if (loginInfoHandle)
+        DisposeHandle(loginInfoHandle);
+    SetResourceFileDepth(depth);
+    CloseResourceFile(fileID); 
+}
+
+void DeleteLoginInfo(char *host) {
+    Word fileID;
+    Word depth;
+    Long rsrcID;
+    Word rsrcFileID;
+
+    fileID = OpenResourceFile(readWriteEnable, NULL, (Pointer)&configFileName);
+    if (toolerror())
+        return;
+
+    depth = SetResourceFileDepth(1);
+    
+    SetHostName(host);
+
+    rsrcID = RMFindNamedResource(rSMBLoginInfo, nameBuf, &rsrcFileID);
+    if (toolerror())
+        goto cleanup;
+
+    RMSetResourceName(rSMBLoginInfo, rsrcID, "\p");
+    RemoveResource(rSMBLoginInfo, rsrcID);
+
+cleanup:
+    SetResourceFileDepth(depth);
+    CloseResourceFile(fileID);    
+}
+

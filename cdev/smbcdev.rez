@@ -309,7 +309,6 @@ resource rAlertString (authenticateError) {
 resource rAlertString (savedLoginError) {
     "62:"
     "Failed to log in to the server using the saved login information. "
-    "The server's configuration may have changed. "
     "You can try to log in manually."
     ":^#0\$00"
 };

@@ -17,6 +17,7 @@
 #include "cdev/loginsmb.h"
 #include "cdev/charset.h"
 #include "cdev/errorcodes.h"
+#include "cdev/configfile.h"
 #include "fst/fstspecific.h"
 
 // Bit setting in DoModalWindow eventHook value
@@ -34,6 +35,7 @@
 #define domainLine      8
 #define cancelBtn       9
 #define loginBtn        10
+#define saveInfoChk     11
 
 static SMBAuthenticateRec authenticatePB = {
     .pCount = 11,
@@ -51,6 +53,7 @@ static bool setParamPtr = false;
 static char username[257];
 static char password[257];
 static char domain[257];
+static bool saveInfo;
 
 #define TAB 0x09
 
@@ -114,6 +117,8 @@ static bool DoLoginWindow(AddressParts *address) {
         if (username[0] != 0 && password[0] == 0)
             MakeThisCtlTarget(GetCtlHandleFromID(windPtr, passwordLine));
 
+        SetCtlValueByID(address->usingSavedLoginInfo, windPtr, saveInfoChk);
+
         if (GetMasterSCB() & scbColorMode)
             MoveWindow(10+160, 47, windPtr);
 
@@ -134,6 +139,7 @@ static bool DoLoginWindow(AddressParts *address) {
     GetLETextByID(windPtr, nameLine, (StringPtr)username);
     GetLETextByID(windPtr, passwordLine, (StringPtr)password);
     GetLETextByID(windPtr, domainLine, (StringPtr)domain);
+    saveInfo = GetCtlValueByID(windPtr, saveInfoChk);
 
     return (controlID == loginBtn);
 }
@@ -227,6 +233,11 @@ unsigned LoginToSMBServer(AddressParts *address, LongWord connectionID,
         if (!DoLoginWindow(address)) {
             result = canceled;
             goto done;
+        }
+        if (saveInfo) {
+            SaveLoginInfo(address->host, domain+1, username+1, password+1);
+        } else {
+            DeleteLoginInfo(address->host);
         }
         result = TryLogin(connectionID, sessionID, false);
     } while (result != 0);

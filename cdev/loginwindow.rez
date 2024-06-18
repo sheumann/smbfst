@@ -12,6 +12,7 @@
 #define domainLine      8
 #define cancelBtn       9
 #define loginBtn        10
+#define saveInfoChk     11
 
 resource rWindParam1 (loginWindow) {
     fAlert+fCtlTie,                     /* wFrameBits */
@@ -26,7 +27,7 @@ resource rWindParam1 (loginWindow) {
     {0,0},                              /* page vertical, horizontal */
     0,                                  /* wInfoRefCon */
     0,                                  /* wInfoHeight */
-    {47, 10, 47+105, 310},              /* wPosition */
+    {42, 10, 42+116, 310},              /* wPosition */
     infront,                            /* wPlane */
     loginWindow,                        /* wStorage */
     $0A09                               /* wInVerb */
@@ -38,6 +39,7 @@ resource rControlList (loginWindow) {
     {
         loginWindow+loginBtn,
         loginWindow+cancelBtn,
+        loginWindow+saveInfoChk,
         loginWindow+domainTxt,
         loginWindow+domainLine,
         loginWindow+passwordTxt,
@@ -161,9 +163,25 @@ resource rControlTemplate (loginWindow+domainLine) {
     }};
 };
 
+resource rControlTemplate (loginWindow+saveInfoChk) {
+    saveInfoChk,
+    {80,10,0,0},
+    CheckControl {{
+        $0000,
+        $1002,
+        0,
+        loginWindow+saveInfoChk,            /* title ref */
+        0                                   /* initial value */
+    }};
+};
+
+resource rPString (loginWindow+saveInfoChk) {
+    "Save login info for this server"
+};
+
 resource rControlTemplate (loginWindow+cancelBtn) {
     cancelBtn,
-    {85, 127, 0, 0},
+    {96, 127, 0, 0},
     SimpleButtonControl {{
         NormalButton,
         $3000+RefIsResource,
@@ -178,7 +196,7 @@ resource rPString(cdevWindow+cancelBtn) { "Cancel" };
 
 resource rControlTemplate (loginWindow+loginBtn) {
     loginBtn,
-    {85, 220, 0, 0},
+    {96, 220, 0, 0},
     SimpleButtonControl {{
         DefaultButton,
         $3000+RefIsResource,

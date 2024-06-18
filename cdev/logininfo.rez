@@ -1,0 +1,13 @@
+/*
+ * Config file resource formats.
+ */
+
+#define rSMBLoginInfo $0001
+
+type rSMBLoginInfo {
+    userOffset:     unsigned integer = (username / 8) - 4;
+    passwordOffset: unsigned integer = (password / 8) - 4;
+    domain:         cstring[$$Word(userOffset)];
+    username:       cstring[$$Word(passwordOffset) - $$Word(userOffset)];
+    password:       cstring;
+};

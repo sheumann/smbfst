@@ -84,6 +84,7 @@ CDEV_OBJ = cdev/smbcdev.a \
            cdev/loginsmb.a \
            cdev/mountsmbvol.a \
            cdev/charset.a \
+           cdev/configfile.a \
            utils/macromantable.a \
            rpc/rpc.a \
            rpc/ndr.a \

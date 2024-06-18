@@ -150,7 +150,8 @@ static void CloseLoginWindow(void) {
     }
 }
 
-static unsigned TryLogin(LongWord connectionID, LongWord *sessionID) {
+static unsigned TryLogin(LongWord connectionID, LongWord *sessionID,
+    bool usingSavedLoginInfo) {
     unsigned result = 0;
 
     UTF16String *user = NULL;
@@ -179,7 +180,11 @@ static unsigned TryLogin(LongWord connectionID, LongWord *sessionID) {
     FSTSpecific(&authenticatePB);
     if (toolerror()) {
         result = authenticateError;
-        DisplayError(authenticateError);
+        if (usingSavedLoginInfo) {
+            DisplayError(savedLoginError);
+        } else {
+            DisplayError(authenticateError);
+        }
         goto cleanup;
     }
 
@@ -212,7 +217,8 @@ unsigned LoginToSMBServer(AddressParts *address, LongWord connectionID,
     }
     
     if (address->username != NULL && address->password != NULL) {
-        result = TryLogin(connectionID, sessionID);
+        result = TryLogin(connectionID, sessionID,
+            address->usingSavedLoginInfo);
         if (result == 0)
             goto done;
     }
@@ -222,7 +228,7 @@ unsigned LoginToSMBServer(AddressParts *address, LongWord connectionID,
             result = canceled;
             goto done;
         }
-        result = TryLogin(connectionID, sessionID);
+        result = TryLogin(connectionID, sessionID, false);
     } while (result != 0);
 
 done:

@@ -30,6 +30,7 @@
 #include "cdev/mountsmbvol.h"
 #include "cdev/errorcodes.h"
 #include "cdev/charset.h"
+#include "cdev/configfile.h"
 #include "mdns/mdnssd.h"
 #include "mdns/mdnsproto.h"
 
@@ -383,6 +384,11 @@ void DoConnect(void)
             DisplayError(noServerNameError);
             goto fixcaret;
         }
+    }
+
+    if (addressParts.username == NULL && addressParts.password == NULL
+        && addressParts.domain == NULL) {
+        GetSavedLoginInfo(&addressParts);
     }
 
     if (!CheckVersions()) {

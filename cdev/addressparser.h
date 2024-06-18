@@ -15,6 +15,7 @@ typedef struct {
     char *displayName;
     
     bool errorFound;
+    bool usingSavedLoginInfo;
 } AddressParts;
 
 

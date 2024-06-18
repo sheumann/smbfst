@@ -306,6 +306,15 @@ resource rAlertString (authenticateError) {
     ":^#0\$00"
 };
 
+resource rAlertString (savedLoginError) {
+    "62:"
+    "Failed to log in to the server using the saved login information. "
+    "The server's configuration may have changed. "
+    "You can try to log in manually."
+    ":^#0\$00"
+};
+
+
 resource rAlertString (mountError) {
     "32:"
     "One or more of the selected volumes could not be mounted."

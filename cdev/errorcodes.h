@@ -10,6 +10,7 @@
 #define mountError                  4007
 #define shareEnumerationError       4008
 #define noSharesError               4009
+#define savedLoginError             4010
 
 #define marinettiVersionWarning     4100
 

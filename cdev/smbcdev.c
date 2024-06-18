@@ -286,8 +286,7 @@ static void ReleaseSession(LongWord sessionID) {
 }
 
 
-Boolean CheckVersions(void)
-{
+Boolean CheckVersions(void) {
     /* Check for Marinetti (SMB FST will keep it active if installed) */
     if (!TCPIPStatus() || toolerror())
         return FALSE;
@@ -334,8 +333,7 @@ void HideGoOnlineControls(void) {
         goOnlineBtnHndl);
 }
 
-void DoConnect(void)
-{
+void DoConnect(void) {
     AddressParts addressParts = {0};
     CtlRecHndl ctl;
     unsigned errorCode;
@@ -429,8 +427,7 @@ fixcaret:
     InitCursor();
 }
 
-void DoHit(Long ctlID, CtlRecHndl ctlHandle)
-{
+void DoHit(Long ctlID, CtlRecHndl ctlHandle) {
     if (!wPtr)  /* shouldn't happen */
         return;
 
@@ -469,8 +466,7 @@ void DoHit(Long ctlID, CtlRecHndl ctlHandle)
     }
 }
 
-long DoMachine(void)
-{
+long DoMachine(void) {
     unsigned int i;
 
     /* Check for presence of SMB FST. */
@@ -501,8 +497,7 @@ long DoMachine(void)
     return 1;
 }
 
-void DoEdit(Word op)
-{
+void DoEdit(Word op) {
     CtlRecHndl ctl;
     GrafPortPtr port;
     
@@ -550,8 +545,7 @@ pascal Word RequestHandler(Word reqCode, void *dataIn, void *dataOut) {
 #pragma databank 0
 #pragma toolparms 0
 
-void DoCreate(WindowPtr windPtr)
-{
+void DoCreate(WindowPtr windPtr) {
     unsigned i;
 
     wPtr = windPtr;
@@ -597,8 +591,7 @@ void DoCreate(WindowPtr windPtr)
         (WordProcPtr)RequestHandler);
 }
 
-void DoEvent(EventRecord *event)
-{
+void DoEvent(EventRecord *event) {
     Word key;
     CtlRecHndl ctl;
 
@@ -651,8 +644,7 @@ void DoRun(void) {
     DoMDNS();
 }
 
-LongWord CDEVMain (LongWord data2, LongWord data1, Word message)
-{
+LongWord CDEVMain (LongWord data2, LongWord data1, Word message) {
     long result = 0;
 
     switch(message) {

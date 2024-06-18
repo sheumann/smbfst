@@ -172,8 +172,7 @@ standardizePath:
 #ifdef ADDRESSPARSER_TEST
 #include <stdio.h>
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
     AddressParts addressParts;
 
     if (argc < 2)

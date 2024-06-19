@@ -115,6 +115,8 @@ Point eventLoc;
 bool networkUp;
 bool networkDown;
 
+bool doingBoot = false;
+
 #pragma databank 1
 #pragma toolparms 1
 Word Compare(ListEntry *memberA, ListEntry *memberB) {
@@ -245,7 +247,7 @@ bool StartMDNS(void) {
 }
 
 void DisplayError(unsigned errorCode) {
-    if (errorCode != canceled) {
+    if (errorCode != canceled && !doingBoot) {
         InitCursor();
         AlertWindow(awResource+awButtonLayout, NULL, errorCode);
     }
@@ -476,7 +478,6 @@ long DoMachine(void) {
         fstInfoRec.fstNum = i;
         GetFSTInfoGS(&fstInfoRec);
         if (toolerror() == paramRangeErr) {
-            InitCursor();
             DisplayError(fstMissingError);
             return 0;
         }
@@ -484,14 +485,12 @@ long DoMachine(void) {
     
     TCPIPStatus();
     if (toolerror()) {
-        InitCursor();
         DisplayError(fstMissingError);
         return 0;
     }
 
     if (TCPIPLongVersion() < DESIRED_MARINETTI_VERSION) {
-        InitCursor();
-        AlertWindow(awResource+awButtonLayout, NULL, marinettiVersionWarning);
+        DisplayError(marinettiVersionWarning);
     }
     
     return 1;
@@ -644,6 +643,18 @@ void DoRun(void) {
     DoMDNS();
 }
 
+void DoBoot(Word *xFlag) {
+    doingBoot = true;
+
+    if (!DoMachine()) {
+        *xFlag = 1;
+        goto done;
+    }
+
+done:
+    doingBoot = false;
+}
+
 LongWord CDEVMain (LongWord data2, LongWord data1, Word message) {
     long result = 0;
 
@@ -655,6 +666,7 @@ LongWord CDEVMain (LongWord data2, LongWord data1, Word message) {
     case CloseCDEV:     DoClose();                          break;
     case EventsCDEV:    DoEvent((EventRecord*)data1);       break;
     case RunCDEV:       DoRun();                            break;
+    case BootCDEV:      DoBoot((Word*)data1);               break;
     }
 
     return result;

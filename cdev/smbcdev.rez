@@ -19,7 +19,7 @@ resource rComment (1) {
 };
 
 resource rCDEVFlags (1) {
-    wantMachine+wantHit+wantClose+wantEvents+wantEdit+wantCreate+wantRun,
+    wantMachine+wantHit+wantClose+wantEvents+wantEdit+wantCreate+wantRun+wantBoot,
     1,                          /* enabled */
     1,                          /* version */
     1,                          /* min ROM version */

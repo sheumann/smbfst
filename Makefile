@@ -129,6 +129,7 @@ $(CDEV_CODE_BINARY): $(CDEV_OBJ)
 	$(CC) -X $^ -o $@
 
 SMB: $(CDEV_RSRC) $(CDEV_CODE_BINARY)
+	rm -f $@
 	$(CC) -c $< -o $@
 	iix chtyp -tcdv $@
 

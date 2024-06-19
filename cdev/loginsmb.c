@@ -237,7 +237,7 @@ unsigned LoginToSMBServer(AddressParts *address, LongWord connectionID,
         if (saveInfo) {
             SaveLoginInfo(address->host, domain+1, username+1, password+1);
         } else {
-            DeleteLoginInfo(address->host);
+            DeleteSavedInfo(address->host, true, true);
         }
         result = TryLogin(connectionID, sessionID, false);
     } while (result != 0);

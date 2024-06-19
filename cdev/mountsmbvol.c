@@ -17,6 +17,7 @@
 #include "cdev/mountsmbvol.h"
 #include "cdev/charset.h"
 #include "cdev/errorcodes.h"
+#include "cdev/configfile.h"
 #include "fst/fstspecific.h"
 #include "rpc/srvsvc.h"
 
@@ -28,10 +29,11 @@
 
 #define sharesWindow    5000
 
-#define selectSharesTxt 1
-#define sharesLst       3
-#define cancelMountBtn  4
-#define mountBtn        5
+#define selectSharesTxt   1
+#define sharesLst         3
+#define cancelMountBtn    4
+#define mountBtn          5
+#define mountAtStartupChk 6
 
 // Maximum number of members in a List Manager list
 #define MAX_LIST_SIZE 0x3fff
@@ -106,9 +108,12 @@ static void EventHook(EventRecord *event) {
 }
 #pragma databank 0
 
-static bool DoSharesWindow(ListEntry *list, unsigned listSize) {
+static bool DoSharesWindow(ListEntry *list, unsigned listSize,
+    bool *mountAtStartup) {
     Handle listCtlHandle;
     LongWord controlID;
+
+    *mountAtStartup = false;
 
     if (windPtr == NULL) {
         oldPort = GetPort();
@@ -143,6 +148,7 @@ static bool DoSharesWindow(ListEntry *list, unsigned listSize) {
         TCPIPPoll();
     } while (controlID != cancelMountBtn && controlID != mountBtn);
 
+    *mountAtStartup = GetCtlValueByID(windPtr, mountAtStartupChk);
     return (controlID == mountBtn);
 }
 
@@ -315,6 +321,51 @@ static unsigned MountSelectedShares(const ListEntry *list, unsigned listSize,
     return result;
 }
 
+static void SaveSelectedShares(const ListEntry *list, unsigned listSize,
+    const ShareInfoRec *infoRec, char *host) {
+    unsigned long i;
+    ShareInfoString *shareName;
+    Handle shareListHandle;
+    uint32_t offset = 0;
+    char *pos;
+    uint16_t shareNameSize;
+
+    shareListHandle = NewHandle(0, MMStartUp(), 0, 0);
+    if (toolerror())
+        return;
+
+    for (i = 0; i < listSize; i++) {
+        if (list[i].memFlag & memSelected) {
+            shareName = infoRec->shares[list[i].index].shareName;
+            if (shareName->len == 0 || shareName->len > UINT16_MAX / 2) {
+                continue;
+            }
+            
+            offset = GetHandleSize(shareListHandle);
+            shareNameSize = (shareName->len-1) * 2;
+            SetHandleSize(offset + sizeof(uint16_t) + shareNameSize
+                + strlen(list[i].memPtr) + 1, shareListHandle);
+            if (toolerror())
+                goto finish;
+            HLock(shareListHandle);
+            pos = *shareListHandle + offset;
+
+            *(uint16_t*)pos = shareNameSize;
+            pos += sizeof(uint16_t);
+
+            memcpy(pos, shareName->str, shareNameSize);
+            pos += shareNameSize;
+            
+            strcpy(pos, list[i].memPtr);
+            
+            HUnlock(shareListHandle);
+        }
+    }
+
+finish:
+    SaveAutoMountList(host, shareListHandle);
+}
+
 static void FreeShareList(ListEntry *list, unsigned listSize) {
     unsigned long i;
 
@@ -333,6 +384,7 @@ unsigned MountSMBVolumes(AddressParts *address, LongWord sessionID) {
     ListEntry *list;
     unsigned listSize;
     bool doMount;
+    bool mountAtStartup;
 
     if (address->share != NULL && address->share[0] != '\0') {
         shareName = MacRomanToUTF16(address->share);
@@ -371,15 +423,21 @@ unsigned MountSMBVolumes(AddressParts *address, LongWord sessionID) {
             return result;
         }
         
-        doMount = DoSharesWindow(list, listSize);
+        doMount = DoSharesWindow(list, listSize, &mountAtStartup);
 
         if (doMount)
             WaitCursor();
         
         CloseSharesWindow();
 
-        if (doMount)
+        if (doMount) {
+            if (mountAtStartup) {
+                SaveSelectedShares(list, listSize, infoRec, address->host);
+            } else {
+                DeleteSavedInfo(address->host, false, true);
+            }
             MountSelectedShares(list, listSize, infoRec, address, sessionID);
+        }
         
         FreeShareList(list, listSize);
         DisposeHandle(infoHandle);

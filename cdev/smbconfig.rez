@@ -6,6 +6,7 @@
  */
 
 #define rSMBLoginInfo $0001
+#define rSMBShareList $0002
 
 type rSMBLoginInfo {
     userOffset:     unsigned integer = (username / 8) - 4;
@@ -13,4 +14,11 @@ type rSMBLoginInfo {
     domain:         cstring[$$Word(userOffset)];
     username:       cstring[$$Word(passwordOffset) - $$Word(userOffset)];
     password:       cstring;
+};
+
+type rSMBShareList {
+    array {
+        wstring;
+        cstring;
+    };
 };

@@ -2,10 +2,11 @@
  * Share list window
  */
 
-#define selectSharesTxt 1
-#define sharesLst       3
-#define cancelMountBtn  4
-#define mountBtn        5
+#define selectSharesTxt   1
+#define sharesLst         3
+#define cancelMountBtn    4
+#define mountBtn          5
+#define mountAtStartupChk 6
 
 resource rWindParam1 (sharesWindow) {
     fAlert+fCtlTie,                     /* wFrameBits */
@@ -20,7 +21,7 @@ resource rWindParam1 (sharesWindow) {
     {0,0},                              /* page vertical, horizontal */
     0,                                  /* wInfoRefCon */
     0,                                  /* wInfoHeight */
-    {22, 10, 22+155, 310},              /* wPosition */
+    {22, 10, 22+161, 310},              /* wPosition */
     infront,                            /* wPlane */
     sharesWindow,                       /* wStorage */
     $0A09                               /* wInVerb */
@@ -32,6 +33,7 @@ resource rControlList (sharesWindow) {
     {
         sharesWindow+mountBtn,
         sharesWindow+cancelMountBtn,
+        sharesWindow+mountAtStartupChk,
         sharesWindow+sharesLst,
         sharesWindow+selectSharesTxt,
     };
@@ -70,10 +72,25 @@ resource rControlTemplate (sharesWindow+sharesLst) {
     }};
 };
 
+resource rControlTemplate (sharesWindow+mountAtStartupChk) {
+    mountAtStartupChk,
+    {125,10,0,0},
+    CheckControl {{
+        $0000,
+        $1002,
+        0,
+        sharesWindow+mountAtStartupChk,     /* title ref */
+        0                                   /* initial value */
+    }};
+};
+
+resource rPString (sharesWindow+mountAtStartupChk) {
+    "Mount selected shares at startup"
+};
 
 resource rControlTemplate (sharesWindow+cancelMountBtn) {
     cancelMountBtn,
-    {135, 123, 0, 0},
+    {141, 123, 0, 0},
     SimpleButtonControl {{
         NormalButton,
         $3000+RefIsResource,
@@ -88,7 +105,7 @@ resource rPString(sharesWindow+cancelMountBtn) { "Cancel" };
 
 resource rControlTemplate (sharesWindow+mountBtn) {
     mountBtn,
-    {135, 216, 0, 0},
+    {141, 216, 0, 0},
     SimpleButtonControl {{
         DefaultButton,
         $3000+RefIsResource,

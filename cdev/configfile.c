@@ -14,6 +14,7 @@
 #define FULL_ACCESS (destroyEnable | renameEnable | readEnable | writeEnable)
 
 #define rSMBLoginInfo 0x0001
+#define rSMBShareList 0x0002
 
 /*
  * Login Info data structure.
@@ -106,7 +107,7 @@ void SaveLoginInfo(char *host, char *domain, char *username, char *password) {
     };
 
     // Remove any existing login info for this server
-    DeleteLoginInfo(host);
+    rsrcID = DeleteSavedInfo(host, true, false);
 
     // Create *:System:Preferences directory (if it does not exist)
     CreateGS(&createRec);
@@ -145,9 +146,11 @@ void SaveLoginInfo(char *host, char *domain, char *username, char *password) {
     strcpy(loginInfo->buf + loginInfo->passwordOffset, password);
 
     // Add the new resource and name it
-    rsrcID = UniqueResourceID(0xFFFF, rSMBLoginInfo);
-    if (toolerror())
-        goto cleanup;
+    if (rsrcID == 0) {
+        rsrcID = UniqueResourceID(0xFFFF, rSMBLoginInfo);
+        if (toolerror())
+            goto cleanup;
+    }
 
     AddResource(loginInfoHandle, attrFixed, rSMBLoginInfo, rsrcID);
     if (toolerror())
@@ -165,12 +168,53 @@ cleanup:
     CloseResourceFile(fileID); 
 }
 
-void DeleteLoginInfo(char *host) {
+Long DeleteSavedInfo(char *host, bool deleteLoginInfo,
+    bool deleteAutoMountList) {
     Word fileID;
     Word depth;
     Long rsrcID;
     Word rsrcFileID;
 
+    fileID = OpenResourceFile(readWriteEnable, NULL, (Pointer)&configFileName);
+    if (toolerror())
+        return 0;
+
+    depth = SetResourceFileDepth(1);
+    
+    SetHostName(host);
+
+    rsrcID = RMFindNamedResource(rSMBLoginInfo, nameBuf, &rsrcFileID);
+    if (toolerror()) {
+        rsrcID = 0;
+        goto cleanup;
+    }
+
+    if (deleteLoginInfo) {
+        RMSetResourceName(rSMBLoginInfo, rsrcID, "\p");
+        RemoveResource(rSMBLoginInfo, rsrcID);
+    }
+    if (deleteAutoMountList) {
+        RemoveResource(rSMBShareList, rsrcID);
+    }
+    CompactResourceFile(0, fileID);
+
+cleanup:
+    SetResourceFileDepth(depth);
+    CloseResourceFile(fileID);   
+    return rsrcID; 
+}
+
+void SaveAutoMountList(char *host, Handle listHandle) {
+    Word fileID;
+    Word depth;
+    Long rsrcID;
+    Word rsrcFileID;
+
+    /*
+     * Auto-mount is only allowed if login info is saved, so the config
+     * file should already exist and have login info for the host.
+     * The share list is given the same ID as the login info.
+     */
     fileID = OpenResourceFile(readWriteEnable, NULL, (Pointer)&configFileName);
     if (toolerror())
         return;
@@ -183,11 +227,10 @@ void DeleteLoginInfo(char *host) {
     if (toolerror())
         goto cleanup;
 
-    RMSetResourceName(rSMBLoginInfo, rsrcID, "\p");
-    RemoveResource(rSMBLoginInfo, rsrcID);
+    RemoveResource(rSMBShareList, rsrcID);
+    AddResource(listHandle, attrFixed, rSMBShareList, rsrcID);
 
 cleanup:
     SetResourceFileDepth(depth);
-    CloseResourceFile(fileID);    
+    CloseResourceFile(fileID);  
 }
-

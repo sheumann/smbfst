@@ -5,6 +5,8 @@
 
 void GetSavedLoginInfo(AddressParts *addressParts);
 void SaveLoginInfo(char *host, char *domain, char *username, char *password);
-void DeleteLoginInfo(char *host);
+void SaveAutoMountList(char *host, Handle listHandle);
+Long DeleteSavedInfo(char *host, bool deleteLoginInfo,
+    bool deleteAutoMountList);
 
 #endif

@@ -13,6 +13,17 @@
 #include "utils/alloc.h"
 #include "smb2/connection.h"
 
+/*
+ * Authenticate with the server, creating an SMB session.
+ *
+ * Flags are:
+ * AUTH_FLAG_GET_NTLMV2_HASH - Fill in pblock->ntlmv2Hash.
+ *  This is done even in most failure cases.
+ * AUTH_FLAG_HAVE_NTLMV2_HASH - Indicates pblock->ntlmv2Hash is filled in.
+ *  May be set on input. Also set on output if using AUTH_FLAG_GET_NTLMV2_HASH.
+ *  pblock->password may be null if this is set on input.
+ * AUTH_FLAG_ANONYMOUS - Anonymous connection (blank username & password).
+ */
 Word SMB_Authenticate(SMBAuthenticateRec *pblock, void *gsosdp, Word pcount) {
     Connection *connection = (Connection *)pblock->connectionID;
     Session *session;
@@ -26,12 +37,20 @@ Word SMB_Authenticate(SMBAuthenticateRec *pblock, void *gsosdp, Word pcount) {
     session->connection = connection;
 
     // Set up auth info for session, including NTLMv2 hash
-    if (!GetNTLMv2Hash(pblock->passwordSize, pblock->password,
-        pblock->userNameSize, pblock->userName,
-        pblock->userDomainSize, pblock->userDomain,
-        session->authInfo.ntlmv2Hash)) {
-        result = outOfMem;
-        goto finish;
+    if (pblock->flags & AUTH_FLAG_HAVE_NTLMV2_HASH) {
+        memcpy(session->authInfo.ntlmv2Hash, pblock->ntlmv2Hash, 16);
+    } else {
+        if (!GetNTLMv2Hash(pblock->passwordSize, pblock->password,
+            pblock->userNameSize, pblock->userName,
+            pblock->userDomainSize, pblock->userDomain,
+            session->authInfo.ntlmv2Hash)) {
+            result = outOfMem;
+            goto finish;
+        }
+        if (pblock->flags & AUTH_FLAG_GET_NTLMV2_HASH) {
+            memcpy(pblock->ntlmv2Hash, session->authInfo.ntlmv2Hash, 16);
+            pblock->flags |= AUTH_FLAG_HAVE_NTLMV2_HASH;
+        }
     }
 
     session->authInfo.userNameSize = pblock->userNameSize;
@@ -56,8 +75,8 @@ Word SMB_Authenticate(SMBAuthenticateRec *pblock, void *gsosdp, Word pcount) {
             pblock->userDomainSize);
     }
 
-    session->authInfo.anonymous =
-        pblock->userNameSize == 0 && pblock->passwordSize == 0;
+    session->authInfo.anonymous = (pblock->flags & AUTH_FLAG_ANONYMOUS)
+        || (pblock->userNameSize == 0 && pblock->passwordSize == 0);
 
     result = SessionSetup(session);
 

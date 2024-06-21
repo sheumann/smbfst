@@ -32,14 +32,20 @@ typedef struct SMBAuthenticateRec {
     Word commandNum;
     LongWord connectionID;
     LongWord sessionID; /* out */
-    Word flags;
+    Word flags; /* in/out */
     char16_t *userName;
     Word userNameSize;
     char16_t *userDomain;
     Word userDomainSize;
     char16_t *password;
     Word passwordSize;
+    Byte ntlmv2Hash[16]; /* optional; in/out */
 } SMBAuthenticateRec;
+
+/* SMB_Authenticate flags bits */
+#define AUTH_FLAG_GET_NTLMV2_HASH  0x0001
+#define AUTH_FLAG_HAVE_NTLMV2_HASH 0x0002
+#define AUTH_FLAG_ANONYMOUS        0x0004
 
 typedef struct SMBConnectionRec {
     Word pCount;

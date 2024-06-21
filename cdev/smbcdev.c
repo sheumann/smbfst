@@ -655,7 +655,9 @@ void MountAtBoot(Handle loginInfoHndl, Handle autoMountListHndl, char *host) {
     addressParts.host = host;
     addressParts.domain = loginInfo->buf;
     addressParts.username = loginInfo->buf + loginInfo->userOffset;
-    addressParts.password = loginInfo->buf + loginInfo->passwordOffset;
+    addressParts.anonymous = loginInfo->anonymous;
+    addressParts.ntlmv2Hash = loginInfo->ntlmv2Hash;
+    addressParts.usingSavedLoginInfo = true;
 
     if (ConnectToSMBServer(host, NULL, &connectionID))
         return;

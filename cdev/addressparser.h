@@ -16,6 +16,8 @@ typedef struct {
     
     bool errorFound;
     bool usingSavedLoginInfo;
+    bool anonymous;
+    unsigned char *ntlmv2Hash;
 } AddressParts;
 
 

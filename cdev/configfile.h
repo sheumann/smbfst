@@ -11,12 +11,14 @@
  */
 typedef struct {
     Word userOffset;
-    Word passwordOffset;
+    Byte ntlmv2Hash[16];
+    Byte anonymous;
     char buf[3 * 256 + 1];
 } LoginInfo;
 
 void GetSavedLoginInfo(AddressParts *addressParts);
-void SaveLoginInfo(char *host, char *domain, char *username, char *password);
+void SaveLoginInfo(char *host, char *domain, char *username, 
+    Byte ntlmv2Hash[16], bool anonymous);
 void SaveAutoMountList(char *host, Handle listHandle);
 Long DeleteSavedInfo(char *host, bool deleteLoginInfo,
     bool deleteAutoMountList);

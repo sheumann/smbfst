@@ -38,10 +38,9 @@
 #define saveInfoChk     11
 
 static SMBAuthenticateRec authenticatePB = {
-    .pCount = 11,
+    .pCount = 12,
     .fileSysID = smbFSID,
     .commandNum = SMB_AUTHENTICATE,
-    .flags = 0,
 };
 
 static GrafPortPtr oldPort;
@@ -157,7 +156,7 @@ static void CloseLoginWindow(void) {
 }
 
 static unsigned TryLogin(LongWord connectionID, LongWord *sessionID,
-    bool usingSavedLoginInfo) {
+    AddressParts *address) {
     unsigned result = 0;
 
     UTF16String *user = NULL;
@@ -175,18 +174,31 @@ static unsigned TryLogin(LongWord connectionID, LongWord *sessionID,
         goto cleanup;
     }
 
+    authenticatePB.flags = 0;
     authenticatePB.connectionID = connectionID;
     authenticatePB.userName = user->text;
     authenticatePB.userNameSize = user->length;
-    authenticatePB.password = pass->text;
-    authenticatePB.passwordSize = pass->length;
     authenticatePB.userDomain = dom->text;
     authenticatePB.userDomainSize = dom->length;
+
+    if (address && address->usingSavedLoginInfo) {
+        memcpy(authenticatePB.ntlmv2Hash, address->ntlmv2Hash, 16);
+        authenticatePB.flags |= AUTH_FLAG_HAVE_NTLMV2_HASH;
+        if (address->anonymous)
+            authenticatePB.flags |= AUTH_FLAG_ANONYMOUS;
+        authenticatePB.password = NULL;
+        authenticatePB.passwordSize = 0;
+    } else {
+        authenticatePB.password = pass->text;
+        authenticatePB.passwordSize = pass->length;
+        if (saveInfo)
+            authenticatePB.flags |= AUTH_FLAG_GET_NTLMV2_HASH;
+    }
 
     FSTSpecific(&authenticatePB);
     if (toolerror()) {
         result = authenticateError;
-        if (usingSavedLoginInfo) {
+        if (address && address->usingSavedLoginInfo) {
             DisplayError(savedLoginError);
         } else {
             DisplayError(authenticateError);
@@ -197,6 +209,7 @@ static unsigned TryLogin(LongWord connectionID, LongWord *sessionID,
     *sessionID = authenticatePB.sessionID;
 
 cleanup:
+    memset(authenticatePB.ntlmv2Hash, 0, 16);
     if (pass)
         memset(pass->text, 0, pass->length);
     free(user);
@@ -222,24 +235,32 @@ unsigned LoginToSMBServer(AddressParts *address, LongWord connectionID,
         domain[0] = strlen(domain+1);
     }
     
-    if (address->username != NULL && address->password != NULL) {
-        result = TryLogin(connectionID, sessionID,
-            address->usingSavedLoginInfo);
+    if ((address->username != NULL && address->password != NULL)
+        || address->usingSavedLoginInfo) {
+        result = TryLogin(connectionID, sessionID, address);
         if (result == 0)
             goto done;
     }
-    
+
+    if (doingBoot) {
+        result = authenticateError;
+        goto done;
+    }
+
     do {
         if (!DoLoginWindow(address)) {
             result = canceled;
             goto done;
         }
+        result = TryLogin(connectionID, sessionID, NULL);
+
         if (saveInfo) {
-            SaveLoginInfo(address->host, domain+1, username+1, password+1);
+            SaveLoginInfo(address->host, domain+1, username+1,
+                authenticatePB.ntlmv2Hash,
+                username[0] == 0 && password[0] == 0);
         } else {
             DeleteSavedInfo(address->host, true, true);
         }
-        result = TryLogin(connectionID, sessionID, false);
     } while (result != 0);
 
 done:

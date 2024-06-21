@@ -62,15 +62,14 @@ void GetSavedLoginInfo(AddressParts *addressParts) {
     infoSize -= 4;
     if (loginInfo.userOffset >= infoSize)
         goto cleanup;
-    if (loginInfo.passwordOffset >= infoSize)
-        goto cleanup;
 
     // ensure strings are null-terminated, even if info is corrupt
     loginInfo.buf[infoSize] = 0;
 
     addressParts->domain = loginInfo.buf;
     addressParts->username = loginInfo.buf + loginInfo.userOffset;
-    addressParts->password = loginInfo.buf + loginInfo.passwordOffset;
+    addressParts->anonymous = loginInfo.anonymous;
+    addressParts->ntlmv2Hash = loginInfo.ntlmv2Hash;
     addressParts->usingSavedLoginInfo = true;
 
 cleanup:
@@ -78,12 +77,13 @@ cleanup:
     CloseResourceFile(fileID);
 }
 
-void SaveLoginInfo(char *host, char *domain, char *username, char *password) {
+void SaveLoginInfo(char *host, char *domain, char *username, 
+    Byte ntlmv2Hash[16], bool anonymous) {
     Word fileID;
     Word depth;
     Handle loginInfoHandle = NULL;
     Long rsrcID;
-    size_t domainLen = 0, usernameLen = 0, passwordLen = 0;
+    size_t domainLen, usernameLen;
     LoginInfo *loginInfo;
 
     static CreateRecGS createRec = {
@@ -113,14 +113,14 @@ void SaveLoginInfo(char *host, char *domain, char *username, char *password) {
     depth = SetResourceFileDepth(1);
     
     // Set up new login info record
-    domainLen = strlen(domain);
-    usernameLen = strlen(username);
-    passwordLen = strlen(password);
+    domainLen = strlen(domain) + 1;
+    usernameLen = strlen(username) + 1;
     
-    if (domainLen > 255 || usernameLen > 255 || passwordLen > 255)
+    if (domainLen > 256 || usernameLen > 256)
         goto cleanup;
 
-    loginInfoHandle = NewHandle(4 + 3 + domainLen + usernameLen + passwordLen,
+    loginInfoHandle = NewHandle(
+        offsetof(LoginInfo, buf) + domainLen + usernameLen,
         MMStartUp(), attrFixed, 0);
     if (toolerror()) {
         loginInfoHandle = NULL;
@@ -128,11 +128,11 @@ void SaveLoginInfo(char *host, char *domain, char *username, char *password) {
     }
     
     loginInfo = (LoginInfo*)*loginInfoHandle;
-    loginInfo->userOffset = domainLen + 1;
-    loginInfo->passwordOffset = loginInfo->userOffset + usernameLen + 1;
+    loginInfo->userOffset = domainLen;
+    loginInfo->anonymous = anonymous;
+    memcpy(loginInfo->ntlmv2Hash, ntlmv2Hash, 16);
     strcpy(loginInfo->buf, domain);
-    strcpy(loginInfo->buf + loginInfo->userOffset, username);
-    strcpy(loginInfo->buf + loginInfo->passwordOffset, password);
+    strcpy(loginInfo->buf + domainLen, username);
 
     // Add the new resource and name it
     if (rsrcID == 0) {

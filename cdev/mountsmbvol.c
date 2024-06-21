@@ -160,7 +160,7 @@ static void CloseSharesWindow(void) {
     }
 }
 
-static Word MountVolume(char16_t *shareName, uint16_t shareNameSize,
+Word MountVolume(char16_t *shareName, uint16_t shareNameSize,
     char *volName, AddressParts *address, LongWord sessionID) {
     UTF16String *hostName;
     uint32_t nameLen;

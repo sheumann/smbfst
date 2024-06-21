@@ -16,21 +16,10 @@
 #define rSMBLoginInfo 0x0001
 #define rSMBShareList 0x0002
 
-/*
- * Login Info data structure.
- * buf contains domain, then user and password at designated offsets
- * (all C strings).
- */
-typedef struct {
-    Word userOffset;
-    Word passwordOffset;
-    char buf[3 * 256 + 1];
-} LoginInfo;
-
 GSString32 configDirName  = {25, "*:System:Preferences"};
 GSString32 configFileName = {31, "*:System:Preferences:SMB.Config"};
 
-static char nameBuf[256];
+static char nameBuf[257];
 
 static LoginInfo loginInfo = {0};
 
@@ -147,7 +136,7 @@ void SaveLoginInfo(char *host, char *domain, char *username, char *password) {
 
     // Add the new resource and name it
     if (rsrcID == 0) {
-        rsrcID = UniqueResourceID(0xFFFF, rSMBLoginInfo);
+        rsrcID = UniqueResourceID(0x0000, rSMBLoginInfo);
         if (toolerror())
             goto cleanup;
     }
@@ -233,4 +222,53 @@ void SaveAutoMountList(char *host, Handle listHandle) {
 cleanup:
     SetResourceFileDepth(depth);
     CloseResourceFile(fileID);  
+}
+
+void ForEachAutoMountList(void (*f)(Handle,Handle,char*)) {
+    Word fileID;
+    Word depth;
+    Long count;
+    Word i;
+    Handle shareListHandle;
+    Handle loginInfoHandle;
+
+    /*
+     * Auto-mount is only allowed if login info is saved, so the config
+     * file should already exist and have login info for the host.
+     * The share list is given the same ID as the login info.
+     */
+    fileID = OpenResourceFile(readEnable, NULL, (Pointer)&configFileName);
+    if (toolerror())
+        return;
+
+    depth = SetResourceFileDepth(1);
+    
+    count = CountResources(rSMBShareList);
+
+    for (i = 1; i != 0 && count != 0; i++) {
+        shareListHandle = LoadResource(rSMBShareList, i);
+        if (toolerror())
+            continue;
+        count--;
+        DetachResource(rSMBShareList, i);
+
+        loginInfoHandle = LoadResource(rSMBLoginInfo, i);
+        if (toolerror())
+            goto cont2;
+        DetachResource(rSMBLoginInfo, i);
+
+        RMGetResourceName(rSMBLoginInfo, i, nameBuf);
+        if (toolerror())
+            goto cont1;
+        nameBuf[nameBuf[0]+1] = '\0';
+
+        f(loginInfoHandle, shareListHandle, nameBuf+1);
+
+cont1:  DisposeHandle(loginInfoHandle);
+cont2:  DisposeHandle(shareListHandle);
+    };
+
+cleanup:
+    SetResourceFileDepth(depth);
+    CloseResourceFile(fileID);
 }

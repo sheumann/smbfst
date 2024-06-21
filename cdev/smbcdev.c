@@ -643,13 +643,58 @@ void DoRun(void) {
     DoMDNS();
 }
 
+void MountAtBoot(Handle loginInfoHndl, Handle autoMountListHndl, char *host) {
+    AddressParts addressParts = {0};
+    LongWord connectionID;
+    LongWord sessionID;
+    LoginInfo *loginInfo = (LoginInfo*)*loginInfoHndl;
+    char *autoMountList = *autoMountListHndl;
+    char *autoMountListEnd = autoMountList + GetHandleSize(autoMountListHndl);
+    uint16_t shareNameSize;
+
+    addressParts.host = host;
+    addressParts.domain = loginInfo->buf;
+    addressParts.username = loginInfo->buf + loginInfo->userOffset;
+    addressParts.password = loginInfo->buf + loginInfo->passwordOffset;
+
+    if (ConnectToSMBServer(host, NULL, &connectionID))
+        return;
+
+    if (LoginToSMBServer(&addressParts, connectionID, &sessionID)) {
+        ReleaseConnection(connectionID);
+        return;
+    }
+    ReleaseConnection(connectionID);
+
+    while (autoMountList < autoMountListEnd) {
+        shareNameSize = *(uint16_t*)autoMountList;
+        autoMountList += sizeof(uint16_t);
+    
+        MountVolume((char16_t*)autoMountList, shareNameSize,
+            autoMountList + shareNameSize, &addressParts, sessionID);
+
+        autoMountList += shareNameSize;
+        autoMountList += strlen(autoMountList) + 1;
+    }
+    ReleaseSession(sessionID);
+}
+
 void DoBoot(Word *xFlag) {
+    bool stayConnected;
+
     doingBoot = true;
 
     if (!DoMachine()) {
         *xFlag = 1;
         goto done;
     }
+
+    stayConnected = TCPIPGetConnectStatus() || TCPIPGetBootConnectFlag();
+
+    ForEachAutoMountList(MountAtBoot);
+
+    if (!stayConnected)
+        TCPIPDisconnect(false, NULL); // disconnect if there are no active ipids
 
 done:
     doingBoot = false;

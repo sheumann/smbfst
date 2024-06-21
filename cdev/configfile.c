@@ -163,6 +163,8 @@ Long DeleteSavedInfo(char *host, bool deleteLoginInfo,
     Word depth;
     Long rsrcID;
     Word rsrcFileID;
+    Handle loginInfoHandle;
+    RefNumRecGS flushRec = {.pCount = 1};
 
     fileID = OpenResourceFile(readWriteEnable, NULL, (Pointer)&configFileName);
     if (toolerror())
@@ -179,6 +181,15 @@ Long DeleteSavedInfo(char *host, bool deleteLoginInfo,
     }
 
     if (deleteLoginInfo) {
+        loginInfoHandle = LoadResource(rSMBLoginInfo, rsrcID);
+        if (!toolerror()) {
+            /* Write over old login info with zeros */
+            memset(*loginInfoHandle, 0, GetHandleSize(loginInfoHandle));
+            MarkResourceChange(true, rSMBLoginInfo, rsrcID);
+            WriteResource(rSMBLoginInfo, rsrcID);
+            flushRec.refNum = fileID;
+            FlushGS(&flushRec);
+        }
         RMSetResourceName(rSMBLoginInfo, rsrcID, "\p");
         RemoveResource(rSMBLoginInfo, rsrcID);
     }

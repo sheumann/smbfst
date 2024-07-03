@@ -23,7 +23,7 @@ uint32_t lastQueryTime = 0;
 
 static uint8_t smbName[] = "\x04_smb\x04_tcp\x05local";
 
-void PrintDNSName(const uint8_t *name) {
+void PrintDNSName(const char *name) {
     uint16_t len;
 
     do {

@@ -163,6 +163,27 @@ static uint8_t *CopyDNSName(uint8_t *dest, const uint8_t *src, uint16_t maxLen)
 }
 
 /*
+ * Decode a DNS-encoded domain name in place.
+ * Returns a pointer to the resulting C string (within the input buffer),
+ * or NULL on error.
+ */
+static char *DNSDecodeName(unsigned char *name) {
+    unsigned len;
+    unsigned char *pos = name;
+
+    while ((len = *pos) != 0) {
+        *pos = '.';
+        pos += len + 1;
+    }
+
+    if (name[0] != 0 && strchr((char*)name, 0) == (char*)pos) {
+        return (char*)name + 1;
+    } else {
+        return NULL;
+    }
+}
+
+/*
  * Process an A record, mapping a hostname to an IPv4 address.
  */
 static bool ProcessA(Handle packetHandle, const unsigned char *rrPtr,
@@ -182,10 +203,12 @@ static bool ProcessA(Handle packetHandle, const unsigned char *rrPtr,
     if (ntoh16(rrFields->RDLENGTH) < sizeof(DNSARRData))
         return true;
     aRRData = (DNSARRData*)rrFields->RDATA;
-    
+
     // Get target address in serverInfo.address
     serverInfo.address = aRRData->ADDRESS;
-    serverInfo.hostName = nameBuf;
+    serverInfo.hostName = DNSDecodeName(nameBuf);
+    if (!serverInfo.hostName)
+        return false;
     
     // Call serverHandler with the full server info
     if (serverHandler)

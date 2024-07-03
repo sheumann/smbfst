@@ -31,6 +31,7 @@
 #include "cdev/errorcodes.h"
 #include "cdev/charset.h"
 #include "cdev/configfile.h"
+#include "cdev/strncasecmp.h"
 #include "mdns/mdns.h"
 #include "mdns/mdnsproto.h"
 
@@ -138,25 +139,33 @@ Word Compare(ListEntry *memberA, ListEntry *memberB) {
 
 void AddServerEntry(ServerInfo *serverInfo) {
     unsigned i;
+    size_t hostNameLen;
+    char *hostName;
 
     if (!UTF8ToMacRoman(serverInfo->name))
         return;
-    
+
+    hostNameLen = strlen(serverInfo->hostName) + 1;
+    hostName = malloc(hostNameLen);
+    if (!hostName)
+        return;
+    strcpy(hostName, serverInfo->hostName);
+
     // If this matches an existing entry, just update that one.
     for (i = 0; i < serverListEntries; i++) {
-        if (serverList[i].serverInfo->address == serverInfo->address
-            && serverList[i].serverInfo->port == serverInfo->port)
+        if (strncasecmp(serverList[i].serverInfo->hostName, hostName,
+            hostNameLen) == 0)
             break;
     }
     
     if (i == serverListEntries) {
         // allocating a new entry
         if (i == SERVER_LIST_SIZE)
-            return; // no more space in list
+            goto skip; // no more space in list
         
         serverList[i].serverInfo = malloc(sizeof(ServerInfo));
         if (serverList[i].serverInfo == NULL)
-            return;
+            goto skip;
         
         serverListEntries++;
         serverList[i].memFlag = 0;
@@ -166,15 +175,23 @@ void AddServerEntry(ServerInfo *serverInfo) {
         // skip update if entry is unchanged
         if (serverList[i].serverInfo->name[0] == serverInfo->name[0]
             && memcmp(serverList[i].serverInfo->name + 1, serverInfo->name + 1,
-            serverInfo->name[0]) == 0)
-            return;
+                serverInfo->name[0]) == 0
+            && serverList[i].serverInfo->address == serverInfo->address
+            && serverList[i].serverInfo->port == serverInfo->port)
+            goto skip;
+
+        free(serverList[i].serverInfo->hostName);
     }
 
     *serverList[i].serverInfo = *serverInfo;
-    serverList[i].serverInfo->hostName = NULL;
+    serverList[i].serverInfo->hostName = hostName;
     serverList[i].memPtr = serverList[i].serverInfo->name;
 
     needListUpdate = true;
+    return;
+
+skip:
+    free(hostName);
 }
 
 void DoMDNS(void) {
@@ -360,19 +377,14 @@ void DoConnect(void) {
         
         addressParts.displayName = addressParts.host;
     } else {
-        static char host[16];
         static char port[6];
 
         for (i = 0; i < serverListEntries; i++) {
             if (serverList[i].memFlag & memSelected) {
-                sprintf(host, "%u.%u.%u.%u",
-                    ((uint8_t*)&serverList[i].serverInfo->address)[0],
-                    ((uint8_t*)&serverList[i].serverInfo->address)[1],
-                    ((uint8_t*)&serverList[i].serverInfo->address)[2],
-                    ((uint8_t*)&serverList[i].serverInfo->address)[3]);
                 sprintf(port, "%u", serverList[i].serverInfo->port);
 
-                addressParts.host = host;
+                addressParts.host = serverList[i].serverInfo->hostName;
+                //TODO known IP address
                 addressParts.port = port;
                 addressParts.displayName =
                     p2cstr((char*)serverList[i].serverInfo->name);

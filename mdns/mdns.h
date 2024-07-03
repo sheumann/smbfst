@@ -8,7 +8,7 @@
 typedef struct {
     uint16_t port;
     uint32_t address;
-    uint8_t *hostName; // fully-expanded DNS name
+    char *hostName; // fully-expanded DNS name
     uint8_t name[64];  // p-string, UTF-8
 } ServerInfo;
 

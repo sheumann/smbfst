@@ -209,7 +209,6 @@ static unsigned TryLogin(LongWord connectionID, LongWord *sessionID,
     *sessionID = authenticatePB.sessionID;
 
 cleanup:
-    memset(authenticatePB.ntlmv2Hash, 0, 16);
     if (pass)
         memset(pass->text, 0, pass->length);
     free(user);
@@ -264,6 +263,7 @@ unsigned LoginToSMBServer(AddressParts *address, LongWord connectionID,
     } while (result != 0);
 
 done:
+    memset(authenticatePB.ntlmv2Hash, 0, 16);
     memset(username, 0, sizeof(username));
     memset(password, 0, sizeof(password));
     memset(domain, 0, sizeof(domain));

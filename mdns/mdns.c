@@ -2,6 +2,7 @@
 #include "defs.h"
 #include <stdbool.h>
 #include <string.h>
+#include <stdlib.h>
 #include <ctype.h>
 #include <tcpip.h>
 #include <misctool.h>
@@ -9,7 +10,7 @@
 #include <orca.h>
 #include "utils/endian.h"
 #include "mdns/mdnsproto.h"
-#include "mdns/mdnssd.h"
+#include "mdns/mdns.h"
 
 static unsigned char nameBuf[DNS_MAX_NAME_LEN], nameBuf2[DNS_MAX_NAME_LEN];
 
@@ -18,10 +19,27 @@ ServerInfo serverInfo;
 #define IP_HEADER_SIZE 20
 #define UDP_HEADER_SIZE 8
 
-static unsigned char queryBuf[MDNS_MAX_PACKET_SIZE - IP_HEADER_SIZE - UDP_HEADER_SIZE];
-static unsigned char *queryPtr;
-static unsigned char *queryNamePtr;
-static unsigned char *queryEnd = queryBuf + sizeof(queryBuf);
+// How often to send out mDNS queries to resolve .local names
+#define MDNS_NAME_QUERY_INTERVAL 60 /* ticks */
+
+// Timeout before giving up on mDNS name queries
+#define MDNS_NAME_QUERY_TIMEOUT (10 * 60) /* ticks */
+
+// Header for a typical DNS/mDNS query
+static DNSHeader queryHeader = {
+    .ID = 0,
+    .flags1 = DNS_QUERY | DNS_OPCODE_QUERY,
+    .flags2 = 0,
+    .QDCOUNT = hton16c(1),
+    .ANCOUNT = hton16c(0),
+    .NSCOUNT = hton16c(0),
+    .ARCOUNT = hton16c(0)
+};
+
+static unsigned char sdQueryBuf[MDNS_MAX_PACKET_SIZE - IP_HEADER_SIZE - UDP_HEADER_SIZE];
+static unsigned char *sdQueryPtr;
+static unsigned char *sdQueryNamePtr;
+static unsigned char *sdQueryEnd = sdQueryBuf + sizeof(sdQueryBuf);
 
 static ServerHandler *serverHandler;
 
@@ -33,7 +51,7 @@ static bool ProcessMDNSPacket(Handle packetHandle, RRFunc *rrFunc);
 /*
  * Get a name from a DNS packet, and write its fully-expanded form to name.
  *
- * startPtr and endPtr are the start and end of the DNS packet.
+ * packetHandle contains the DNS packet.
  * dataPtr is the pointer to the beginning of the name in the DNS packet.
  * name is the buffer to write the name to, if any (can be NULL).
  *
@@ -170,7 +188,8 @@ static bool ProcessA(Handle packetHandle, const unsigned char *rrPtr,
     serverInfo.hostName = nameBuf;
     
     // Call serverHandler with the full server info
-    serverHandler(&serverInfo);
+    if (serverHandler)
+        serverHandler(&serverInfo);
     
     return false;
 }
@@ -222,7 +241,7 @@ static bool ProcessPTR(Handle packetHandle, const unsigned char *rrPtr,
         return false;
     if (GetName(packetHandle, rrPtr, nameBuf) == NULL)
         return true;
-    if (!DNSNamesMatch(nameBuf, queryNamePtr))
+    if (!DNSNamesMatch(nameBuf, sdQueryNamePtr))
         return false;
 
     // Ignore records with TTL of 0, which indicate the resource is going away.
@@ -238,16 +257,16 @@ static bool ProcessPTR(Handle packetHandle, const unsigned char *rrPtr,
     memcpy(serverInfo.name, nameBuf2, nameBuf2[0] + 1);
 
     // Copy this PTR record as a "known answer" to suppress future responses
-    queryRRPtr = queryPtr;  
-    queryRRPtr = CopyDNSName(queryRRPtr, nameBuf, queryEnd-queryRRPtr);
+    queryRRPtr = sdQueryPtr;  
+    queryRRPtr = CopyDNSName(queryRRPtr, nameBuf, sdQueryEnd-queryRRPtr);
     if (queryRRPtr == NULL)
         goto process;
-    if (queryEnd-queryRRPtr < sizeof(DNSRRFixedPart))
+    if (sdQueryEnd-queryRRPtr < sizeof(DNSRRFixedPart))
         goto process;
     queryRRFields = (DNSRRFixedPart*)queryRRPtr;
     *queryRRFields = *rrFields;
     queryRRPtr += sizeof(DNSRRFixedPart);
-    queryRRPtr = CopyDNSName(queryRRPtr, nameBuf2, queryEnd-queryRRPtr);
+    queryRRPtr = CopyDNSName(queryRRPtr, nameBuf2, sdQueryEnd-queryRRPtr);
     if (queryRRPtr == NULL)
         goto process;
     queryRRFields->RDLENGTH = hton16(queryRRPtr - queryRRFields->RDATA);
@@ -256,9 +275,9 @@ static bool ProcessPTR(Handle packetHandle, const unsigned char *rrPtr,
      * This is needed to suppress responses from Apple's mDNSResponder.
      */
     queryRRFields->TTL = hton32c(0x7FFFFFFF);
-    ((DNSHeader*)queryBuf)->ANCOUNT =
-        hton16(ntoh16(((DNSHeader*)queryBuf)->ANCOUNT) + 1);
-    queryPtr = queryRRPtr;
+    ((DNSHeader*)sdQueryBuf)->ANCOUNT =
+        hton16(ntoh16(((DNSHeader*)sdQueryBuf)->ANCOUNT) + 1);
+    sdQueryPtr = queryRRPtr;
 
 process:
     ProcessMDNSPacket(packetHandle, ProcessSRV);
@@ -333,11 +352,11 @@ static bool ProcessMDNSPacket(Handle packetHandle, RRFunc *rrFunc) {
 }
 
 /*
- * Process an mDNS packet, calling handler with the full server information
+ * Process an mDNS-SD packet, calling handler with the full server information
  * that can be derived from the packet, if any.  (The handler may be called
  * multiple times with info for multiple servers, although this is unusual.)
  */
-void MDNSProcessPacket(Handle packetHandle, ServerHandler *handler) {
+void MDNSSDProcessPacket(Handle packetHandle, ServerHandler *handler) {
     serverHandler = handler;
     HLock(packetHandle);
     ProcessMDNSPacket(packetHandle, ProcessPTR);
@@ -346,35 +365,141 @@ void MDNSProcessPacket(Handle packetHandle, ServerHandler *handler) {
 /*
  * Initialize mDNS-SD state to query for the specified name.
  */
-void MDNSInitQuery(const uint8_t *queryName) {
-    static DNSHeader queryHeader = {
-        .ID = 0,
-        .flags1 = DNS_QUERY | DNS_OPCODE_QUERY,
-        .flags2 = 0,
-        .QDCOUNT = hton16c(1),
-        .ANCOUNT = hton16c(0),
-        .NSCOUNT = hton16c(0),
-        .ARCOUNT = hton16c(0)
-    };
+void MDNSSDInitQuery(const uint8_t *queryName) {
+    sdQueryPtr = sdQueryBuf;
 
-    queryPtr = queryBuf;
-
-    memcpy(queryPtr, &queryHeader, sizeof(queryHeader));
-    queryPtr += sizeof(queryHeader);
+    memcpy(sdQueryPtr, &queryHeader, sizeof(queryHeader));
+    sdQueryPtr += sizeof(queryHeader);
     
-    queryNamePtr = queryPtr;
-    queryPtr = CopyDNSName(queryPtr, queryName, DNS_MAX_NAME_LEN);
+    sdQueryNamePtr = sdQueryPtr;
+    sdQueryPtr = CopyDNSName(sdQueryPtr, queryName, DNS_MAX_NAME_LEN);
     
-    *(uint16_t*)queryPtr = hton16c(DNS_TYPE_PTR);
-    queryPtr += sizeof(uint16_t);
+    *(uint16_t*)sdQueryPtr = hton16c(DNS_TYPE_PTR);
+    sdQueryPtr += sizeof(uint16_t);
     
-    *(uint16_t*)queryPtr = hton16c(DNS_CLASS_IN | MDNS_FLAG_QU);
-    queryPtr += sizeof(uint16_t);
+    *(uint16_t*)sdQueryPtr = hton16c(DNS_CLASS_IN | MDNS_FLAG_QU);
+    sdQueryPtr += sizeof(uint16_t);
 }
 
 /*
  * Send out an mDNS-SD query.
  */
-void MDNSSendQuery(Word ipid) {
-    TCPIPSendUDP(ipid, (Pointer)queryBuf, queryPtr - queryBuf);
+void MDNSSDSendQuery(Word ipid) {
+    TCPIPSendUDP(ipid, (Pointer)sdQueryBuf, sdQueryPtr - sdQueryBuf);
+}
+
+/*
+ * Send out an mDNS query.
+ */
+void MDNSSendQuery(Word ipid, void *query, size_t len) {
+    TCPIPSendUDP(ipid, query, len);
+}
+
+/*
+ * Encode a domain name in the form used by DNS packets.
+ *
+ * Returns a pointer to immediately after the encoded name on success,
+ * or NULL on failure.
+ */
+static unsigned char * DNSEncodeName(unsigned char *buf, const char *name) {
+    size_t componentLen;
+    unsigned remainingLen;
+    char *dotPtr;
+
+    remainingLen = DNS_MAX_NAME_LEN;
+
+    do {
+        dotPtr = strchr(name, '.');
+        if (dotPtr) {
+            componentLen = dotPtr - name;
+            if (componentLen == 0 && name[1] != '\0')
+                return NULL;
+        } else {
+            componentLen = strlen(name);
+        }
+    
+        if (componentLen >= remainingLen || componentLen > DNS_MAX_LABEL_LEN)
+            return NULL;
+    
+        *buf++ = componentLen;
+        memcpy(buf, name, componentLen);
+        buf += componentLen;
+        
+        remainingLen -= componentLen;
+        if (dotPtr) {
+            name = dotPtr + 1;
+        } else {
+            name += componentLen;
+        }
+    } while (componentLen != 0);
+
+    return buf;
+}
+
+/*
+ * Resolve a name to an IP address via mDNS.  Returns the IP address on
+ * success, or 0 on failure.
+ *
+ * This is normally used for .local addresses.
+ */
+Long MDNSResolveName(char *name) {
+    size_t len;
+    unsigned char *query = NULL;
+    Word ipid;
+    DNSQuestionFixedPart *questionFixedPart;
+    Handle dgmHandle;
+    Long startTime, lastTime;
+    
+    len = strlen(name);
+    if (len != 0 && name[len-1] == '.')
+        len--;
+
+    len += sizeof(DNSHeader) + sizeof(DNSQuestionFixedPart) + 2;
+
+    query = malloc(len);
+    if (!query)
+        return 0;
+
+    *(DNSHeader *)query = queryHeader;
+    questionFixedPart = (DNSQuestionFixedPart *)
+        DNSEncodeName(query + sizeof(queryHeader), name);
+    if (questionFixedPart == NULL)
+        goto finish;
+    questionFixedPart->QTYPE = hton16c(DNS_TYPE_A);
+    questionFixedPart->QCLASS = hton16c(DNS_CLASS_IN | MDNS_FLAG_QU);
+
+    ipid = TCPIPLogin(userid(), MDNS_IP, MDNS_PORT, 0, 0x40);
+    if (toolerror())
+        goto finish;
+
+    // Don't send from the mDNS port, which indicates a full mDNS implementation
+    if (TCPIPGetSourcePort(ipid) == MDNS_PORT)
+        TCPIPSetSourcePort(ipid, 59628);
+
+    serverInfo.address = 0;
+    startTime = GetTick();
+    lastTime = 0;
+    do {
+        if (GetTick() - lastTime > MDNS_NAME_QUERY_INTERVAL) {
+            MDNSSendQuery(ipid, query, len);
+            lastTime = GetTick();
+        }
+        TCPIPPoll();
+        dgmHandle = TCPIPGetNextDatagram(ipid, protocolUDP, 0xC000);
+        if (toolerror())
+            break;
+        if (dgmHandle != NULL) {
+            serverHandler = NULL;
+            HLock(dgmHandle);
+            ProcessMDNSPacket(dgmHandle, ProcessA);
+            DisposeHandle(dgmHandle);
+        }
+    } while (serverInfo.address == 0
+        && GetTick() - startTime < MDNS_NAME_QUERY_TIMEOUT);
+
+    TCPIPLogout(ipid);
+
+finish:
+    free(query);
+    return serverInfo.address;
 }

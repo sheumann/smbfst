@@ -31,7 +31,7 @@
 #include "cdev/errorcodes.h"
 #include "cdev/charset.h"
 #include "cdev/configfile.h"
-#include "mdns/mdnssd.h"
+#include "mdns/mdns.h"
 #include "mdns/mdnsproto.h"
 
 #pragma cdev CDEVMain
@@ -183,7 +183,7 @@ void DoMDNS(void) {
 
     if (mdnsActive) {
         if (GetTick() - lastQueryTime > interval) {
-            MDNSSendQuery(ipid);
+            MDNSSDSendQuery(ipid);
             lastQueryTime = GetTick();
             if (interval < MAX_INTERVAL)
                 interval *= 2;
@@ -197,7 +197,7 @@ void DoMDNS(void) {
             if (toolerror())
                 break;
             if (dgmHandle != NULL) {
-                MDNSProcessPacket(dgmHandle, AddServerEntry);
+                MDNSSDProcessPacket(dgmHandle, AddServerEntry);
                 DisposeHandle(dgmHandle);
             }
         } while (dgmHandle != NULL && ++i < 10);
@@ -236,7 +236,7 @@ bool StartMDNS(void) {
     if (TCPIPGetSourcePort(ipid) == MDNS_PORT)
         TCPIPSetSourcePort(ipid, 59627);
     
-    MDNSInitQuery(smbName);
+    MDNSSDInitQuery(smbName);
 
     mdnsActive = true;
     lastQueryTime = 0;

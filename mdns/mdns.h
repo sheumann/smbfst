@@ -1,5 +1,5 @@
-#ifndef MDNSSD_H
-#define MDNSSD_H
+#ifndef MDNS_H
+#define MDNS_H
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -14,10 +14,12 @@ typedef struct {
 
 typedef void ServerHandler(ServerInfo *);
 
-void MDNSProcessPacket(Handle packetHandle, ServerHandler *handler);
+void MDNSSDProcessPacket(Handle packetHandle, ServerHandler *handler);
 
-void MDNSInitQuery(const uint8_t *queryName);
+void MDNSSDInitQuery(const uint8_t *queryName);
 
-void MDNSSendQuery(Word ipid);
+void MDNSSDSendQuery(Word ipid);
+
+Long MDNSResolveName(char *name);
 
 #endif

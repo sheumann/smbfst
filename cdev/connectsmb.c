@@ -8,6 +8,8 @@
 #include <orca.h>
 #include "fst/fstspecific.h"
 #include "cdev/errorcodes.h"
+#include "cdev/strncasecmp.h"
+#include "mdns/mdns.h"
 
 #define SMB_PORT 445
 
@@ -27,22 +29,30 @@ unsigned ConnectToSMBServer(char *host, char *port, LongWord *connectionID) {
     unsigned long portNum;
     static char hostPstring[256];
     static dnrBuffer dnrState;
+    size_t hostLen;
 
     if (TCPIPValidateIPCString(host)) {
         TCPIPConvertIPCToHex(&theCvtRec, host);
         connectPB.serverIP = theCvtRec.cvtIPAddress;
-    } else if (strlen(host) <= 255) {
-        hostPstring[0] = strlen(host);
-        memcpy(hostPstring+1, host, hostPstring[0]);
-        TCPIPDNRNameToIP(hostPstring, &dnrState);
-        do {
-            TCPIPPoll();
-        } while (dnrState.DNRstatus == DNR_Pending);
-        
-        if (dnrState.DNRstatus == DNR_OK) {
-            connectPB.serverIP = dnrState.DNRIPaddress;
+    } else if ((hostLen = strlen(host)) <= 255) {
+        if ((hostLen >= 6 && !strncasecmp(host + hostLen - 6, ".local", 6))
+            || (hostLen >= 7 && !strncasecmp(host + hostLen - 7, ".local.", 7))) {
+            connectPB.serverIP = MDNSResolveName(host);
+            if (connectPB.serverIP == 0)
+                return connectToServerError;
         } else {
-            return connectToServerError;
+            hostPstring[0] = strlen(host);
+            memcpy(hostPstring+1, host, hostPstring[0]);
+            TCPIPDNRNameToIP(hostPstring, &dnrState);
+            do {
+                TCPIPPoll();
+            } while (dnrState.DNRstatus == DNR_Pending);
+            
+            if (dnrState.DNRstatus == DNR_OK) {
+                connectPB.serverIP = dnrState.DNRIPaddress;
+            } else {
+                return connectToServerError;
+            }
         }
     } else {
         return connectToServerError;

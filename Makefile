@@ -89,7 +89,7 @@ CDEV_OBJ = cdev/smbcdev.a \
            rpc/rpc.a \
            rpc/ndr.a \
            rpc/srvsvc.a \
-           mdns/mdnssd.a
+           mdns/mdns.a
 
 CDEV_RSRC = \
            cdev/smbcdev.rez \
@@ -108,7 +108,7 @@ LISTSHARES_OBJ = \
 
 LISTSERVERS_OBJ = \
            commands/listservers.a \
-           mdns/mdnssd.a
+           mdns/mdns.a
 
 BINARIES = SMB.FST SMB mountsmb listshares listservers
 

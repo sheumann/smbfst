@@ -82,6 +82,8 @@ typedef struct {
 /* QCLASS value used in queries (CLASS values are also valid) */
 #define DNS_QCLASS_ANY  255
 
+#define DNS_MAX_LABEL_LEN 63
+
 #define DNS_MAX_NAME_LEN 256
 
 /* The RDATA portion of a SRV RR (RFC 2782) */

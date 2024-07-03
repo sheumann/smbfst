@@ -11,7 +11,7 @@
 #include <shell.h>
 #include "utils/endian.h"
 #include "mdns/mdnsproto.h"
-#include "mdns/mdnssd.h"
+#include "mdns/mdns.h"
 
 extern pascal int SysKeyAvail(void);
 
@@ -63,11 +63,11 @@ int main(int argc, char *argv[]) {
     if (toolerror())
         return 0;
     
-    MDNSInitQuery(smbName);
+    MDNSSDInitQuery(smbName);
 
     while (!SysKeyAvail()) {
         if (GetTick() - lastQueryTime > interval) {
-            MDNSSendQuery(ipid);
+            MDNSSDSendQuery(ipid);
             lastQueryTime = GetTick();
             if (interval < MAX_INTERVAL)
                 interval *= 2;
@@ -76,7 +76,7 @@ int main(int argc, char *argv[]) {
         TCPIPPoll();
         dgmHandle = TCPIPGetNextDatagram(ipid, protocolUDP, 0xC000);
         if (!toolerror() && dgmHandle != NULL) {
-            MDNSProcessPacket(dgmHandle, PrintServerInfo);
+            MDNSSDProcessPacket(dgmHandle, PrintServerInfo);
             DisposeHandle(dgmHandle);
         }
     }

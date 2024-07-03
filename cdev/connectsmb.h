@@ -3,6 +3,7 @@
 
 #include <types.h>
 
-unsigned ConnectToSMBServer(char *host, char *port, LongWord *connectionID);
+unsigned ConnectToSMBServer(char *host, char *port, LongWord ipAddress,
+    LongWord *connectionID);
 
 #endif

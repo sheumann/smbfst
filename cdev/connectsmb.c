@@ -23,7 +23,16 @@ static SMBConnectRec connectPB = {
     .flags = 0x00FF,
 };
 
-unsigned ConnectToSMBServer(char *host, char *port, LongWord *connectionID) {
+/*
+ * Connect to an SMB server at the specified host and port.
+ * If ipAddress is not 0, it is used; otherwise the address is resolved from the
+ * specified hostname.  On success, *connectionID is set to the connection ID.
+ *
+ * Returns an error code, or 0 on success.
+ * 
+ */
+unsigned ConnectToSMBServer(char *host, char *port, LongWord ipAddress,
+    LongWord *connectionID) {
     char *endPtr;
     cvtRec theCvtRec;
     unsigned long portNum;
@@ -31,7 +40,9 @@ unsigned ConnectToSMBServer(char *host, char *port, LongWord *connectionID) {
     static dnrBuffer dnrState;
     size_t hostLen;
 
-    if (TCPIPValidateIPCString(host)) {
+    if (ipAddress != 0) {
+        connectPB.serverIP = ipAddress;
+    } else if (TCPIPValidateIPCString(host)) {
         TCPIPConvertIPCToHex(&theCvtRec, host);
         connectPB.serverIP = theCvtRec.cvtIPAddress;
     } else if ((hostLen = strlen(host)) <= 255) {

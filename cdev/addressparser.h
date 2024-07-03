@@ -2,6 +2,7 @@
 #define ADDRESSPARSER_H
 
 #include <stdbool.h>
+#include <stdint.h>
 
 typedef struct {
     char *domain;
@@ -18,6 +19,7 @@ typedef struct {
     bool usingSavedLoginInfo;
     bool anonymous;
     unsigned char *ntlmv2Hash;
+    uint32_t knownIP;
 } AddressParts;
 
 

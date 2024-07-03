@@ -384,7 +384,7 @@ void DoConnect(void) {
                 sprintf(port, "%u", serverList[i].serverInfo->port);
 
                 addressParts.host = serverList[i].serverInfo->hostName;
-                //TODO known IP address
+                addressParts.knownIP = serverList[i].serverInfo->address;
                 addressParts.port = port;
                 addressParts.displayName =
                     p2cstr((char*)serverList[i].serverInfo->name);
@@ -408,8 +408,8 @@ void DoConnect(void) {
         goto fixcaret;
     }
 
-    errorCode =
-        ConnectToSMBServer(addressParts.host, addressParts.port, &connectionID);
+    errorCode = ConnectToSMBServer(addressParts.host, addressParts.port, 
+        addressParts.knownIP, &connectionID);
     if (errorCode) {
         DisplayError(errorCode);
         goto fixcaret;
@@ -671,7 +671,7 @@ void MountAtBoot(Handle loginInfoHndl, Handle autoMountListHndl, char *host) {
     addressParts.ntlmv2Hash = loginInfo->ntlmv2Hash;
     addressParts.usingSavedLoginInfo = true;
 
-    if (ConnectToSMBServer(host, NULL, &connectionID))
+    if (ConnectToSMBServer(host, NULL, 0, &connectionID))
         return;
 
     if (LoginToSMBServer(&addressParts, connectionID, &sessionID)) {

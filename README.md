@@ -14,6 +14,7 @@ If you are using an Uthernet or Uthernet II, please be sure to install the lates
 
 [1]: http://www.apple2.org/marinetti/
 
+
 Installation
 ------------
 To install the SMB FST:
@@ -35,9 +36,9 @@ Connecting to SMB Servers
 -------------------------
 To connect to an SMB server, open the SMB control panel. You can enter the server address in the text box or select from a list of servers detected on the local network. In some circumstances, servers may not show up in the list, but you can still connect to them by entering their address. Once you have selected a server, click __Connect__.
 
-Once you have connected to the server, you will be prompted to log in. Enter your user name and password. If your account is associated with a domain (used in enterprise Windows networks), enter it as well. When logging in to home systems, the domain can typically be left blank. If you are logging in as a guest, you may need to either enter the name "Guest" or leave the name blank, depending on the server's configuration.
+Once you have connected to a server, you will be prompted to log in. Enter your user name and password. If your account is associated with a domain (used in enterprise Windows networks), enter it as well. When logging in to home systems, the domain can typically be left blank. If you are logging in as a guest, you may need to either enter the name "Guest" or leave the name blank, depending on the server's configuration. There is an option to save your login information for the server, so that you will not need to enter it manually in the future.
 
-Once you have logged in, you will be shown a list of file shares available on the server. Select the ones you want and click __Mount__. The selected shares will be mounted as network disks on your Apple IIGS, and you will be able to access them like other disks, e.g. in the Finder and in the open or save dialogs of applications.
+Once you have logged in, you will be shown a list of file shares available on the server. Select the ones you want and click __Mount__. The selected shares will be mounted as network disks on your Apple IIGS, and you will be able to access them like other disks, e.g. in the Finder and in the open or save dialogs of applications. There is an option to mount the selected shares every time the IIGS starts up; this is only available if you have saved your login information for the server.
 
 To disconnect from a file share when you are done with it, drag it to the Trash or use the Eject command in the Finder's Disk menu.
 
@@ -45,6 +46,8 @@ To disconnect from a file share when you are done with it, drag it to the Trash 
 Server Configuration
 --------------------
 The following subsections give instructions for configuring Windows, macOS, Samba, Solaris, or illumos servers for use with the SMB FST, as well as general requirements applicable to any SMB server.
+
+These instructions only cover configuration steps that are specifically necessary to work with the SMB FST. For general instructions on configuring your computer as an SMB server, refer to the documentation for your operating system.
 
 
 ### Windows Server Configuration

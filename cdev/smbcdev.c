@@ -56,8 +56,6 @@
 // SortList/SortList2 compareProc value
 #define SORT_CASE_INSENSITIVE ((void*)0x00000001)
 
-#define memNever 0x20
-
 #define cdevWindow          1000
 
 #define serverAddressTxt    2

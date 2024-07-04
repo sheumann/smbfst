@@ -17,7 +17,7 @@ typedef struct {
 } LoginInfo;
 
 void GetSavedLoginInfo(AddressParts *addressParts);
-void SaveLoginInfo(char *host, char *domain, char *username, 
+bool SaveLoginInfo(char *host, char *domain, char *username, 
     Byte ntlmv2Hash[16], bool anonymous);
 void SaveAutoMountList(char *host, Handle listHandle);
 Long DeleteSavedInfo(char *host, bool deleteLoginInfo,

@@ -252,10 +252,12 @@ unsigned LoginToSMBServer(AddressParts *address, LongWord connectionID,
             goto done;
         }
         result = TryLogin(connectionID, sessionID, NULL);
+        
+        address->usingSavedLoginInfo = false;
 
         if (saveInfo) {
-            SaveLoginInfo(address->host, domain+1, username+1,
-                authenticatePB.ntlmv2Hash,
+            address->usingSavedLoginInfo = SaveLoginInfo(address->host,
+                domain+1, username+1, authenticatePB.ntlmv2Hash,
                 username[0] == 0 && password[0] == 0);
         } else {
             DeleteSavedInfo(address->host, true, true);

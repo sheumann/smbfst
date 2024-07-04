@@ -77,7 +77,7 @@ cleanup:
     CloseResourceFile(fileID);
 }
 
-void SaveLoginInfo(char *host, char *domain, char *username, 
+bool SaveLoginInfo(char *host, char *domain, char *username, 
     Byte ntlmv2Hash[16], bool anonymous) {
     Word fileID;
     Word depth;
@@ -85,6 +85,7 @@ void SaveLoginInfo(char *host, char *domain, char *username,
     Long rsrcID;
     size_t domainLen, usernameLen;
     LoginInfo *loginInfo;
+    bool result = false;
 
     static CreateRecGS createRec = {
         .pCount = 5,
@@ -108,7 +109,7 @@ void SaveLoginInfo(char *host, char *domain, char *username,
     // Open resource file
     fileID = OpenResourceFile(readWriteEnable, NULL, (Pointer)&configFileName);
     if (toolerror())
-        return;
+        return false;
 
     depth = SetResourceFileDepth(1);
     
@@ -149,12 +150,17 @@ void SaveLoginInfo(char *host, char *domain, char *username,
 
     SetHostName(host);
     RMSetResourceName(rSMBLoginInfo, rsrcID, nameBuf);
+    if (toolerror())
+        goto cleanup;
+    
+    result = true;
 
 cleanup:
     if (loginInfoHandle)
         DisposeHandle(loginInfoHandle);
     SetResourceFileDepth(depth);
-    CloseResourceFile(fileID); 
+    CloseResourceFile(fileID);
+    return result;
 }
 
 Long DeleteSavedInfo(char *host, bool deleteLoginInfo,

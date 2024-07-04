@@ -14,6 +14,7 @@
 #include <tcpip.h>
 #include <gsos.h>
 #include <orca.h>
+#include <misctool.h> //debug
 #include "cdev/mountsmbvol.h"
 #include "cdev/charset.h"
 #include "cdev/errorcodes.h"
@@ -109,7 +110,7 @@ static void EventHook(EventRecord *event) {
 #pragma databank 0
 
 static bool DoSharesWindow(ListEntry *list, unsigned listSize,
-    bool *mountAtStartup) {
+    bool allowMountAtStartup, bool *mountAtStartup) {
     Handle listCtlHandle;
     LongWord controlID;
 
@@ -131,6 +132,9 @@ static bool DoSharesWindow(ListEntry *list, unsigned listSize,
         listCtlHandle = (Handle)GetCtlHandleFromID(windPtr, sharesLst);
         NewList2(NULL, 1, (Ref)list, refIsPointer, listSize, listCtlHandle);
         SortList2(SORT_CASE_INSENSITIVE, listCtlHandle);
+
+        if (!allowMountAtStartup)
+            HiliteCtlByID(inactiveHilite, windPtr, mountAtStartupChk);
 
         ShowWindow(windPtr);
 
@@ -423,7 +427,8 @@ unsigned MountSMBVolumes(AddressParts *address, LongWord sessionID) {
             return result;
         }
         
-        doMount = DoSharesWindow(list, listSize, &mountAtStartup);
+        doMount = DoSharesWindow(list, listSize,
+            address->usingSavedLoginInfo, &mountAtStartup);
 
         if (doMount)
             WaitCursor();

@@ -12,7 +12,7 @@
 #include "helpers/errors.h"
 #include "helpers/closerequest.h"
 
-Word Destroy(void *pblock, void *gsosdp, Word pcount) {
+Word Destroy(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     ReadStatus result;
     DIB *dib;
     SMB2_SET_INFO_Request *setInfoReq;

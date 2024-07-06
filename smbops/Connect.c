@@ -10,7 +10,7 @@
 #include "utils/alloc.h"
 #include "systemops/Startup.h"
 
-Word SMB_Connect(SMBConnectRec *pblock, void *gsosdp, Word pcount) {
+Word SMB_Connect(SMBConnectRec *pblock, struct GSOSDP *gsosdp, Word pcount) {
     Word result;
 
     if (pblock->pCount != 7)

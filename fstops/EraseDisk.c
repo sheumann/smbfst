@@ -2,6 +2,6 @@
 #include <gsos.h>
 #include <prodos.h>
 
-Word EraseDisk(void *pblock, void *gsosdp, Word pcount) {
+Word EraseDisk(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     return invalidFSTop;
 }

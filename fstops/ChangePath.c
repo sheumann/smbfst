@@ -12,7 +12,7 @@
 #include "helpers/errors.h"
 #include "helpers/closerequest.h"
 
-Word ChangePath(void *pblock, void *gsosdp, Word pcount) {
+Word ChangePath(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     ReadStatus result;
     DIB *dib1, *dib2;
     SMB2_FILEID fileID;

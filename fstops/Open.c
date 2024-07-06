@@ -57,7 +57,7 @@ void SetOpenAccess(Word access, bool p16Sharing) {
     }
 }
 
-Word Open(void *pblock, void *gsosdp, Word pcount) {
+Word Open(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     static Word requestAccess[ACCESS_TYPE_COUNT];
     int i;
     Word result;

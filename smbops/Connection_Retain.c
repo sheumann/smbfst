@@ -4,7 +4,8 @@
 #include "smb2/connection.h"
 #include "fst/fstspecific.h"
 
-Word SMB_Connection_Retain(SMBConnectionRec *pblock, void *gsosdp, Word pcount) {
+Word SMB_Connection_Retain(SMBConnectionRec *pblock, struct GSOSDP *gsosdp,
+    Word pcount) {
     if (pblock->pCount != 3)
         return invalidPcount;
 

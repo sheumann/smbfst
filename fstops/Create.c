@@ -33,7 +33,7 @@
  * We generally try to match this behavior.
  */
 
-Word Create(void *pblock, void *gsosdp, Word pcount) {
+Word Create(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     Word result;
     DIB *dib;
     static SMB2_FILEID fileID;

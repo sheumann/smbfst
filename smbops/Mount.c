@@ -13,7 +13,7 @@
 
 static uint32_t treeConnectCounter = 0;
 
-Word SMB_Mount(SMBMountRec *pblock, void *gsosdp, Word pcount) {
+Word SMB_Mount(SMBMountRec *pblock, struct GSOSDP *gsosdp, Word pcount) {
     unsigned dibIndex;
     Session *session = (Session*)pblock->sessionID;
     Word errCode;

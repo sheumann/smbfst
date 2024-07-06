@@ -24,7 +24,8 @@
  *  pblock->password may be null if this is set on input.
  * AUTH_FLAG_ANONYMOUS - Anonymous connection (blank username & password).
  */
-Word SMB_Authenticate(SMBAuthenticateRec *pblock, void *gsosdp, Word pcount) {
+Word SMB_Authenticate(SMBAuthenticateRec *pblock, struct GSOSDP *gsosdp,
+    Word pcount) {
     Connection *connection = (Connection *)pblock->connectionID;
     Session *session;
     Word result;

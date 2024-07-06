@@ -13,6 +13,9 @@ typedef union {
 
 static TimeUnion timeUnion;
 
+// Seconds from 1 Jan 1904 (ConvSeconds base) to 13 Nov 1969 (ORCA/C (time_t)0)
+#define CONVSECONDS_TIME_OFFSET 2078611200ul
+
 // TODO Rework these functions to work over the whole range of GS/OS TimeRec
 //      (i.e. avoid dependency on 32-bit time_t).
 
@@ -33,17 +36,23 @@ TimeRec GetGSTime(uint64_t filetime, Session *session) {
 
     // Convert to time_t format
     time = (filetime - TIME_T_0) / 10000000;
-    
-    // Convert to struct tm
-    tm = localtime(&time);
-    
-    timeRec.weekDay = tm->tm_wday + 1;
-    timeRec.month = tm->tm_mon;
-    timeRec.day = tm->tm_mday - 1;
-    timeRec.year = tm->tm_year;
-    timeRec.hour = tm->tm_hour;
-    timeRec.minute = tm->tm_min;
-    timeRec.second = tm->tm_sec;
+
+    // Use ConvSeconds if possible, because it is faster than localtime.
+    if (time <= 0xFFFFFFFF - CONVSECONDS_TIME_OFFSET) {
+        ConvSeconds(secs2TimeRec, time + CONVSECONDS_TIME_OFFSET,
+            (Pointer)&timeRec);
+    } else {    
+        // Convert to struct tm
+        tm = localtime(&time);
+        
+        timeRec.weekDay = tm->tm_wday + 1;
+        timeRec.month = tm->tm_mon;
+        timeRec.day = tm->tm_mday - 1;
+        timeRec.year = tm->tm_year;
+        timeRec.hour = tm->tm_hour;
+        timeRec.minute = tm->tm_min;
+        timeRec.second = tm->tm_sec;
+    }
     
     return timeRec;
 }

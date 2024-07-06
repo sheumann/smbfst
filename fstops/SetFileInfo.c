@@ -15,7 +15,7 @@
 #include "helpers/errors.h"
 #include "helpers/closerequest.h"
 
-Word SetFileInfo(void *pblock, void *gsosdp, Word pcount) {
+Word SetFileInfo(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     ReadStatus result;
     DIB *dib;
     static SMB2_FILEID fileID, infoFileID;
@@ -312,7 +312,7 @@ set_info:
         if (pcount != 3) {
             afpInfo.prodosAuxType = fileType.auxType;
         } else {
-            originalFileType = GetFileType(gsosdp, &afpInfo,
+            originalFileType = GetFileType(gsosdp->path1Ptr, &afpInfo,
                 (bool)(attributes & FILE_ATTRIBUTE_DIRECTORY));
             fileType.auxType = originalFileType.auxType;
         }

@@ -17,6 +17,7 @@ Word ClearBackupBit(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     DIB *dib;
     SMB2_FILEID fileID;
     uint32_t attributes;
+    Word retval = 0;
 
     dib = GetDIB(gsosdp, 1);
     if (dib == NULL)
@@ -79,14 +80,14 @@ Word ClearBackupBit(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     result = SendRequestAndGetResponse(dib, SMB2_SET_INFO,
         sizeof(setInfoRequest) + sizeof(FILE_BASIC_INFORMATION));
     if (result != rsDone)
-        return ConvertError(result);
+        retval = ConvertError(result);
 
     /*
      * Close file
      */
     result = SendCloseRequestAndGetResponse(dib, &fileID);
     if (result != rsDone)
-        return ConvertError(result);
+        return retval ? retval : ConvertError(result);
 
-    return 0;
+    return retval;
 }

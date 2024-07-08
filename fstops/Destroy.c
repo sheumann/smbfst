@@ -11,6 +11,7 @@
 #include "helpers/path.h"
 #include "helpers/errors.h"
 #include "helpers/closerequest.h"
+#include "fst/fstdata.h"
 
 Word Destroy(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     ReadStatus result;
@@ -89,7 +90,10 @@ Word Destroy(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     result = GetResponse(dib, setInfoMsgNum);
     if (result != rsDone && retval == 0)
         retval = ConvertError(result);
-    
+
+    if (!retval)
+        volChangedDevNum = dib->DIBDevNum;
+
     result = GetResponse(dib, closeMsgNum);
     if (result != rsDone && retval == 0)
         retval = ConvertError(result);

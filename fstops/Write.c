@@ -6,6 +6,7 @@
 #include "gsos/gsosdata.h"
 #include "driver/driver.h"
 #include "helpers/errors.h"
+#include "fst/fstdata.h"
 
 Word Write(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     Word result;
@@ -61,7 +62,9 @@ Word Write(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
             sizeof(writeRequest) + transferCount);
         if (result != rsDone)
             break;
-        
+
+        volChangedDevNum = dibs[i].DIBDevNum;
+
         if (writeResponse.Count == 0 || writeResponse.Count > transferCount)
             return networkError;
         

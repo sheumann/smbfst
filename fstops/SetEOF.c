@@ -8,6 +8,7 @@
 #include "driver/driver.h"
 #include "helpers/position.h"
 #include "helpers/errors.h"
+#include "fst/fstdata.h"
 
 Word SetEOF(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     Word result;
@@ -68,6 +69,8 @@ Word SetEOF(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
         sizeof(setInfoRequest) + setInfoRequest.BufferLength);
     if (result != rsDone)
         return ConvertError(result);
+
+    volChangedDevNum = dibs[i].DIBDevNum;
 
     fcr->eof = eof;
 

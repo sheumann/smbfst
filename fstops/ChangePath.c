@@ -11,6 +11,7 @@
 #include "helpers/path.h"
 #include "helpers/errors.h"
 #include "helpers/closerequest.h"
+#include "fst/fstdata.h"
 
 Word ChangePath(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     ReadStatus result;
@@ -100,6 +101,9 @@ Word ChangePath(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
         sizeof(setInfoRequest) + setInfoRequest.BufferLength);
     if (result != rsDone)
         retval = ConvertError(result);
+
+    if (!retval)
+        volChangedDevNum = dib1->DIBDevNum;
 
 close:
     /*

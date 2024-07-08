@@ -12,6 +12,7 @@ CRYPTO_SRC = \
 HEADERS =  *.h */*.h
 
 FST_OBJ =  fst/smbfst.A \
+           fst/fstdata.a \
            smb2/connection.a \
            smb2/session.a \
            smb2/smb2.a \

@@ -17,6 +17,7 @@
 #include "helpers/errors.h"
 #include "helpers/createcontext.h"
 #include "helpers/closerequest.h"
+#include "fst/fstdata.h"
 
 #define extendExistingFile 0x8005
 
@@ -187,6 +188,8 @@ Word Create(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
                 retval = pathNotFound;
             return retval;
         }
+
+        volChangedDevNum = dib->DIBDevNum;
         
         fileID = createResponse.FileId;
     }
@@ -210,7 +213,6 @@ Word Create(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
         } else {
             createRequest.CreateDisposition = FILE_CREATE;
         }
-        
         
         createRequest.CreateOptions = FILE_NON_DIRECTORY_FILE;
         createRequest.FileAttributes = initialAttributes;
@@ -264,6 +266,9 @@ Word Create(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
                 retval = ConvertError(result);
             }
         }
+
+        if (!retval)
+            volChangedDevNum = dib->DIBDevNum;
 
         result = GetResponse(dib, closeMsgNum);
         if (result != rsDone && retval == 0)

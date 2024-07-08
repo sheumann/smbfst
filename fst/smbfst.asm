@@ -82,6 +82,9 @@ maxRegularCall equ $25                  ; max call we handle, except FSTSpecific
 FSTSpecificCall equ $33                 ; FSTSpecific call number (low byte)
 pblock  equ     $32                     ; pblock ptr (on GS/OS direct page)
 SYS_EXIT equ    $01fc40                 ; SYS_EXIT system service call
+NOTIFY_VOLUME_CHANGE equ $40            ; GS/OS event code
+POST_OS_EVENT equ $01FCC4               ; system service call
+callNumber equ  $30                     ; GS/OS call number (GS/OS dp location)
         
         phk                             ; set databank (no need to save/restore)
         plb
@@ -122,6 +125,21 @@ push_params anop
         pei     pblock
 
 thecall jsl     >000000                 ; modified above
+
+        ldx     volChangedDevNum
+        beq     return
+        stz     volChangedDevNum
+        pha
+        
+        pei     callNumber              ; A = call number
+        phx                             ; X = device number
+        phy                             ; Y = undefined
+        
+        lda     #NOTIFY_VOLUME_CHANGE
+        ldx     #^NOTIFY_VOLUME_CHANGE
+        jsl     POST_OS_EVENT
+        
+        pla
 
 return  cmp     #1                      ; set/clear carry based on result
         jml     >SYS_EXIT               ; return via SYS_EXIT

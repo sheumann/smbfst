@@ -11,6 +11,7 @@
 #include "helpers/path.h"
 #include "helpers/errors.h"
 #include "helpers/closerequest.h"
+#include "fst/fstdata.h"
 
 Word ClearBackupBit(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     ReadStatus result;
@@ -81,6 +82,9 @@ Word ClearBackupBit(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
         sizeof(setInfoRequest) + sizeof(FILE_BASIC_INFORMATION));
     if (result != rsDone)
         retval = ConvertError(result);
+
+    if (!retval)
+        volChangedDevNum = dib->DIBDevNum;
 
     /*
      * Close file

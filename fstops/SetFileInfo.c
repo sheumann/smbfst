@@ -14,6 +14,7 @@
 #include "helpers/datetime.h"
 #include "helpers/errors.h"
 #include "helpers/closerequest.h"
+#include "fst/fstdata.h"
 
 Word SetFileInfo(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     ReadStatus result;
@@ -166,6 +167,9 @@ Word SetFileInfo(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
             result = SendRequestAndGetResponse(dib, SMB2_SET_INFO,
                 sizeof(setInfoRequest) + sizeof(FILE_BASIC_INFORMATION));
             // ignore errors here
+
+            if (result == rsDone)
+                volChangedDevNum = dib->DIBDevNum;
 
             forcedWritable = true;
         }
@@ -370,6 +374,9 @@ set_info:
                 sizeof(writeRequest) + sizeof(AFPInfo));
             if (result != rsDone)
                 retval = ConvertError(result);
+
+            if (!retval)
+                volChangedDevNum = dib->DIBDevNum;
         }
 
 close_afp_info:
@@ -415,6 +422,9 @@ finish:
             sizeof(setInfoRequest) + sizeof(FILE_BASIC_INFORMATION));
         if (result != rsDone)
             retval = retval ? retval : ConvertError(result);
+
+        if (!retval)
+            volChangedDevNum = dib->DIBDevNum;
     }
 
     /*

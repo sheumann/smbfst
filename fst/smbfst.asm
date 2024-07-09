@@ -190,8 +190,8 @@ gsos_calls anop
         dc      i1'1',a3'Destroy'       ; $2002 Destroy
         dc      i4'0'
         dc      i1'3',a3'ChangePath'    ; $2004 ChangePath ^
-        dc      i1'12',a3'SetFileInfo'  ; $2005 SetFilelnfo
-        dc      i1'12',a3'GetFileInfo'  ; $2006 GetFilelnfo
+        dc      i1'12',a3'SetFileInfo'  ; $2005 SetFileInfo
+        dc      i1'12',a3'GetFileInfo'  ; $2006 GetFileInfo
         dc      i1'6',a3'JudgeName'     ; $2007 JudgeName ^
         dc      i1'8',a3'Volume'        ; $2008 Volume ^
         dc      i4'0'

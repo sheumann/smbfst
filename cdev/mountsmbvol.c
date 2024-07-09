@@ -274,6 +274,15 @@ static unsigned BuildShareList(const ShareInfoRec *infoRec,
                     infoRec->shares[i].shareName->len - 2] == '$')
                 continue;
 
+            /*
+             * Skip print$ share, if present.
+             * Windows 7 (at least) shares print drivers here.
+             */
+            if (infoRec->shares[i].shareName->len == 7
+                && memcmp(infoRec->shares[i].shareName->str, u"print$",
+                    7 * sizeof(char16_t)) == 0)
+                continue;
+
             entry->memPtr = UTF16ToMacRoman(infoRec->shares[i].shareName->len,
                 infoRec->shares[i].shareName->str);
             if (entry->memPtr == NULL)

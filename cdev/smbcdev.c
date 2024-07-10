@@ -53,6 +53,13 @@
 
 #define DESIRED_MARINETTI_VERSION 0x03006011 /* 3.0b11 */
 
+#define DESIRED_UTHERNET_LL_VERSION  0x1050000
+#define DESIRED_UTHERNET2_LL_VERSION 0x2050000
+
+// Marinetti link layer IDs
+#define conUthernet  0x000A
+#define conUthernet2 0x000E
+
 // SortList/SortList2 compareProc value
 #define SORT_CASE_INSENSITIVE ((void*)0x00000001)
 
@@ -478,6 +485,23 @@ void DoHit(Long ctlID, CtlRecHndl ctlHandle) {
     }
 }
 
+static void CheckLinkLayerVersion(void) {
+    static bool reportedOldLinkLayer = false;
+    static linkInfoBlk linkInfo;
+
+    if (!reportedOldLinkLayer) {
+        TCPIPGetLinkLayer(&linkInfo);
+        
+        if ((linkInfo.liMethodID == conUthernet
+                && linkInfo.liVersion < DESIRED_UTHERNET_LL_VERSION)
+            || (linkInfo.liMethodID == conUthernet2)
+                && linkInfo.liVersion < DESIRED_UTHERNET2_LL_VERSION) {
+            reportedOldLinkLayer = true;
+            DisplayError(linkLayerVersionWarning);
+        }       
+    }
+}
+
 long DoMachine(void) {
     unsigned int i;
 
@@ -502,6 +526,8 @@ long DoMachine(void) {
     if (TCPIPLongVersion() < DESIRED_MARINETTI_VERSION) {
         DisplayError(marinettiVersionWarning);
     }
+    
+    CheckLinkLayerVersion();
     
     return 1;
 }
@@ -641,6 +667,7 @@ void DoRun(void) {
         StartMDNS();
         HideGoOnlineControls();
         networkUp = false;
+        CheckLinkLayerVersion();
     }
     
     if (networkDown) {

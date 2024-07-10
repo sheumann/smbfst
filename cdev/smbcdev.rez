@@ -342,3 +342,15 @@ resource rAlertString (marinettiVersionWarning) {
     ":^#6\$00"
 };
 
+resource rAlertString (linkLayerVersionWarning) {
+    "94:"
+    "You are using an outdated version of the Uthernet or Uthernet II "
+    "link layer for Marinetti. "
+    "With your current link layer version, the SMB Control Panel will "
+    "not be able to list SMB servers on the local network. "
+    "To enable the full functionality of the SMB Control Panel, "
+    "please upgrade to the latest version of the link layer, "
+    "available from speccie.uk."
+    ":^#6\$00"
+};
+

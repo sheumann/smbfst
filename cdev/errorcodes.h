@@ -13,5 +13,6 @@
 #define savedLoginError             4010
 
 #define marinettiVersionWarning     4100
+#define linkLayerVersionWarning     4101
 
 #define canceled                    5000

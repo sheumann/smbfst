@@ -10,9 +10,10 @@ System Requirements
 * [Marinetti][1] 3.0b11 or later
 * A Marinetti-compatible network interface (such as an Ethernet card)
 
-If you are using an Uthernet or Uthernet II, please be sure to install the latest version of their Marinetti link layers.
+If you are using an Uthernet or Uthernet II, please be sure to install the latest version of their Marinetti link layers, available [here][2].
 
 [1]: http://www.apple2.org/marinetti/
+[2]: https://speccie.uk/software/marinetti-link-layers/
 
 
 Installation
@@ -91,7 +92,7 @@ In order to properly support IIGS-style file types and resource forks, it is str
     vfs objects = catia fruit streams_xattr
     fruit:encoding = native
 
-If you are configuring Samba via a management interface (e.g. on a NAS) rather than by editing `smb.conf` directly, use of the `vfs_fruit` module may be controlled by a Mac compatibility setting.
+On some Linux distros, you may need to install a package such as `samba-vfs-modules` to provide the `vfs_fruit` module. If you are configuring Samba via a management interface (e.g. on a NAS) rather than by editing `smb.conf` directly, use of the `vfs_fruit` module may be controlled by a Mac compatibility setting.
 
 In order for Samba servers to be listed in the SMB control panel, the server system must be running an mDNS responder such as Avahi. This is installed by default in many Linux distributions, but on some systems you may need to install it yourself. (You can still connect to Samba servers by entering their address in the SMB control panel, even if they do not have an mDNS responder.)
 
@@ -100,9 +101,9 @@ In order for Samba servers to be listed in the SMB control panel, the server sys
 
 The Solaris or illumos SMB servers should typically work without requiring configuration changes.
 
-By default, Solaris or illumos SMB servers do not advertise themselves using mDNS-SD, so they will not be listed in the SMB control panel. You can still connect to them by entering their addresses, but if you want them to show up in the list, you can follow the steps described [here][2].
+By default, Solaris or illumos SMB servers do not advertise themselves using mDNS-SD, so they will not be listed in the SMB control panel. You can still connect to them by entering their addresses, but if you want them to show up in the list, you can follow the steps described [here][3].
 
-[2]: https://www.tumfatig.net/2023/smb-shares-using-omnios-zones-and-zfs/#announce-the-smb-service
+[3]: https://www.tumfatig.net/2023/smb-shares-using-omnios-zones-and-zfs/#announce-the-smb-service
 
 
 ### General Server Requirements

@@ -16,10 +16,11 @@ static IORecGS ioRec = {
 };
 
 /*
- * We should be able to use MustRecvFragSize bytes (i.e. 1432), but Samba
- * seems to want at least 2048, so we go with that.
+ * We should be able to use MustRecvFragSize bytes (i.e. 1432), but recent
+ * Samba versions want at least 2048 and older Samba versions want 4280
+ * (matching Windows), so we go with 4280 for compatibility.
  */
-char ioBuf[2048];
+char ioBuf[4280];
 
 bool ConnectRPC(RPCConnection *conn, char *name) {
     static GSString32 gsName;

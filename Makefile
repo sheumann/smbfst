@@ -62,6 +62,7 @@ FST_OBJ =  fst/smbfst.A \
            helpers/datetime.a \
            helpers/errors.a \
            helpers/filetype.a \
+           helpers/fsattributes.a \
            helpers/path.a \
            helpers/position.a \
            utils/alloc.a \

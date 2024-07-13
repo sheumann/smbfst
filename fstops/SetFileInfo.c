@@ -14,6 +14,7 @@
 #include "helpers/datetime.h"
 #include "helpers/errors.h"
 #include "helpers/closerequest.h"
+#include "helpers/fsattributes.h"
 #include "fst/fstdata.h"
 
 Word SetFileInfo(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
@@ -229,14 +230,17 @@ Word SetFileInfo(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
              * If we get STATUS_OBJECT_NAME_INVALID for the AFP info (after
              * successfully accessing the main stream with the same base name),
              * this presumably means that the filesystem does not support
-             * named streams.  We will not report this as an error, because
+             * named streams.  STATUS_OBJECT_NAME_NOT_FOUND may also mean that.
+             * We will not report an error in these cases, because
              * if we did it would prevent us from setting file info on such
              * filesystems at all.  This way, we can at least set attributes
              * and dates, although the filetype and Finder Info will not be
              * set correctly.
              */
-            if (result == rsFailed
-                && msg.smb2Header.Status == STATUS_OBJECT_NAME_INVALID)
+            if (result == rsFailed &&
+                (msg.smb2Header.Status == STATUS_OBJECT_NAME_INVALID
+                || (msg.smb2Header.Status == STATUS_OBJECT_NAME_NOT_FOUND
+                    && !(GetFSAttributes(dib, &fileID) & FILE_NAMED_STREAMS))))
                 goto finish;
         }
         if (result != rsDone) {

@@ -66,6 +66,7 @@ Word ConvertError(ReadStatus rs) {
         case STATUS_ILLEGAL_CHARACTER:
         case STATUS_UNMAPPABLE_CHARACTER:
         case STATUS_UNDEFINED_CHARACTER:
+        case STATUS_OBJECT_NAME_INVALID:
             return badPathSyntax;
 
         case STATUS_TOO_MANY_OPENED_FILES:

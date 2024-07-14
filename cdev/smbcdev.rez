@@ -297,6 +297,12 @@ resource rAlertString (noServerNameError) {
     ":^#0\$00"
 };
 
+resource rAlertString (badPortNumberError) {
+    "22:"
+    "The specified port number is invalid."
+    ":^#0\$00"
+};
+
 resource rAlertString (connectTCPIPError) {
     "32:"
     "Marinetti could not connect to the network."

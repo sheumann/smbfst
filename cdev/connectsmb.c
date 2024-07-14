@@ -60,7 +60,6 @@ unsigned ConnectToSMBServer(char *host, char *port, LongWord ipAddress,
         errno = 0;
         portNum = strtoul(port, &endPtr, 10);
         if (errno != 0 || *endPtr != '\0' || portNum > 0xFFFF) {
-            // TODO report error
             return badPortNumberError;
         }
         connectPB.serverPort = portNum;

@@ -56,6 +56,23 @@ unsigned ConnectToSMBServer(char *host, char *port, LongWord ipAddress,
     static dnrBuffer dnrState;
     size_t hostLen;
 
+    if (port) {
+        errno = 0;
+        portNum = strtoul(port, &endPtr, 10);
+        if (errno != 0 || *endPtr != '\0' || portNum > 0xFFFF) {
+            // TODO report error
+            return badPortNumberError;
+        }
+        connectPB.serverPort = portNum;
+    } else {
+        connectPB.serverPort = SMB_PORT;
+    }
+
+    TCPIPConnect(NULL);
+    if (toolerror() && toolerror() != terrCONNECTED) {
+        return connectTCPIPError;
+    }
+
     if (ipAddress != 0) {
         connectPB.serverIP = ipAddress;
     } else if (TCPIPValidateIPCString(host)) {
@@ -83,23 +100,6 @@ unsigned ConnectToSMBServer(char *host, char *port, LongWord ipAddress,
         }
     } else {
         return connectToServerError;
-    }
-
-    if (port) {
-        errno = 0;
-        portNum = strtoul(port, &endPtr, 10);
-        if (errno != 0 || *endPtr != '\0' || portNum > 0xFFFF) {
-            // TODO report error
-            return badPortNumberError;
-        }
-        connectPB.serverPort = portNum;
-    } else {
-        connectPB.serverPort = SMB_PORT;
-    }
-    
-    TCPIPConnect(NULL);
-    if (toolerror() && toolerror() != terrCONNECTED) {
-        return connectTCPIPError;
     }
 
     FSTSpecific(&connectPB);

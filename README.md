@@ -43,6 +43,8 @@ Once you have logged in, you will be shown a list of file shares available on th
 
 To disconnect from a file share when you are done with it, drag it to the Trash or use the Eject command in the Finder's Disk menu.
 
+If you want to reset the SMB FST to its default configuration, delete the `*:System:Preferences:SMB.Config` file. This will remove any saved login information and any settings for mounting shares at startup.
+
 
 Server Configuration
 --------------------

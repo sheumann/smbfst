@@ -33,7 +33,7 @@ fstheader start
         dc      i4'0'                   ; reserved
         dc      i1'3',c'SMB'            ; FST name (p-string)
 ;                                       ; FST info string (shown in text boot)
-        dc      i1'35',c'SMB FST               v01.00 beta 2'
+        dc      i1'35',c'SMB FST               v01.00 beta 3'
         dc      i2'0'
 ;                                       ; credits for FST
         dc      i1'26',c'SMB FST by Stephen Heumann'

@@ -27,6 +27,7 @@
 #include "systemops/Startup.h"
 #include "utils/random.h"
 #include "utils/finderstate.h"
+#include "utils/buffersize.h"
 #include "smb2/smb2.h"
 
 extern pascal void SystemUserID (unsigned, char *);
@@ -144,6 +145,11 @@ static void Startup2(void) {
          */
         LoadOneTool(54, 0x0200);
         if (toolerror()) {
+            marinettiStatus = tcpipLoadError;
+            return;
+        }
+        
+        if (!InitBufferSize()) {
             marinettiStatus = tcpipLoadError;
             return;
         }

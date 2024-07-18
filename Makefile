@@ -80,6 +80,7 @@ FST_OBJ =  fst/smbfst.A \
            helpers/path.a \
            helpers/position.a \
            utils/alloc.a \
+           utils/buffersize.a \
            utils/charsetutils.a \
            utils/finderstate.a \
            utils/guidutils.a \

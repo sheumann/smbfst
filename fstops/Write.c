@@ -23,6 +23,7 @@
 #include "driver/driver.h"
 #include "helpers/errors.h"
 #include "fst/fstdata.h"
+#include "utils/buffersize.h"
 
 Word Write(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     Word result;
@@ -32,6 +33,7 @@ Word Write(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     unsigned char *buf;
     uint32_t remainingCount;
     uint16_t transferCount;
+    uint16_t blockSize;
 
     if (pcount != 0)
         pblock = &(((IORecGS*)pblock)->refNum);
@@ -55,9 +57,13 @@ Word Write(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     // TODO should we send a zero-length write request in this case?
     if (remainingCount == 0)
         return 0;
-    
+
+    blockSize = GetBufferSize(min(remainingCount, IO_BUFFER_SIZE));
+    if (blockSize == 0)
+        return outOfMem;
+
     do {
-        transferCount = min(remainingCount, IO_BUFFER_SIZE);
+        transferCount = min(remainingCount, blockSize);
         writeRequest.DataOffset =
             sizeof(SMB2Header) + offsetof(SMB2_WRITE_Request, Buffer);
         writeRequest.Length = transferCount;

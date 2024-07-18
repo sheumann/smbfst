@@ -22,6 +22,7 @@
 #include "gsos/gsosdata.h"
 #include "driver/driver.h"
 #include "helpers/errors.h"
+#include "utils/buffersize.h"
 
 Word Read(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     Word result;
@@ -33,6 +34,7 @@ Word Read(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     uint16_t transferCount;
     unsigned char *newlineList;
     Word retval;
+    uint16_t blockSize;
 
     if (pcount != 0)
         pblock = &(((IORecGS*)pblock)->refNum);
@@ -55,9 +57,13 @@ Word Read(void *pblock, struct GSOSDP *gsosdp, Word pcount) {
     
     if (remainingCount == 0)
         return 0;
-    
+
+    blockSize = GetBufferSize(min(remainingCount, IO_BUFFER_SIZE));
+    if (blockSize == 0)
+        return outOfMem;
+
     do {
-        transferCount = min(remainingCount, IO_BUFFER_SIZE);
+        transferCount = min(remainingCount, blockSize);
         readRequest.Padding =
             sizeof(SMB2Header) + offsetof(SMB2_READ_Response, Buffer);
         readRequest.Flags = 0;

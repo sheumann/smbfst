@@ -42,6 +42,7 @@ Word ConvertError(ReadStatus rs) {
         case STATUS_CANNOT_DELETE:
         case STATUS_DIRECTORY_NOT_EMPTY:
         case STATUS_QUOTA_EXCEEDED:
+        case STATUS_STOPPED_ON_SYMLINK:
             return invalidAccess;
 
         case STATUS_SHARING_VIOLATION:

@@ -18,7 +18,7 @@
 #include "cdev/errorcodes.h"
 
 resource rVersion (1) {
-    { 1,0,0,beta,3 },
+    { 1,0,0,release,0 },
     verUS,
     "SMB",
     "By Stephen Heumann"
@@ -43,7 +43,7 @@ resource rCDEVFlags (1) {
     {0, 0, 160, 320},           /* rectangle */
     "SMB",                      /* name */
     "Stephen Heumann",          /* author */
-    "v1.0b3"                    /* version string */
+    "v1.0"                      /* version string */
 };
 
 read rCDevCode (0x1,convert,locked) "SMBCDev.bin";

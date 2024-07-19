@@ -4,16 +4,24 @@ By Stephen Heumann
 
 The SMB FST allows an Apple IIGS to access file servers using the SMB protocol.
 
+__To download the latest version of the SMB FST, visit the [releases page][1].__
+
+__The SMB FST is free and open source, but [contributions][2] to support this project are welcome.__
+
+[1]: https://github.com/sheumann/smbfst/releases
+[2]: https://github.com/sponsors/sheumann?frequency=one-time
+
+
 System Requirements
 -------------------
 * An Apple IIGS with System 6.0.1 or later
-* [Marinetti][1] 3.0b11 or later
+* [Marinetti][3] 3.0b11 or later
 * A Marinetti-compatible network interface (such as an Ethernet card)
 
-If you are using an Uthernet or Uthernet II, please be sure to install the latest version of their Marinetti link layers, available [here][2].
+If you are using an Uthernet or Uthernet II, please be sure to install the latest version of their Marinetti link layers, available [here][4].
 
-[1]: http://www.apple2.org/marinetti/
-[2]: https://speccie.uk/software/marinetti-link-layers/
+[3]: http://www.apple2.org/marinetti/
+[4]: https://speccie.uk/software/marinetti-link-layers/
 
 
 Installation
@@ -103,9 +111,9 @@ In order for Samba servers to be listed in the SMB control panel, the server sys
 
 The Solaris or illumos SMB servers should typically work without requiring configuration changes.
 
-By default, Solaris or illumos SMB servers do not advertise themselves using mDNS-SD, so they will not be listed in the SMB control panel. You can still connect to them by entering their addresses, but if you want them to show up in the list, you can follow the steps described [here][3].
+By default, Solaris or illumos SMB servers do not advertise themselves using mDNS-SD, so they will not be listed in the SMB control panel. You can still connect to them by entering their addresses, but if you want them to show up in the list, you can follow the steps described [here][5].
 
-[3]: https://www.tumfatig.net/2023/smb-shares-using-omnios-zones-and-zfs/#announce-the-smb-service
+[5]: https://www.tumfatig.net/2023/smb-shares-using-omnios-zones-and-zfs/#announce-the-smb-service
 
 
 ### General Server Requirements

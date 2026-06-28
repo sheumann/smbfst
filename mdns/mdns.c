@@ -443,7 +443,7 @@ void MDNSSendQuery(Word ipid, void *query, size_t len) {
 static unsigned char * DNSEncodeName(unsigned char *buf, const char *name) {
     size_t componentLen;
     unsigned remainingLen;
-    char *dotPtr;
+    const char *dotPtr;
 
     remainingLen = DNS_MAX_NAME_LEN;
 
